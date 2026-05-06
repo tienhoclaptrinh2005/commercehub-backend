@@ -1,0 +1,21 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5678/commercehub_db
+    username: postgres
+    password: 123
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+jwt:
+  secret: "DayLaMotDoanMaBaoMatRatDaiVaKhoDoanDungDeKyTokenCommerceHub123456"
+  expiration: 86400000 # Thời gian sống của Access Token 1 ngày = 86400000 ms
+  refreshExpiration: 604800000 # Thời gian sống của Refresh Token7 ngày = 604800000 ms
