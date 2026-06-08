@@ -2,7 +2,7 @@ package com.commercehub.backend.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -38,25 +38,64 @@ public class User {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
+    @Builder.Default
     @Column(nullable = false, length = 30)
-    private String status;
+    private String status = "ACTIVE";
 
+    @Column(name = "ban_reason", columnDefinition = "TEXT")
+    private String banReason;
+
+    @Column(name = "last_active_at", nullable = false)
+    private OffsetDateTime lastActiveAt;
+
+    // lk bảng level_configs
+    @Builder.Default
+    @Column(name = "user_level", nullable = false)
+    private Integer userLevel = 1;
+
+    @Builder.Default
+    @Column(name = "accumulated_spent", nullable = false)
+    private BigDecimal accumulatedSpent = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "accumulated_earned", nullable = false)
+    private BigDecimal accumulatedEarned = BigDecimal.ZERO;
+
+    @Builder.Default
     @Column(name = "is_email_verified", nullable = false)
-    private Boolean isEmailVerified;
+    private Boolean isEmailVerified = false;
 
-    @Column(name = "last_login_at")
-    private OffsetDateTime lastLoginAt;
+    @Builder.Default
+    @Column(name = "is_phone_verified", nullable = false)
+    private Boolean isPhoneVerified = false;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at", insertable = false, updatable = false)
+    @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
-    @Column(name = "deleted_at")
-    private OffsetDateTime deletedAt;
-
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    //qh Many-to-Many với bảng Roles
     @Builder.Default
-    private Set<UserRole> userRoles = new HashSet<>();
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles = new HashSet<>();
+
+    @PrePersist
+    protected void onCreate() {
+        OffsetDateTime now = OffsetDateTime.now();
+
+        createdAt = now;
+        updatedAt = now;
+        lastActiveAt = now;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = OffsetDateTime.now();
+    }
 }

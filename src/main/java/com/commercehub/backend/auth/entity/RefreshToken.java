@@ -3,7 +3,6 @@ package com.commercehub.backend.auth.entity;
 import com.commercehub.backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.OffsetDateTime;
 
 @Entity
@@ -23,20 +22,27 @@ public class RefreshToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, unique = true, length = 500)
+    @Column(nullable = false, unique = true, columnDefinition = "TEXT")
     private String token;
 
-    @Builder.Default
-    @Column(name = "token_type", nullable = false, length = 30)
-    private String tokenType = "REFRESH";
+    @Column(name = "device_id")
+    private String deviceId;
+
+    @Column(name = "ip_address", length = 45)
+    private String ipAddress;
 
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
 
-    @Builder.Default
     @Column(nullable = false)
     private Boolean revoked = false;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = OffsetDateTime.now();
+        if (revoked == null) revoked = false;
+    }
 }

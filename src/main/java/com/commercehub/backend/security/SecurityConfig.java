@@ -20,8 +20,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
-    // Cấu hình thuật toán mã hóa mật khẩu (Bcrypt)
+
+    // mã hóa password
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -29,22 +32,27 @@ public class SecurityConfig {
 
     // Cung cấp AuthenticationManager cho AuthService gọi
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
     }
 
     // Cấu hình luồng bảo mật
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable) // Tắt CSRF vì hệ thống dùng JWT
+                .exceptionHandling(exc ->
+                        exc.authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                                .accessDeniedHandler(jwtAccessDeniedHandler)
+                )
+
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Không dùng session
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll() // Mở khóa cho mọi API bắt đầu bằng /api/v1/auth
                         .anyRequest().authenticated() // Mọi request khác đều phải có token hợp lệ
                 );
 
-        // Chèn Filter kiểm tra JWT của chúng ta vào trước Filter mặc định của Spring
+        // Chèn Filter kiểm tra JWT  vào trước Filter mặc định của Spring
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

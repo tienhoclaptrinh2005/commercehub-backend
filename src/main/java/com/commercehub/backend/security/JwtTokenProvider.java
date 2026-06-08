@@ -18,7 +18,10 @@ public class JwtTokenProvider {
     private String jwtSecret;
 
     @Value("${jwt.expiration}")
-    private int jwtExpirationInMs;
+    private long jwtExpirationInMs;
+
+    @Value("${jwt.refreshExpiration}")
+    private long jwtRefreshExpirationInMs;
 
     // Tạo key mã hóa từ chuỗi secret trong application.yml
     private Key getSigningKey() {
@@ -32,12 +35,27 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
 
         return Jwts.builder()
-                .setSubject(userPrincipal.getUsername()) // subject chứa identifier (email/username)
+                .setSubject(userPrincipal.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
+
+
+    public String generateTokenFromUsername (String username) {
+            Date now = new Date();
+            Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+
+            return Jwts.builder()
+                    .setSubject(username)
+                    .setIssuedAt(now)
+                    .setExpiration(expiryDate)
+                    .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                    .compact();
+    }
+
+
 
     // Lấy username/email từ Token
     public String getUsernameFromJWT(String token) {

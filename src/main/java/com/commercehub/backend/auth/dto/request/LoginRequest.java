@@ -12,9 +12,11 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class LoginRequest {
 
-    @NotBlank(message = "Vui lòng nhập email hoặc username")
-     String identifier; // Dùng 1 trường này chứa cả email hoặc username
+    @NotBlank(message = "Vui lòng nhập email ")
+     String email;
 
     @NotBlank(message = "Vui lòng nhập mật khẩu")
      String password;
+
+    private String deviceId;
 }

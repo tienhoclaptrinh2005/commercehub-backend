@@ -1,23 +1,18 @@
 package com.commercehub.backend.user.repository;
 
-import com.commercehub.backend.user.entity.User; // Đã cập nhật đúng đường dẫn import
-import org.springframework.data.jpa.repository.EntityGraph;
+import com.commercehub.backend.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+@Repository
 public interface UserRepository extends JpaRepository<User, Long> {
-
+    Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
 
+    Optional<User> findByPhone(String phone);
+    boolean existsByPhone(String phone);
+
     boolean existsByUsername(String username);
-
-    @EntityGraph(attributePaths = {"userRoles", "userRoles.role"})
-    Optional<User> findByUsername(String username);
-
-    @EntityGraph(attributePaths = {"userRoles", "userRoles.role"})
-    Optional<User> findByEmail(String email);
-
-    @EntityGraph(attributePaths = {"userRoles", "userRoles.role"})
-    Optional<User> findByUsernameOrEmail(String username, String email);
 }
