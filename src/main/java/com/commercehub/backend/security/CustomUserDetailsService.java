@@ -8,7 +8,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import java.util.ArrayList; // Sau này sẽ load Role thật từ bảng user_roles
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.stream.Collectors;
 
 @Service
@@ -18,14 +19,17 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
 
     @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("Email hoặc mật khẩu không chính xác"));
+    @Transactional(readOnly = true)
+    public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
+
+        User user = userRepository.findByEmail(identifier)
+                .orElseGet(() -> userRepository.findByUsername(identifier)
+                        .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản với định danh: " + identifier)));
 
         var authorities = user.getRoles().stream()
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName().toUpperCase()))
                 .collect(Collectors.toList());
 
-        return new CustomUserDetails(user,authorities);
+        return new CustomUserDetails(user, authorities);
     }
 }

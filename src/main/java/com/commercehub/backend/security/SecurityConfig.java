@@ -13,6 +13,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -23,36 +28,61 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
-
-    // mã hóa password
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Cung cấp AuthenticationManager cho AuthService gọi
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
         return configuration.getAuthenticationManager();
     }
 
-    // Cấu hình luồng bảo mật
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+
+        // Cấu hình các tên miền được phép gọi API
+        config.setAllowedOrigins(List.of(
+                "http://localhost:3000",        // Fontend
+                "https://vmtstore.vn",          // Tên miền
+                "https://www.vmtstore.vn"
+        ));
+
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
+
+        config.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable) // Tắt CSRF vì hệ thống dùng JWT
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Kích hoạt CORS
+                .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exc ->
                         exc.authenticationEntryPoint(jwtAuthenticationEntryPoint)
                                 .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
-
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Không dùng session
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**").permitAll() // Mở khóa cho mọi API bắt đầu bằng /api/v1/auth
-                        .anyRequest().authenticated() // Mọi request khác đều phải có token hợp lệ
+                        .requestMatchers(
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/refresh-token",
+                                "/api/v1/auth/logout",
+                                "/api/v1/auth/google",
+                                "/api/v1/auth/forgot-password",
+                                "/api/v1/auth/reset-password",
+                                "/api/v1/auth/verify-email",
+                                "/api/v1/users/levels",
+                                "/api/v1/users/{username}"
+                        ).permitAll()
+                        .anyRequest().authenticated()
                 );
-
-        // Chèn Filter kiểm tra JWT  vào trước Filter mặc định của Spring
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

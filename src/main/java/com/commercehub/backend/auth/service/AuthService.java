@@ -11,6 +11,7 @@ import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.RoleRepository;
 import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -20,16 +21,15 @@ import org.springframework.transaction.annotation.Transactional;
 import com.commercehub.backend.auth.mapper.AuthMapper;
 import java.time.OffsetDateTime;
 import java.util.UUID;
- import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
- import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
- import com.google.api.client.http.javanet.NetHttpTransport;
- import com.google.api.client.json.gson.GsonFactory;
- import java.util.Collections;
-
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import java.util.Collections;
 
 @Service
 @RequiredArgsConstructor
-
+@Slf4j
 public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
@@ -39,7 +39,6 @@ public class AuthService {
     private final AuthMapper authMapper;
     private final RoleRepository roleRepository;
 
-
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -47,7 +46,7 @@ public class AuthService {
         }
         User newUser = authMapper.toUserEntity(request);
         newUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-
+        newUser.setUsername(generateUniqueUsername(request.getEmail()));
         Role buyerRole = roleRepository.findByName("BUYER")
                 .orElseThrow(() -> new RuntimeException("Lỗi cấu hình: Không tìm thấy quyền BUYER trong hệ thống!"));
 
@@ -56,20 +55,17 @@ public class AuthService {
         }
         newUser.getRoles().add(buyerRole);
 
-
         userRepository.save(newUser);
 
-        // Đăng ký xong  tự động login luôn
+        // Đăng ký xong tự động login luôn
         return login(new LoginRequest() {{
             setEmail(request.getEmail());
             setPassword(request.getPassword());
         }});
     }
 
-
     public AuthResponse login(LoginRequest request) {
-
-        // xác minh tài khoản
+        // Xác minh tài khoản bằng Email và Password
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
@@ -77,16 +73,16 @@ public class AuthService {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         User user = userDetails.getUser();
 
-        // tạo token ngắn hạn
+        // Tạo Access Token ngắn hạn (Subject = Username)
         String accessToken = jwtTokenProvider.generateAccessToken(authentication);
 
-        // taoj refresh Token dài hạn và lưu vào db
+        // Tạo Refresh Token dài hạn và lưu vào DB
         String refreshTokenString = UUID.randomUUID().toString();
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
                 .token(refreshTokenString)
                 .deviceId(request.getDeviceId())
-                .expiresAt(OffsetDateTime.now().plusDays(7)) // sống 7 day
+                .expiresAt(OffsetDateTime.now().plusDays(7)) // Hạn sống 7 ngày
                 .revoked(false)
                 .build();
         refreshTokenRepository.save(refreshToken);
@@ -104,27 +100,45 @@ public class AuthService {
                 .build();
     }
 
-    // hàm đổi token mới
+    // Luồng đổi Token mới áp dụng cơ chế bảo mật Rotation (Xoay vòng mã)
     @Transactional
-    public  AuthResponse refreshToken(RefreshTokenRequest request) {
-        RefreshToken refreshToken = refreshTokenRepository.findByTokenAndRevokedFalse(request.getRefreshToken())
-                .orElseThrow(() -> new RuntimeException("Refresh Token không hợp lệ hoặc đã bị thu hồi "));
-        if (refreshToken.getExpiresAt().isBefore(OffsetDateTime.now())) {
-            refreshToken.setRevoked(true);
-            refreshTokenRepository.save(refreshToken);
-            throw new RuntimeException("Refresh Token đã hết hạn . Vui Lòng đăng nhập lại !");
+    public AuthResponse refreshToken(RefreshTokenRequest request) {
+        // 1. Kiểm tra tính hợp lệ của Refresh Token cũ
+        RefreshToken oldRefreshToken = refreshTokenRepository.findByTokenAndRevokedFalse(request.getRefreshToken())
+                .orElseThrow(() -> new RuntimeException("Refresh Token không hợp lệ hoặc đã bị thu hồi"));
+
+        if (oldRefreshToken.getExpiresAt().isBefore(OffsetDateTime.now())) {
+            oldRefreshToken.setRevoked(true);
+            refreshTokenRepository.save(oldRefreshToken);
+            throw new RuntimeException("Refresh Token đã hết hạn. Vui lòng đăng nhập lại!");
         }
 
-        User user = refreshToken.getUser();
+        User user = oldRefreshToken.getUser();
+
+        // 2. THỰC HIỆN XOAY VÒNG: Vô hiệu hóa ngay lập tức token cũ để tránh tống tiền công nghệ
+        oldRefreshToken.setRevoked(true);
+        refreshTokenRepository.save(oldRefreshToken);
+
+        // 3. Sinh Refresh Token mới tinh thay thế cho Frontend lưu đè
+        String newRefreshTokenString = UUID.randomUUID().toString();
+        RefreshToken newRefreshToken = RefreshToken.builder()
+                .user(user)
+                .token(newRefreshTokenString)
+                .deviceId(oldRefreshToken.getDeviceId()) // Kế thừa thiết bị đang dùng
+                .expiresAt(OffsetDateTime.now().plusDays(7))
+                .revoked(false)
+                .build();
+        refreshTokenRepository.save(newRefreshToken);
 
         user.setLastActiveAt(OffsetDateTime.now());
         userRepository.save(user);
 
+        // 4. Sinh Access Token mới dựa trên Username (Đã đồng bộ nhất quán với luồng Login)
         String newAccessToken = jwtTokenProvider.generateTokenFromUsername(user.getEmail());
 
-        return  AuthResponse.builder()
+        return AuthResponse.builder()
                 .accessToken(newAccessToken)
-                .refreshToken(refreshToken.getToken())
+                .refreshToken(newRefreshTokenString) // Trả về mã refresh mới tinh
                 .userId(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
@@ -132,8 +146,6 @@ public class AuthService {
                 .build();
     }
 
-
-    // đăh xuất
     @Transactional
     public void logout(LogoutRequest request) {
         RefreshToken refreshToken = refreshTokenRepository.findByTokenAndRevokedFalse(request.getRefreshToken())
@@ -141,79 +153,72 @@ public class AuthService {
 
         refreshToken.setRevoked(true);
         refreshTokenRepository.save(refreshToken);
-
     }
 
-
+    // Tìm kiếm linh hoạt: theo Email hoặc Username (vì CustomUserDetails.getUsername() trả về email)
     @Transactional
-    public void changePassword(String email , ChangePasswordRequest request) {
-
+    public void changePassword(String identifier, ChangePasswordRequest request) {
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new RuntimeException("Mật khẩu xác nhận không khớp !");
+            throw new RuntimeException("Mật khẩu xác nhận không khớp!");
         }
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(()-> new RuntimeException("Không tìm thấy người dùng !"));
 
-        if (!passwordEncoder.matches(request.getOldPassword() , user.getPasswordHash())){
-            throw new RuntimeException("Mật khẩu cũ không chính xác ");
+        User user = userRepository.findByEmail(identifier)
+                .or(() -> userRepository.findByUsername(identifier))
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Mật khẩu cũ không chính xác!");
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
-
     }
-
 
     @Transactional
     public AuthResponse googleLogin(GoogleLoginRequest request) {
         try {
             // 1. Cấu hình máy giải mã Token của Google
-            // (Lưu ý: Thay "CLIENT_ID_CUA_BAN" bằng ID dự án trên Google Cloud của bạn sau này)
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
                     .setAudience(Collections.singletonList("CLIENT_ID_CUA_BAN"))
                     .build();
 
-            // 2. Kiểm tra tính hợp lệ của Token
+            // 2. Kiểm tra tính hợp lệ của Token từ Google gửi sang
             GoogleIdToken idToken = verifier.verify(request.getCredential());
             if (idToken == null) {
                 throw new RuntimeException("Token Google không hợp lệ hoặc đã hết hạn!");
             }
 
-            // 3. Rút trích thông tin từ Token chuẩn của Google
+            // 3. Rút trích thông tin
             GoogleIdToken.Payload payload = idToken.getPayload();
             String email = payload.getEmail();
             String name = (String) payload.get("name");
             String pictureUrl = (String) payload.get("picture");
 
-            // 4. KỊCH BẢN HYBRID: Kiểm tra xem Email này đã tồn tại trong DB chưa
+            // 4. Kiểm tra xem Email này đã có tài khoản chưa
             User user = userRepository.findByEmail(email).orElse(null);
 
             if (user == null) {
-                // TÌNH HUỐNG A: Lần đầu tiên tới hệ thống -> Tự động đăng ký
+                // TÌNH HUỐNG A: Tài khoản mới tinh -> Đăng ký tự động
                 user = new User();
                 user.setEmail(email);
                 user.setFullName(name != null ? name : "Người dùng Google");
                 user.setAvatarUrl(pictureUrl);
-
-                // Dùng cỗ máy tự động sinh Username (Cắt từ email)
                 user.setUsername(generateUniqueUsername(email));
-
-                // Sinh mật khẩu ngẫu nhiên dài loằng ngoằng (để bypass việc bắt buộc có pass)
-                // Khách hàng có thể dùng tính năng "Quên mật khẩu" sau này để đổi cái pass này
                 user.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
 
-                // Cấp quyền BUYER mặc định
                 Role buyerRole = roleRepository.findByName("BUYER")
                         .orElseThrow(() -> new RuntimeException("Lỗi cấu hình: Không tìm thấy quyền BUYER!"));
                 user.setRoles(new java.util.HashSet<>(java.util.List.of(buyerRole)));
 
-                userRepository.save(user); // Lưu khách mới vào DB
+                userRepository.save(user);
             } else {
-                // TÌNH HUỐNG B: Khách đã có tài khoản (Đăng ký tay hoặc từng Đăng nhập Google rồi)
-                // -> Không làm gì cả, cứ thế đi tiếp xuống bước 5 để cấp Token!
+                // TÌNH HUỐNG B: Tài khoản đã tồn tại -> Kiểm tra trạng thái trước khi cấp Token
+                if (!"ACTIVE".equals(user.getStatus())) {
+                    throw new RuntimeException("Tài khoản đã bị khóa!");
+                }
             }
 
-            // 5. Sinh hệ thống Token (Access + Refresh) của riêng CommerceHub cho User này
+            // 5. Sinh hệ thống Token của CommerceHub (Đã đồng bộ dùng Username làm chủ thể)
             String accessToken = jwtTokenProvider.generateTokenFromUsername(user.getEmail());
 
             String refreshTokenString = UUID.randomUUID().toString();
@@ -229,7 +234,6 @@ public class AuthService {
             user.setLastActiveAt(OffsetDateTime.now());
             userRepository.save(user);
 
-            // 6. Trả về kết quả cho Frontend
             return AuthResponse.builder()
                     .accessToken(accessToken)
                     .refreshToken(refreshTokenString)
@@ -244,21 +248,17 @@ public class AuthService {
         }
     }
 
-    // --- HÀM PHỤ TRỢ: Tự động sinh Username ---
+    // Tự động sinh Username không trùng lặp
     private String generateUniqueUsername(String email) {
         String baseName = email.contains("@") ? email.substring(0, email.indexOf('@')) : "user";
         baseName = baseName.replaceAll("[^a-zA-Z0-9]", "");
 
         String generatedUsername = baseName + "_" + (1000 + new java.util.Random().nextInt(9000));
 
-        // Vòng lặp kiểm tra: Lỡ xui xẻo trùng với người có sẵn thì quay random lại
         while (userRepository.existsByUsername(generatedUsername)) {
             generatedUsername = baseName + "_" + (1000 + new java.util.Random().nextInt(9000));
         }
 
         return generatedUsername;
     }
-
-
-
 }

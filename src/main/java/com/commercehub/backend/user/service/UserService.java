@@ -15,8 +15,8 @@ public class UserService {
     private final UserMapper userMapper;
 
     @Transactional(readOnly = true)
-    public UserResponse getUserById(Long id) {
-        return userRepository.findById(id)
+    public UserResponse getUserByUsername(String username) {
+        return userRepository.findByUsername(username)
                 .map(userMapper::toUserResponse)
                 .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại!"));
     }

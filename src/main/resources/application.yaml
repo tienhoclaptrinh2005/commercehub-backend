@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5678/commercehub_db
-    username: postgres
-    password: 123
+    url: ${DB_URL:jdbc:postgresql://localhost:5678/commercehub_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:123}
 
   jpa:
     hibernate:
@@ -16,6 +16,6 @@ spring:
         format_sql: true
 
 jwt:
-  secret: "DayLaMotDoanMaBaoMatRatDaiVaKhoDoanDungDeKyTokenCommerceHub123456"
+  secret: ${JWT_SECRET:V29ya2luZ0hhcmRPbkNvbW1lcmNlSHViUHJvamVjdDIwMjZTZWN1cmVLZXlWMzg5NDU=}
   expiration: 86400000 # Thời gian sống của Access Token 1 ngày = 86400000 ms
   refreshExpiration: 604800000 # Thời gian sống của Refresh Token7 ngày = 604800000 ms

@@ -4,6 +4,7 @@ import com.commercehub.backend.auth.dto.request.*;
 import com.commercehub.backend.auth.dto.response.AuthResponse;
 import com.commercehub.backend.auth.service.AuthService;
 import com.commercehub.backend.security.CustomUserDetails;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,12 +20,12 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         return new ResponseEntity<>(authService.register(request), HttpStatus.CREATED);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
 
@@ -38,16 +39,6 @@ public class AuthController {
         authService.logout(request);
         return ResponseEntity.ok("Đăng xuất thành công!");
     }
-
-    @PostMapping("/change-password")
-    public ResponseEntity<String> changePassword(
-            @RequestBody ChangePasswordRequest request,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-
-        authService.changePassword(currentUser.getUsername(), request);
-        return ResponseEntity.ok("Đổi mật khẩu thành công!");
-    }
-
 
 
     @PostMapping("/google")

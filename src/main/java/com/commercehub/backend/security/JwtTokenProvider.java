@@ -1,6 +1,7 @@
 package com.commercehub.backend.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,9 +24,10 @@ public class JwtTokenProvider {
     @Value("${jwt.refreshExpiration}")
     private long jwtRefreshExpirationInMs;
 
-    // Tạo key mã hóa từ chuỗi secret trong application.yml
+    // Tạo key mã hóa từ chuỗi secret Base64 trong application.yml
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     // Sinh Access Token
