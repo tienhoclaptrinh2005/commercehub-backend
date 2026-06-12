@@ -79,7 +79,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/reset-password",
                                 "/api/v1/auth/verify-email",
                                 "/api/v1/users/levels",
-                                "/api/v1/users/{username}"
+                                "/api/v1/users/{username}" ,
+                                "/error"
                         ).permitAll()
                         .anyRequest().authenticated()
                 );

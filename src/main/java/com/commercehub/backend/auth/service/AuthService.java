@@ -4,6 +4,8 @@ import com.commercehub.backend.auth.dto.request.*;
 import com.commercehub.backend.auth.dto.response.AuthResponse;
 import com.commercehub.backend.auth.entity.RefreshToken;
 import com.commercehub.backend.auth.repository.RefreshTokenRepository;
+import com.commercehub.backend.common.exception.AppException;
+import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.security.JwtTokenProvider;
 import com.commercehub.backend.user.entity.Role;
@@ -42,7 +44,7 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email đã được sử dụng!");
+            throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
         User newUser = authMapper.toUserEntity(request);
         newUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
@@ -57,7 +59,7 @@ public class AuthService {
 
         userRepository.save(newUser);
 
-        // Đăng ký xong tự động login luôn
+
         return login(new LoginRequest() {{
             setEmail(request.getEmail());
             setPassword(request.getPassword());
@@ -65,7 +67,7 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        // Xác minh tài khoản bằng Email và Password
+
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
@@ -73,7 +75,7 @@ public class AuthService {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         User user = userDetails.getUser();
 
-        // Tạo Access Token ngắn hạn (Subject = Username)
+
         String accessToken = jwtTokenProvider.generateAccessToken(authentication);
 
         // Tạo Refresh Token dài hạn và lưu vào DB
@@ -100,10 +102,8 @@ public class AuthService {
                 .build();
     }
 
-    // Luồng đổi Token mới áp dụng cơ chế bảo mật Rotation (Xoay vòng mã)
     @Transactional
     public AuthResponse refreshToken(RefreshTokenRequest request) {
-        // 1. Kiểm tra tính hợp lệ của Refresh Token cũ
         RefreshToken oldRefreshToken = refreshTokenRepository.findByTokenAndRevokedFalse(request.getRefreshToken())
                 .orElseThrow(() -> new RuntimeException("Refresh Token không hợp lệ hoặc đã bị thu hồi"));
 
@@ -115,16 +115,16 @@ public class AuthService {
 
         User user = oldRefreshToken.getUser();
 
-        // 2. THỰC HIỆN XOAY VÒNG: Vô hiệu hóa ngay lập tức token cũ để tránh tống tiền công nghệ
+
         oldRefreshToken.setRevoked(true);
         refreshTokenRepository.save(oldRefreshToken);
 
-        // 3. Sinh Refresh Token mới tinh thay thế cho Frontend lưu đè
+
         String newRefreshTokenString = UUID.randomUUID().toString();
         RefreshToken newRefreshToken = RefreshToken.builder()
                 .user(user)
                 .token(newRefreshTokenString)
-                .deviceId(oldRefreshToken.getDeviceId()) // Kế thừa thiết bị đang dùng
+                .deviceId(oldRefreshToken.getDeviceId())
                 .expiresAt(OffsetDateTime.now().plusDays(7))
                 .revoked(false)
                 .build();
@@ -133,12 +133,12 @@ public class AuthService {
         user.setLastActiveAt(OffsetDateTime.now());
         userRepository.save(user);
 
-        // 4. Sinh Access Token mới dựa trên Username (Đã đồng bộ nhất quán với luồng Login)
+
         String newAccessToken = jwtTokenProvider.generateTokenFromUsername(user.getEmail());
 
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
-                .refreshToken(newRefreshTokenString) // Trả về mã refresh mới tinh
+                .refreshToken(newRefreshTokenString)
                 .userId(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
@@ -155,7 +155,7 @@ public class AuthService {
         refreshTokenRepository.save(refreshToken);
     }
 
-    // Tìm kiếm linh hoạt: theo Email hoặc Username (vì CustomUserDetails.getUsername() trả về email)
+
     @Transactional
     public void changePassword(String identifier, ChangePasswordRequest request) {
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
@@ -248,7 +248,7 @@ public class AuthService {
         }
     }
 
-    // Tự động sinh Username không trùng lặp
+
     private String generateUniqueUsername(String email) {
         String baseName = email.contains("@") ? email.substring(0, email.indexOf('@')) : "user";
         baseName = baseName.replaceAll("[^a-zA-Z0-9]", "");

@@ -6,7 +6,8 @@ import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.commercehub.backend.common.exception.AppException;
+import com.commercehub.backend.common.exception.ErrorCode;
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -18,6 +19,6 @@ public class UserService {
     public UserResponse getUserByUsername(String username) {
         return userRepository.findByUsername(username)
                 .map(userMapper::toUserResponse)
-                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại!"));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 }

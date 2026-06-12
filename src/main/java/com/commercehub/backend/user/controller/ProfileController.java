@@ -1,5 +1,6 @@
 package com.commercehub.backend.user.controller;
 
+import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.user.dto.request.UpdateAvatarRequest;
 import com.commercehub.backend.user.dto.request.UpdateProfileRequest;
@@ -18,25 +19,29 @@ public class ProfileController {
     private final ProfileService profileService;
 
     @GetMapping
-    public ResponseEntity<ProfileResponse> getMyProfile(@AuthenticationPrincipal CustomUserDetails currentUser) {
+    public ResponseEntity<ApiResponse<ProfileResponse>> getMyProfile(@AuthenticationPrincipal CustomUserDetails currentUser) {
             String email = currentUser.getUsername();
-            return ResponseEntity.ok(profileService.getMyProfile(email));
+            ProfileResponse response = profileService.getMyProfile(email);
 
+
+           return ResponseEntity.ok(ApiResponse.success("Lấy thông tin hồ sơ thành công!", response));
     }
 
     @PutMapping
-    public ResponseEntity<ProfileResponse> updateMyProfile (@RequestBody UpdateProfileRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
+    public ResponseEntity<ApiResponse<ProfileResponse>> updateMyProfile (@RequestBody UpdateProfileRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
         String email = currentUser.getUsername();
-        return ResponseEntity.ok(profileService.updateMyProfile(email , request));
+        ProfileResponse response = profileService.updateMyProfile(email, request);
+
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật hồ sơ thành công !" , response));
 
     }
 
 
-    @PatchMapping
-    public ResponseEntity<ProfileResponse> updateAvatar(@RequestBody UpdateAvatarRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
+    @PatchMapping("/avatar")
+    public ResponseEntity<ApiResponse<ProfileResponse>> updateAvatar(@RequestBody UpdateAvatarRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
         String email = currentUser.getUsername();
-        ProfileResponse updatedProfile = profileService.updateAvatar(email , request);
-        return ResponseEntity.ok(updatedProfile);
+        ProfileResponse response = profileService.updateAvatar(email, request);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công !", response));
     }
 
 }
