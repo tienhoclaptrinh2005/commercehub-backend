@@ -3,6 +3,7 @@ package com.commercehub.backend.auth.controller;
 import com.commercehub.backend.auth.dto.request.*;
 import com.commercehub.backend.auth.dto.response.AuthResponse;
 import com.commercehub.backend.auth.service.AuthService;
+import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.security.CustomUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,30 +21,37 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return new ResponseEntity<>(authService.register(request), HttpStatus.CREATED);
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
+        AuthResponse response = authService.register(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .code(201)
+                .message("Đăng ký tài khoản thành công!")
+                .data(response)
+                .build()
+        );
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", authService.login(request)));
     }
 
     @PostMapping("/refresh-token")
-    public ResponseEntity<AuthResponse> refreshToken(@RequestBody RefreshTokenRequest request) {
-        return ResponseEntity.ok(authService.refreshToken(request));
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Làm mới Token thành công!", authService.refreshToken(request)));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<String> logout(@RequestBody LogoutRequest request) {
+    public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
-        return ResponseEntity.ok("Đăng xuất thành công!");
-    }
+        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công!", null));    }
 
 
     @PostMapping("/google")
-    public ResponseEntity<AuthResponse> googleLogin(@RequestBody GoogleLoginRequest request) {
-        return ResponseEntity.ok(authService.googleLogin(request));
+    public ResponseEntity<ApiResponse<AuthResponse>> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập bằng Google thành công!", authService.googleLogin(request)));
     }
 
 }

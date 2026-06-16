@@ -1,11 +1,14 @@
 package com.commercehub.backend.user.controller;
 
+import com.commercehub.backend.common.exception.AppException;
+import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.user.dto.request.UpdateAvatarRequest;
 import com.commercehub.backend.user.dto.request.UpdateProfileRequest;
 import com.commercehub.backend.user.dto.response.ProfileResponse;
 import com.commercehub.backend.user.service.ProfileService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,6 +23,10 @@ public class ProfileController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<ProfileResponse>> getMyProfile(@AuthenticationPrincipal CustomUserDetails currentUser) {
+        if (currentUser == null) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED); // Báo lỗi 401
+        }
+
             String email = currentUser.getUsername();
             ProfileResponse response = profileService.getMyProfile(email);
 
@@ -28,7 +35,7 @@ public class ProfileController {
     }
 
     @PutMapping
-    public ResponseEntity<ApiResponse<ProfileResponse>> updateMyProfile (@RequestBody UpdateProfileRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
+    public ResponseEntity<ApiResponse<ProfileResponse>> updateMyProfile (@Valid @RequestBody UpdateProfileRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
         String email = currentUser.getUsername();
         ProfileResponse response = profileService.updateMyProfile(email, request);
 
@@ -38,7 +45,7 @@ public class ProfileController {
 
 
     @PatchMapping("/avatar")
-    public ResponseEntity<ApiResponse<ProfileResponse>> updateAvatar(@RequestBody UpdateAvatarRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
+    public ResponseEntity<ApiResponse<ProfileResponse>> updateAvatar(@Valid @RequestBody UpdateAvatarRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
         String email = currentUser.getUsername();
         ProfileResponse response = profileService.updateAvatar(email, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công !", response));

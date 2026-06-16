@@ -47,4 +47,22 @@ public class UserController {
         List<UserLevelResponse> response = userLevelService.getAllLevelConfigs();
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách cấp độ thành công!", response));
     }
+
+
+
+    @PutMapping("/me/username")
+    public ResponseEntity<ApiResponse<Void>> updateMyUsername(
+            @RequestParam("newUsername") String newUsername,
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+
+
+        userService.updateUsername(currentUser.getUser().getId(), newUsername);
+
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .code(200)
+                .message("Cập nhật Username thành công!")
+                .build());
+    }
+
+
 }

@@ -69,19 +69,20 @@ public class JwtTokenProvider {
         return claims.getSubject();
     }
 
-    // Kiểm tra Token có hợp lệ không
     public boolean validateToken(String authToken) {
         try {
             Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
             return true;
-        } catch (MalformedJwtException ex) {
-            log.error("Invalid JWT token");
-        } catch (ExpiredJwtException ex) {
-            log.error("Expired JWT token");
-        } catch (UnsupportedJwtException ex) {
-            log.error("Unsupported JWT token");
+        } catch (io.jsonwebtoken.security.SignatureException ex) {
+            log.error("Invalid JWT signature: JWT bị giả mạo chữ ký!");
+        } catch (io.jsonwebtoken.MalformedJwtException ex) {
+            log.error("Invalid JWT token: Token không đúng định dạng!");
+        } catch (io.jsonwebtoken.ExpiredJwtException ex) {
+            log.error("Expired JWT token: Token đã hết hạn!");
+        } catch (io.jsonwebtoken.UnsupportedJwtException ex) {
+            log.error("Unsupported JWT token: Token không được hỗ trợ!");
         } catch (IllegalArgumentException ex) {
-            log.error("JWT claims string is empty.");
+            log.error("JWT claims string is empty: Chuỗi claims trống!");
         }
         return false;
     }

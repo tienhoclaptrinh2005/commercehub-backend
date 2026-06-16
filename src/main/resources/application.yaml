@@ -15,6 +15,9 @@ spring:
       hibernate:
         format_sql: true
 
+google:
+  client-id: "xxxxx.apps.googleusercontent.com"
+
 jwt:
   secret: ${JWT_SECRET:V29ya2luZ0hhcmRPbkNvbW1lcmNlSHViUHJvamVjdDIwMjZTZWN1cmVLZXlWMzg5NDU=}
   expiration: 86400000 # Thời gian sống của Access Token 1 ngày = 86400000 ms

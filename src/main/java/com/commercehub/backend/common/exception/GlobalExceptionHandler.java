@@ -1,12 +1,17 @@
 package com.commercehub.backend.common.exception;
 
 import com.commercehub.backend.common.response.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -39,21 +44,31 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(value = BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handlingBadCredentialsException(BadCredentialsException exception) {
-            ApiResponse<Void> response = ApiResponse.<Void>builder()
-                    .success(false)
-                    .code(ErrorCode.INVALID_CREDENTIALS.getCode())
-                    .message(ErrorCode.INVALID_CREDENTIALS.getMessage())
-                    .build();
+        ApiResponse<Void> response = ApiResponse.<Void>builder()
+                .success(false)
+                .code(ErrorCode.INVALID_CREDENTIALS.getCode())
+                .message(ErrorCode.INVALID_CREDENTIALS.getMessage())
+                .build();
 
         return ResponseEntity.status(ErrorCode.INVALID_CREDENTIALS.getHttpStatus()).body(response);
     }
 
+    @ExceptionHandler(value = LockedException.class)
+    public ResponseEntity<ApiResponse<Void>> handlingLockedException(LockedException exception) {
+        ApiResponse<Void> response = ApiResponse.<Void>builder()
+                .success(false)
+                .code(ErrorCode.ACCOUNT_LOCKED.getCode())
+                .message(ErrorCode.ACCOUNT_LOCKED.getMessage())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
 
 
     @ExceptionHandler(value = RuntimeException.class)
     public ResponseEntity<ApiResponse<Void>> handlingRuntimeException(RuntimeException exception) {
 
-        exception.printStackTrace();
+        log.error("Unexpected error occurred: ", exception);
 
         ApiResponse<Void> response = ApiResponse.<Void>builder()
                 .success(false)
@@ -63,4 +78,17 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(ErrorCode.UNCATEGORIZED_EXCEPTION.getHttpStatus()).body(response);
     }
+
+    @ExceptionHandler(value = AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handlingAccessDeniedException(AccessDeniedException exception) {
+        ApiResponse<Void> response = ApiResponse.<Void>builder()
+                .success(false)
+                .code(ErrorCode.UNAUTHORIZED.getCode())
+                .message(ErrorCode.UNAUTHORIZED.getMessage())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+
 }

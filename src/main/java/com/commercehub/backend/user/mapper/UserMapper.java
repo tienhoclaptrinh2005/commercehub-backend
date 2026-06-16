@@ -17,7 +17,7 @@ public class UserMapper {
                 .username(user.getUsername())
                 .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())
-                .userLevel(user.getUserLevel())
+                .userLevel(user.getUserLevel() != null ? user.getUserLevel().getLevel() : null)
                 .createdAt(user.getCreatedAt())
                 .build();
     }

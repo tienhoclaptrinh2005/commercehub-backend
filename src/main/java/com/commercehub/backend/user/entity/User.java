@@ -48,10 +48,15 @@ public class User {
     @Column(name = "last_active_at", nullable = false)
     private OffsetDateTime lastActiveAt;
 
-    // lk bảng level_configs
     @Builder.Default
-    @Column(name = "user_level", nullable = false)
-    private Integer userLevel = 1;
+    @Column(name = "provider", length = 20)
+    private String provider = "LOCAL";
+
+
+    // lk bảng level_configs
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "user_level", referencedColumnName = "level", nullable = false)
+    private LevelConfig userLevel;
 
     @Builder.Default
     @Column(name = "accumulated_spent", nullable = false)

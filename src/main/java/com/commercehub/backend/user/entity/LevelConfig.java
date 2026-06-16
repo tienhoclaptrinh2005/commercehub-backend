@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-
+@Builder
 public class LevelConfig {
 
     @Id
@@ -19,13 +19,15 @@ public class LevelConfig {
     @Column(nullable = false , length =  50)
     private String label; // level  1 , 2 , 4 ,5 ...
 
-    @Column(name = "min_spent" , nullable = false)
-    private BigDecimal minSpent;        //số tiền chi tiêu tối thiểu
+    @Column(name = "min_spent", nullable = false, precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal minSpent = BigDecimal.ZERO;
 
+    @Column(name = "allowed_shop_count", nullable = false)
+    @Builder.Default
+    private Integer allowedShopCount = 0;
 
-    @Column(name="allowed_shop_count" , nullable = false )
-    private Integer allowedShopCount; // số lg gian hàng shop đc phép mở
-
+    @Column(length = 255)
     private String description;
 
 

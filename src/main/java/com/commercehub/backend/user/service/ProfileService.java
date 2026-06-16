@@ -1,28 +1,74 @@
 package com.commercehub.backend.user.service;
 
-
+import com.commercehub.backend.common.exception.AppException;
+import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.user.dto.request.UpdateAvatarRequest;
 import com.commercehub.backend.user.dto.request.UpdateProfileRequest;
 import com.commercehub.backend.user.dto.response.ProfileResponse;
 import com.commercehub.backend.user.entity.User;
+import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.commercehub.backend.user.repository.UserRepository;
+
 @Service
 @RequiredArgsConstructor
-
-
 public class ProfileService {
 
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public ProfileResponse getMyProfile(String email){
+    public ProfileResponse getMyProfile(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin nguười dùng !"));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return buildProfileResponse(user);
+    }
 
+    @Transactional
+    public ProfileResponse updateMyProfile(String email, UpdateProfileRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
+            user.setFullName(request.getFullName().trim());
+        }
+
+        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
+            String newPhone = request.getPhone().trim();
+
+            if (!newPhone.equals(user.getPhone())) {
+                userRepository.findByPhone(newPhone).ifPresent(existingUser -> {
+                    if (!existingUser.getId().equals(user.getId())) {
+                        throw new AppException(ErrorCode.PHONE_ALREADY_EXISTS);
+                    }
+                });
+                user.setPhone(newPhone);
+                user.setIsPhoneVerified(false);
+            }
+        }
+
+        if (request.getAvatarUrl() != null && !request.getAvatarUrl().trim().isEmpty()) {
+            user.setAvatarUrl(request.getAvatarUrl().trim());
+        }
+
+        userRepository.save(user);
+        return buildProfileResponse(user);
+    }
+
+    @Transactional
+    public ProfileResponse updateAvatar(String email, UpdateAvatarRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        if (request.getAvatarUrl() != null && !request.getAvatarUrl().trim().isEmpty()) {
+            user.setAvatarUrl(request.getAvatarUrl().trim());
+        }
+
+        userRepository.save(user);
+        return buildProfileResponse(user);
+    }
+
+    private ProfileResponse buildProfileResponse(User user) {
         return ProfileResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -31,7 +77,7 @@ public class ProfileService {
                 .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())
                 .status(user.getStatus())
-                .userLevel(user.getUserLevel())
+                .userLevel(user.getUserLevel() != null ? user.getUserLevel().getLevel() : null)
                 .accumulatedSpent(user.getAccumulatedSpent())
                 .accumulatedEarned(user.getAccumulatedEarned())
                 .isEmailVerified(user.getIsEmailVerified())
@@ -40,61 +86,4 @@ public class ProfileService {
                 .lastActiveAt(user.getLastActiveAt())
                 .build();
     }
-
-
-
-    @Transactional
-    public ProfileResponse updateMyProfile(String email , UpdateProfileRequest request){
-
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(()-> new RuntimeException("Không tìm thấy thông tin người dùng !"));
-
-        if (request.getFullName() != null  && !request.getFullName().trim().isEmpty()) {
-            user.setFullName(request.getFullName().trim());
-
-        }
-
-        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
-            String newPhone = request.getPhone().trim();
-            userRepository.findByPhone(newPhone).ifPresent(existingUser-> {
-                if (!existingUser.getId().equals(user.getId())){
-                    throw new RuntimeException("Số đuện thoại đã được dùng bởi tài khoản khác  !");
-                }
-            });
-            user.setPhone(newPhone);
-
-        }
-
-        if (request.getAvatarUrl() != null && !request.getAvatarUrl().trim().isEmpty()) {
-            user.setAvatarUrl(request.getAvatarUrl().trim());
-        }
-        userRepository.save(user);
-
-        return getMyProfile(email);
-
-
-
-
-    }
-
-    @Transactional
-    public  ProfileResponse updateAvatar(String email , UpdateAvatarRequest request){
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin người dùng !"));
-
-        if (request.getAvatarUrl() != null && !request.getAvatarUrl().trim().isEmpty()) {
-            user.setAvatarUrl(request.getAvatarUrl().trim());
-        }
-
-        userRepository.save(user);
-
-        return getMyProfile(email);
-
-
-    }
-
-
-
 }

@@ -15,7 +15,6 @@ public class AuthMapper {
         user.setEmail(request.getEmail());
         user.setFullName(request.getFullName());
         user.setStatus("ACTIVE");
-        user.setUserLevel(1);
         user.setAccumulatedSpent(BigDecimal.ZERO);
         user.setAccumulatedEarned(BigDecimal.ZERO);
         user.setIsEmailVerified(false);

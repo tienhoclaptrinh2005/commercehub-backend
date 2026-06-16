@@ -1,6 +1,5 @@
 package com.commercehub.backend.category.entity;
 
-import com.commercehub.backend.common.base.AuditableEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -29,10 +28,11 @@ public class Category  {
     @Column(name = "icon_url")
      String iconUrl;
 
+    @Builder.Default
     @Column(name = "is_active", columnDefinition = "boolean default true")
-    private Boolean isActive = true;
+     Boolean isActive = true;
 
     @Column(name = "sort_order")
-    private Integer sortOrder;
+     Integer sortOrder;
 
 }

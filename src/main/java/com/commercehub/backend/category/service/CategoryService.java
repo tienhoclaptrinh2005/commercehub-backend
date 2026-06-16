@@ -23,13 +23,14 @@ public class CategoryService {
     private final CategoryMapper categoryMapper;
 
     // Lấy toàn bộ danh mục đang hoạt động và xếp đúng vị trí để đưa lên Giao diện trang chủ
+    @Transactional(readOnly = true)
     public List<CategoryResponse> getAllActiveCategories() {
         return categoryRepository.findAllByIsActiveTrueOrderBySortOrderAsc()
                 .stream()
                 .map(categoryMapper::toResponse)
                 .toList();
     }
-
+    @Transactional(readOnly = true)
     public CategoryResponse getCategoryBySlug(String slug) {
         Category category = categoryRepository.findBySlug(slug)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
@@ -50,7 +51,7 @@ public class CategoryService {
         String generatedSlug = SlugUtils.toSlug(request.getName());
 
         if (categoryRepository.existsBySlug(generatedSlug)) {
-            generatedSlug = generatedSlug + "-" + System.currentTimeMillis();
+            throw new AppException(ErrorCode.CATEGORY_ALREADY_EXISTS);
         }
         category.setSlug(generatedSlug);
         category.setIsActive(true);
@@ -64,10 +65,20 @@ public class CategoryService {
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
         if (request.getName() != null && !request.getName().equals(category.getName())) {
+
+
             if (categoryRepository.existsByName(request.getName())) {
                 throw new AppException(ErrorCode.CATEGORY_ALREADY_EXISTS);
             }
-            category.setSlug(SlugUtils.toSlug(request.getName()));
+
+
+            String newSlug = SlugUtils.toSlug(request.getName());
+            if (categoryRepository.existsBySlug(newSlug)) {
+                throw new AppException(ErrorCode.CATEGORY_ALREADY_EXISTS);
+            }
+
+            category.setName(request.getName());
+            category.setSlug(newSlug);
         }
 
         categoryMapper.updateEntityFromRequest(request, category);
@@ -77,9 +88,10 @@ public class CategoryService {
 
     @Transactional
     public void deleteCategory(Long id) {
-        if (!categoryRepository.existsById(id)) {
-            throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
-        }
-        categoryRepository.deleteById(id);
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        category.setIsActive(false);
+        categoryRepository.save(category);
     }
 }

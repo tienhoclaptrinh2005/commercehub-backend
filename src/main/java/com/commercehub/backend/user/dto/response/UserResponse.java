@@ -1,5 +1,6 @@
 package com.commercehub.backend.user.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import java.time.OffsetDateTime;
@@ -11,6 +12,7 @@ import java.time.OffsetDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserResponse {
+    @JsonIgnore
     Long id;
     String username;
     String fullName;

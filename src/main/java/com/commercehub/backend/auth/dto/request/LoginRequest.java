@@ -18,5 +18,5 @@ public class LoginRequest {
     @NotBlank(message = "Vui lòng nhập mật khẩu")
      String password;
 
-    private String deviceId;
+     String deviceId;
 }

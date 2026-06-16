@@ -30,6 +30,6 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName().toUpperCase()))
                 .collect(Collectors.toList());
 
-        return new CustomUserDetails(user, authorities);
+        return new CustomUserDetails(user, authorities,user.getId());
     }
 }
