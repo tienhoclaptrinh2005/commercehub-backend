@@ -15,8 +15,7 @@ public interface ShopRepository extends JpaRepository<Shop, Long> {
     boolean existsByName(String name);
     boolean existsBySlug(String slug);
 
-
-    long countByOwnerId(Long ownerId);
+    Optional<Shop> findByOwnerId(Long ownerId);
 
     List<Shop> findAllByOwnerId(Long ownerId);
     Page<Shop> findByStatus(String status, Pageable pageable);

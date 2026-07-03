@@ -20,12 +20,15 @@ import org.springframework.beans.factory.annotation.Value; // Thêm dòng này
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.commercehub.backend.auth.mapper.AuthMapper;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -34,6 +37,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 
 import java.util.Collections;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -82,7 +86,9 @@ public class AuthService {
 
         userRepository.save(newUser);
 
-        String accessToken = jwtTokenProvider.generateTokenFromUsername(newUser.getEmail());
+
+        Authentication authentication = createAuthentication(newUser);
+        String accessToken = jwtTokenProvider.generateAccessToken(authentication);
 
         String refreshTokenString = UUID.randomUUID().toString();
         RefreshToken refreshToken = RefreshToken.builder()
@@ -167,7 +173,8 @@ public class AuthService {
         user.setLastActiveAt(OffsetDateTime.now());
         userRepository.save(user);
 
-        String newAccessToken = jwtTokenProvider.generateTokenFromUsername(user.getEmail());
+        Authentication authentication = createAuthentication(user);
+        String newAccessToken = jwtTokenProvider.generateAccessToken(authentication);
 
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
@@ -180,12 +187,20 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(LogoutRequest request) {
+    public void logout(LogoutRequest request, Long currentUserId) {
         RefreshToken refreshToken = refreshTokenRepository.findByTokenAndRevokedFalse(request.getRefreshToken())
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
+
+        if (!refreshToken.getUser().getId().equals(currentUserId)) {
+            log.warn("Cảnh báo bảo mật: User ID {} cố gắng thu hồi Refresh Token của User ID {}", currentUserId, refreshToken.getUser().getId());
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
         refreshToken.setRevoked(true);
         refreshTokenRepository.save(refreshToken);
     }
+
+
 
     @Transactional
     public void changePassword(String identifier, ChangePasswordRequest request) {
@@ -264,7 +279,8 @@ public class AuthService {
                 }
             }
 
-            String accessToken = jwtTokenProvider.generateTokenFromUsername(user.getEmail());
+            Authentication authentication = createAuthentication(user);
+            String accessToken = jwtTokenProvider.generateAccessToken(authentication);
 
             String refreshTokenString = UUID.randomUUID().toString();
             RefreshToken refreshToken = RefreshToken.builder()
@@ -301,6 +317,24 @@ public class AuthService {
         baseName = baseName.replaceAll("[^a-zA-Z0-9]", "");
 
         String uniqueSuffix = java.util.UUID.randomUUID().toString().substring(0, 8);
-        return baseName + "_" + uniqueSuffix; // VD: tienvu_8a7b6c5d
+        String username =  baseName + "_" + uniqueSuffix; // VD: tienvu_8a7b6c5d
+
+        while (userRepository.existsByUsername(username)) {
+            uniqueSuffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+            username = baseName + "_" + uniqueSuffix;
+        }
+
+        return username;
     }
+
+
+    private Authentication createAuthentication(User user) {
+        List<GrantedAuthority> authorities = user.getRoles().stream()
+                .map(role -> new SimpleGrantedAuthority(role.getName()))
+                .collect(Collectors.toList());
+        CustomUserDetails userDetails = new CustomUserDetails(user,authorities,user.getId());
+
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    }
+
 }

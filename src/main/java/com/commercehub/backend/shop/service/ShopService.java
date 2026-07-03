@@ -62,22 +62,18 @@ public class ShopService {
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        int allowedCount = owner.getUserLevel().getAllowedShopCount();
-        if (allowedCount <= 0) {
-            throw new AppException(ErrorCode.SHOP_CREATION_NOT_ALLOWED);
+        if (shopRepository.findByOwnerId(ownerId).isPresent()) {
+            throw new AppException(ErrorCode.USER_ALREADY_HAS_SHOP);
         }
-        long currentShopCount = shopRepository.countByOwnerId(ownerId);
 
-        if (currentShopCount >= allowedCount) {
-            throw new AppException(ErrorCode.SHOP_LIMIT_REACHED);
-        }
 
         Shop shop = shopMapper.toEntity(request);
         shop.setOwner(owner);
 
         String generatedSlug = SlugUtils.toSlug(request.getName());
-        if (shopRepository.existsBySlug(generatedSlug)) {
-            generatedSlug = generatedSlug + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+
+        while (shopRepository.existsBySlug(generatedSlug)) {
+            generatedSlug = SlugUtils.toSlug(request.getName()) + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
         }
         shop.setSlug(generatedSlug);
 
@@ -111,6 +107,8 @@ public class ShopService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
+        shopMapper.updateEntityFromRequest(request, shop);
+
         if (request.getName() != null && !request.getName().equals(shop.getName())) {
             if (shopRepository.existsByName(request.getName())) {
                 throw new AppException(ErrorCode.SHOP_ALREADY_EXISTS);
@@ -123,7 +121,6 @@ public class ShopService {
             shop.setSlug(newSlug);
         }
 
-        shopMapper.updateEntityFromRequest(request, shop);
         return shopMapper.toResponse(shopRepository.save(shop));
     }
 

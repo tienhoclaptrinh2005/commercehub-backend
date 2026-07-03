@@ -23,9 +23,9 @@ public class LevelConfig {
     @Builder.Default
     private BigDecimal minSpent = BigDecimal.ZERO;
 
-    @Column(name = "allowed_shop_count", nullable = false)
+    @Column(name = "allowed_product_count", nullable = false)
     @Builder.Default
-    private Integer allowedShopCount = 0;
+    Integer allowedProductCount = 0;
 
     @Column(length = 255)
     private String description;

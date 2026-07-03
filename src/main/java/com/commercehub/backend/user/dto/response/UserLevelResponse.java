@@ -14,6 +14,6 @@ public class UserLevelResponse {
     Integer level;
     String label;
     BigDecimal minSpent;
-    Integer allowedShopCount;
+    Integer allowedProductCount;
     String description;
 }

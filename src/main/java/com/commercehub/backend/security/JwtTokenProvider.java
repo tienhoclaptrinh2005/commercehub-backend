@@ -45,18 +45,6 @@ public class JwtTokenProvider {
     }
 
 
-    public String generateTokenFromUsername (String username) {
-            Date now = new Date();
-            Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
-
-            return Jwts.builder()
-                    .setSubject(username)
-                    .setIssuedAt(now)
-                    .setExpiration(expiryDate)
-                    .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                    .compact();
-    }
-
 
 
     // Lấy username/email từ Token

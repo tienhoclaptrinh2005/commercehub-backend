@@ -22,12 +22,13 @@ public class Shop  {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
      Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id", nullable = false,unique = true)
      User owner;
 
     @Column(nullable = false, unique = true ,length = 255)
      String name;
+
 
     @Column(nullable = false, unique = true, length = 255)
      String slug;

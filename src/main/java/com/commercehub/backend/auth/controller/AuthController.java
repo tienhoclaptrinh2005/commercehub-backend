@@ -43,10 +43,12 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Làm mới Token thành công!", authService.refreshToken(request)));
     }
 
+
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody LogoutRequest request) {
-        authService.logout(request);
-        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công!", null));    }
+    public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody LogoutRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
+        authService.logout(request, currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công!", null));
+    }
 
 
     @PostMapping("/google")

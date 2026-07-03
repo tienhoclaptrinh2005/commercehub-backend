@@ -23,7 +23,7 @@ public class UserLevelService {
                         .level(config.getLevel())
                         .label(config.getLabel())
                         .minSpent(config.getMinSpent())
-                        .allowedShopCount(config.getAllowedShopCount())
+                        .allowedProductCount(config.getAllowedProductCount())
                         .description(config.getDescription())
                         .build())
                 .collect(Collectors.toList());
