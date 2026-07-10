@@ -54,8 +54,15 @@ public enum ErrorCode {
 
     // Review
     CANNOT_REVIEW_OWN_PRODUCT(400, "Bạn không thể đánh giá sản phẩm của chính mình!", HttpStatus.BAD_REQUEST),
-    REVIEW_ALREADY_EXISTS(400, "Bạn đã đánh giá sản phẩm này rồi!", HttpStatus.BAD_REQUEST)
+    REVIEW_ALREADY_EXISTS(400, "Bạn đã đánh giá sản phẩm này rồi!", HttpStatus.BAD_REQUEST),
 
+
+    // ví
+    WALLET_NOT_FOUND(400 , "Không tìm thấy ví người dùng !", HttpStatus.BAD_REQUEST),
+    INSUFFICIENT_BALANCE(400,"Số dư không đủ !" , HttpStatus.BAD_REQUEST),
+    INVALID_AMOUNT(400,"Số tiền không hợp lệ !" , HttpStatus.BAD_REQUEST),
+    INSUFFICIENT_HOLD_BALANCE(400, "Số dư giữ không đủ ", HttpStatus.BAD_REQUEST),
+    WALLET_INACTIVE(403, "Ví không hoạt động !", HttpStatus.FORBIDDEN),
 
     ;
 
