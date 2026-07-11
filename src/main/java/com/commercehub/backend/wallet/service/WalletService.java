@@ -5,6 +5,7 @@ import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.wallet.dto.response.WalletResponse;
 import com.commercehub.backend.wallet.entity.Wallet;
 import com.commercehub.backend.wallet.entity.WalletTransaction;
+import com.commercehub.backend.wallet.mapper.WalletMapper;
 import com.commercehub.backend.wallet.repository.WalletRepository;
 import com.commercehub.backend.wallet.repository.WalletTransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,18 +20,14 @@ public class WalletService {
 
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository transactionRepository;
-
+    private final WalletMapper walletMapper;
 
     @Transactional(readOnly = true)
     public WalletResponse getMyWallet(Long userId) {
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
 
-        return WalletResponse.builder()
-                .availableBalance(wallet.getAvailableBalance())
-                .holdBalance(wallet.getHoldBalance())
-                .status(wallet.getStatus())
-                .build();
+        return walletMapper.toWalletResponse(wallet);
     }
 
 
