@@ -53,7 +53,7 @@ public enum ErrorCode {
     INVALID_DELIVERY_TYPE_FOR_CONFIG(400, "Sản phẩm không thuộc loại đặt trước (PRE_ORDER) nên không thể cấu hình.", HttpStatus.BAD_REQUEST),
 
     // Review
-    CANNOT_REVIEW_OWN_PRODUCT(400, "Bạn không thể đánh giá sản phẩm của chính mình!", HttpStatus.BAD_REQUEST),
+    CANNOT_REVIEW_OWN_PRODUCT(400, "Bạn không thể đánh giá hoặc mua sản phẩm của chính mình!", HttpStatus.BAD_REQUEST),
     REVIEW_ALREADY_EXISTS(400, "Bạn đã đánh giá sản phẩm này rồi!", HttpStatus.BAD_REQUEST),
 
 
