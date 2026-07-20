@@ -30,4 +30,26 @@ public class HoldReleaseService {
             }
         }
     }
-}
+
+    /**
+     * Nhả tiền sớm cho Seller khi Buyer xác nhận đã nhận hàng.
+     * Tìm HoldRelease theo orderItemId, nếu đang HOLDING thì release ngay.
+     */
+    public void earlyReleaseByOrderItemId(Long orderItemId) {
+        HoldRelease hr = holdReleaseRepository.findByOrderItemId(orderItemId);
+        if (hr == null) {
+            log.warn("Không tìm thấy HoldRelease cho orderItemId={}", orderItemId);
+            return;
+        }
+        if (!"HOLDING".equals(hr.getStatus())) {
+            log.info("HoldRelease ID {} đã được xử lý (status={}), bỏ qua.", hr.getId(), hr.getStatus());
+            return;
+        }
+        try {
+            holdReleaseProcessor.processSingle(hr);
+            log.info("Nhả tiền sớm thành công cho HoldRelease ID {} (orderItemId={})", hr.getId(), orderItemId);
+        } catch (Exception e) {
+            log.error("Lỗi khi nhả tiền sớm HoldRelease ID {}: {}", hr.getId(), e.getMessage());
+        }
+    }
+}

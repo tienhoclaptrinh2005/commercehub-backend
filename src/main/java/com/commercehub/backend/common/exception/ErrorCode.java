@@ -64,6 +64,13 @@ public enum ErrorCode {
     INSUFFICIENT_HOLD_BALANCE(400, "Số dư giữ không đủ ", HttpStatus.BAD_REQUEST),
     WALLET_INACTIVE(403, "Ví không hoạt động !", HttpStatus.FORBIDDEN),
 
+    //oder
+    SHOP_SUSPENDED(403, "Gian hàng hiện đang bị tạm khóa, không thể đặt hàng!", HttpStatus.FORBIDDEN),
+    PRODUCT_NOT_AVAILABLE(400, "Sản phẩm hiện không đủ số lượng hoặc đã hết hàng!", HttpStatus.BAD_REQUEST),
+    ORDER_NOT_FOUND(404, "Không tìm thấy đơn hàng!", HttpStatus.NOT_FOUND),
+    CANNOT_BUY_OWN_PRODUCT(400, "Bạn không thể mua sản phẩm của chính mình!", HttpStatus.BAD_REQUEST),
+
+
     ;
 
 

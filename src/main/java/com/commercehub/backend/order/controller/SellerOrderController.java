@@ -1,12 +1,10 @@
 package com.commercehub.backend.order.controller;
 
-import com.commercehub.backend.common.exception.AppException;
-import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.order.service.OrderService;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.shop.entity.Shop;
-import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.shop.service.ShopService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -19,12 +17,11 @@ import org.springframework.web.bind.annotation.*;
 public class SellerOrderController {
 
     private final OrderService orderService;
-    private final ShopRepository shopRepository; // Inject thêm ShopRepository
+    private final ShopService shopService;
 
-    // Hàm private tiện ích để lấy Shop từ User đang login
+    // Hàm private tiện ích để lấy Shop từ User đang login (qua Service layer)
     private Shop getCurrentSellerShop(Long userId) {
-        return shopRepository.findByOwnerId(userId)
-                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+        return shopService.getShopByOwnerId(userId);
     }
 
     // GET /api/v1/seller/orders
@@ -32,7 +29,7 @@ public class SellerOrderController {
     public ResponseEntity<ApiResponse<?>> getSellerOrders(
             @AuthenticationPrincipal CustomUserDetails currentUser, Pageable pageable) {
 
-        Shop shop = getCurrentSellerShop(currentUser.getId()); // Lấy code thật
+        Shop shop = getCurrentSellerShop(currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success("Success", orderService.getSellerOrders(shop.getId(), pageable)));
     }
 
@@ -41,7 +38,7 @@ public class SellerOrderController {
     public ResponseEntity<ApiResponse<?>> getSellerOrderDetail(
             @AuthenticationPrincipal CustomUserDetails currentUser, @PathVariable Long id) {
 
-        Shop shop = getCurrentSellerShop(currentUser.getId()); // Lấy code thật
+        Shop shop = getCurrentSellerShop(currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success("Success", orderService.getSellerOrderDetail(shop.getId(), id)));
     }
 }

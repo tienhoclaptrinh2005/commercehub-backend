@@ -18,4 +18,8 @@ public interface DigitalAssetRepository extends JpaRepository<DigitalAsset, Long
             nativeQuery = true)
     List<DigitalAsset> findAvailableAssetsWithLock(@Param("variantId") Long variantId, @Param("limit") int limit);
 
+    @Query("SELECT da FROM DigitalAsset da WHERE da.orderItemId IN " +
+            "(SELECT oi.id FROM OrderItem oi WHERE oi.order.id = :orderId)")
+    List<DigitalAsset> findDeliveredAssetsByOrderId(@Param("orderId") Long orderId);
+
 }

@@ -2,6 +2,7 @@ package com.commercehub.backend.product.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.order.dto.response.DeliveredAssetResponse;
 import com.commercehub.backend.product.dto.request.UploadDigitalAssetRequest;
 import com.commercehub.backend.product.dto.response.DigitalAssetResponse;
 import com.commercehub.backend.product.entity.DigitalAsset;
@@ -21,6 +22,9 @@ public class DigitalAssetService {
 
     private final DigitalAssetRepository digitalAssetRepository;
     private final ProductVariantRepository variantRepository;
+
+
+    // SELLER (Upload, Xem danh sách, Xóa)
 
 
     @Transactional
@@ -47,6 +51,7 @@ public class DigitalAssetService {
             DigitalAsset asset = DigitalAsset.builder()
                     .productVariant(variant)
                     .assetType(variant.getProduct().getProductType())
+                    // Lưu ý: Database column là JSONB, nếu rawData là JSON String thì JPA sẽ tự map (tùy cấu hình Dialect)
                     .assetData(rawData.trim())
                     .status("AVAILABLE")
                     .build();
@@ -59,7 +64,6 @@ public class DigitalAssetService {
 
         return addedCount;
     }
-
 
     @Transactional(readOnly = true)
     public List<DigitalAssetResponse> getAssetsByVariant(Long sellerId, Long variantId) {
@@ -86,19 +90,34 @@ public class DigitalAssetService {
         DigitalAsset asset = digitalAssetRepository.findById(assetId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
-
         if (!asset.getProductVariant().getProduct().getShop().getOwner().getId().equals(sellerId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         String status = asset.getStatus();
         if ("SOLD".equals(asset.getStatus())) {
             throw new AppException(ErrorCode.CANNOT_DELETE_SOLD_ASSET);
-        }else if(!"AVAILABLE".equals(status)) {
-            throw new AppException(ErrorCode.ACCOUNT_IN_TRANSACTION_OR_LOCKED);
+        } else if (!"AVAILABLE".equals(status)) {
+            throw new AppException(ErrorCode.ACCOUNT_IN_TRANSACTION_OR_LOCKED); // Hoặc tạo mã ErrorCode.ASSET_NOT_AVAILABLE
         }
 
         ProductVariant variant = asset.getProductVariant();
         variantRepository.incrementStockCount(variant.getId(), -1);
         digitalAssetRepository.delete(asset);
+    }
+
+
+    // BUYER
+
+
+    @Transactional(readOnly = true)
+    public List<DeliveredAssetResponse> getDeliveredAssetsByOrderId(Long orderId) {
+        return digitalAssetRepository.findDeliveredAssetsByOrderId(orderId).stream()
+                .map(asset -> DeliveredAssetResponse.builder()
+                        .id(asset.getId())
+                        .orderItemId(asset.getOrderItemId())
+                        .assetType(asset.getAssetType())
+                        .assetData(asset.getAssetData())
+                        .build())
+                .collect(Collectors.toList());
     }
 }

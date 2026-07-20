@@ -11,10 +11,12 @@ import com.commercehub.backend.product.entity.DigitalAsset;
 import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.repository.DigitalAssetRepository;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
-import com.commercehub.backend.fee.entity.PlatformFeeConfig;
+import com.commercehub.backend.fee.dto.FeeResult;
 import com.commercehub.backend.fee.entity.PlatformFeeLedger;
-import com.commercehub.backend.fee.repository.PlatformFeeConfigRepository;
 import com.commercehub.backend.fee.repository.PlatformFeeLedgerRepository;
+import com.commercehub.backend.fee.service.FeeCalculationService;
+import com.commercehub.backend.user.entity.User;
+import com.commercehub.backend.user.repository.UserRepository;
 import com.commercehub.backend.wallet.entity.HoldRelease;
 import com.commercehub.backend.wallet.entity.Wallet;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
@@ -27,7 +29,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -40,18 +41,20 @@ public class InstantOrderService {
     private final DigitalAssetRepository assetRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final UserRepository userRepository; // Đã thêm UserRepository
+    private final OrderStatusService orderStatusService;
 
     // Wallet & Fee
     private final WalletService walletService;
     private final WalletRepository walletRepository;
     private final HoldReleaseRepository holdReleaseRepository;
-    private final PlatformFeeConfigRepository feeConfigRepository;
+    private final FeeCalculationService feeCalculationService;
     private final PlatformFeeLedgerRepository feeLedgerRepository;
 
     @Transactional
     public Long checkoutInstant(Long buyerId, CheckoutRequest request) {
 
-        // 1. Kiểm tra Variant & Product
+
         ProductVariant variant = variantRepository.findById(request.getProductVariantId())
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
@@ -61,44 +64,49 @@ public class InstantOrderService {
 
         Long sellerId = variant.getProduct().getShop().getOwner().getId();
         if (buyerId.equals(sellerId)) {
-            throw new AppException(ErrorCode.CANNOT_REVIEW_OWN_PRODUCT); // Không tự mua hàng
+            throw new AppException(ErrorCode.CANNOT_BUY_OWN_PRODUCT);
         }
 
-        // 2. Khóa dòng Asset bằng SKIP LOCKED (Chống Race Condition)
+        if (!"ACTIVE".equals(variant.getProduct().getShop().getStatus())) {
+            throw new AppException(ErrorCode.SHOP_SUSPENDED);
+        }
+
+        if (!"ACTIVE".equals(variant.getProduct().getStatus())) {
+            throw new AppException(ErrorCode.PRODUCT_NOT_AVAILABLE);
+        }
+
+        if (!"ACTIVE".equals(variant.getStatus())) {
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+        }
+
+        User buyer = userRepository.findById(buyerId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+
         List<DigitalAsset> assetsToSell = assetRepository.findAvailableAssetsWithLock(variant.getId(), request.getQuantity());
         if (assetsToSell.size() < request.getQuantity()) {
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION); // Hết hàng
         }
 
-        // 3. Lấy cấu hình phí sàn đang Active
-        PlatformFeeConfig activeFeeConfig = feeConfigRepository.findByIsActiveTrue()
-                .orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION)); // Chưa cấu hình phí
-
-        // 4. Tính toán tiền bạc & Phí
         BigDecimal quantity = new BigDecimal(request.getQuantity());
         BigDecimal totalAmount = variant.getPrice().multiply(quantity);
+        FeeResult feeResult = feeCalculationService.calculateFee(totalAmount);
 
-        // Tính phí: raw_fee = sale_amount * fee_rate_snapshot
-        BigDecimal rawFee = totalAmount.multiply(activeFeeConfig.getFeeRate());
-        BigDecimal feeAfterMin = rawFee.max(activeFeeConfig.getMinFeeAmount());
+        BigDecimal finalFee = feeResult.getFeeAmount();
+        BigDecimal sellerNetAmount = feeResult.getSellerNetAmount();
 
-        BigDecimal finalFee;
-        if (activeFeeConfig.getMaxFeeAmount() != null) {
-            finalFee = feeAfterMin.min(activeFeeConfig.getMaxFeeAmount());
-        } else {
-            finalFee = feeAfterMin;
+        if (totalAmount.compareTo(finalFee.add(sellerNetAmount)) != 0) {
+            log.error("Fee invariant violated! total={}, fee={}, net={}", totalAmount, finalFee, sellerNetAmount);
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
-        finalFee = finalFee.setScale(0, RoundingMode.HALF_UP);
-        BigDecimal sellerNetAmount = totalAmount.subtract(finalFee);
 
-        // 5. Kế toán dòng tiền (Trừ buyer, Hold seller)
+
         walletService.deductBalance(buyerId, totalAmount, "ORDER_PAYMENT", null, "ORDER");
         walletService.holdForSeller(sellerId, totalAmount, null);
 
-        // 6. Tạo Order (DELIVERED ngay lập tức)
         Order order = Order.builder()
-                .orderCode(OrderCodeGenerator.generate())
-                .user(variantRepository.findById(buyerId).get().getShop().getOwner()) // Mock lấy user
+                .orderCode(OrderCodeGenerator.generate(variant.getProduct().getShop().getId()))
+                .user(buyer)
                 .shop(variant.getProduct().getShop())
                 .deliveryType("INSTANT")
                 .subtotalAmount(totalAmount)
@@ -110,6 +118,14 @@ public class InstantOrderService {
                 .deliveredAt(OffsetDateTime.now())
                 .build();
         orderRepository.save(order);
+
+        orderStatusService.logStatusChange(
+                order,
+                null,
+                "DELIVERED",
+                buyerId,
+                "Checkout tức thì - giao hàng ngay"
+        );
 
         // Tạo OrderItem
         OrderItem orderItem = OrderItem.builder()
@@ -134,7 +150,7 @@ public class InstantOrderService {
         }
         assetRepository.saveAll(assetsToSell);
 
-        // 7. Tạo HoldRelease (Tiền bị giữ)
+        // HoldRelease (Tiền bị giữ)
         Wallet sellerWallet = walletRepository.findByUserId(sellerId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
 
@@ -149,14 +165,14 @@ public class InstantOrderService {
                 .build();
         holdRelease = holdReleaseRepository.save(holdRelease);
 
-        // 8. Tạo Platform Fee Ledger (Sổ cái phí)
+        // Tạo Platform Fee Ledger (Sổ cái phí)
         PlatformFeeLedger feeLedger = PlatformFeeLedger.builder()
                 .orderItemId(orderItem.getId())
                 .orderId(order.getId())
                 .shopId(variant.getProduct().getShop().getId())
                 .sellerWalletId(sellerWallet.getId())
-                .feeConfigId(activeFeeConfig.getId())
-                .feeRateSnapshot(activeFeeConfig.getFeeRate())
+                .feeConfigId(feeResult.getFeeConfigId())
+                .feeRateSnapshot(feeResult.getFeeRateSnapshot())
                 .saleAmount(totalAmount)
                 .feeAmount(finalFee)
                 .sellerNetAmount(sellerNetAmount)
@@ -170,7 +186,7 @@ public class InstantOrderService {
         holdRelease.setFeeLedgerId(feeLedger.getId());
         holdReleaseRepository.save(holdRelease);
 
-        log.info("🛒 Checkout INSTANT thành công - Order ID: {} | Tổng: {} | Phí sàn: {}", order.getId(), totalAmount, finalFee);
+        log.info(" Checkout INSTANT thành công - Order ID: {} | Tổng: {} | Phí sàn: {}", order.getId(), totalAmount, finalFee);
 
         return order.getId();
     }

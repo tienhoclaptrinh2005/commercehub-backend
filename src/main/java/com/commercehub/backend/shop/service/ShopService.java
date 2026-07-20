@@ -125,6 +125,15 @@ public class ShopService {
     }
 
 
+    /**
+     * Lấy Shop theo Owner ID — dùng cho các Controller/Service cần resolve shop của seller đang login.
+     */
+    @Transactional(readOnly = true)
+    public Shop getShopByOwnerId(Long ownerId) {
+        return shopRepository.findByOwnerId(ownerId)
+                .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
+    }
+
     //LUỒNG DÀNH CHO ADMIN (TRANG QUẢN TRỊ)
 
 

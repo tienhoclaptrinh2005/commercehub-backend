@@ -7,6 +7,7 @@ import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -16,6 +17,7 @@ public class CheckoutService {
     private final InstantOrderService instantOrderService;
     // private final PreOrderService preOrderService; // Mở comment khi làm luồng Pre-Order
 
+    @Transactional
     public Long processCheckout(Long buyerId, CheckoutRequest request) {
         // Lấy thông tin Variant để xác định loại giao hàng
         ProductVariant variant = variantRepository.findById(request.getProductVariantId())
