@@ -14,9 +14,11 @@ import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.LevelConfigRepository;
 import com.commercehub.backend.user.repository.RoleRepository;
 import com.commercehub.backend.user.repository.UserRepository;
+import com.commercehub.backend.wallet.entity.Wallet;
+import com.commercehub.backend.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value; // Thêm dòng này
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.commercehub.backend.auth.mapper.AuthMapper;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +54,7 @@ public class AuthService {
     private final AuthMapper authMapper;
     private final RoleRepository roleRepository;
     private final LevelConfigRepository levelConfigRepository;
+    private final WalletRepository walletRepository;
 
     @Value("${google.client-id:xxxxxxxx.googleusercontent.com}")
     private String googleClientId;
@@ -67,7 +71,7 @@ public class AuthService {
         Role buyerRole = roleRepository.findByName("BUYER")
                 .orElseThrow(() -> {
                     log.error("CRITICAL ERROR: Không tìm thấy quyền 'BUYER' trong bảng Roles khi đăng ký User mới!");
-                    return new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+                    return new AppException(ErrorCode.SYSTEM_CONFIG_ERROR);
                 });
 
         if (newUser.getRoles() == null) {
@@ -78,7 +82,7 @@ public class AuthService {
         LevelConfig defaultLevel = levelConfigRepository.findById(1)
                 .orElseThrow(() -> {
                     log.error("CRITICAL ERROR: Không tìm thấy Level 1 (Mặc định) trong bảng level_configs!");
-                    return new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+                    return new AppException(ErrorCode.SYSTEM_CONFIG_ERROR);
                 });
         newUser.setUserLevel(defaultLevel);
 
@@ -86,6 +90,14 @@ public class AuthService {
 
         userRepository.save(newUser);
 
+        Wallet wallet = Wallet.builder()
+                .user(newUser)
+                .availableBalance(BigDecimal.ZERO)
+                .holdBalance(BigDecimal.ZERO)
+                .status("ACTIVE")
+                .isPlatform(false)
+                .build();
+        walletRepository.save(wallet);
 
         Authentication authentication = createAuthentication(newUser);
         String accessToken = jwtTokenProvider.generateAccessToken(authentication);
@@ -252,12 +264,12 @@ public class AuthService {
                 Role buyerRole = roleRepository.findByName("BUYER")
                         .orElseThrow(() -> {
                             log.error("CRITICAL ERROR (Google Login): Không tìm thấy quyền 'BUYER' trong bảng Roles!");
-                            return new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+                            return new AppException(ErrorCode.SYSTEM_CONFIG_ERROR);
                         });
                 LevelConfig defaultLevel = levelConfigRepository.findById(1)
                         .orElseThrow(() -> {
                             log.error("CRITICAL ERROR (Google Login): Không tìm thấy Level 1 trong bảng level_configs!");
-                            return new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+                            return new AppException(ErrorCode.SYSTEM_CONFIG_ERROR);
                         });
                 user = User.builder()
                         .email(email)
@@ -272,7 +284,18 @@ public class AuthService {
                         .provider("GOOGLE")
                         .build();
 
+
                 userRepository.save(user);
+
+                Wallet wallet = Wallet.builder()
+                        .user(user)
+                        .availableBalance(BigDecimal.ZERO)
+                        .holdBalance(BigDecimal.ZERO)
+                        .status("ACTIVE")
+                        .isPlatform(false)
+                        .build();
+                walletRepository.save(wallet);
+
             } else {
                 if (!"ACTIVE".equals(user.getStatus())) {
                     throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -327,14 +350,12 @@ public class AuthService {
         return username;
     }
 
-
     private Authentication createAuthentication(User user) {
         List<GrantedAuthority> authorities = user.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority(role.getName()))
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
                 .collect(Collectors.toList());
-        CustomUserDetails userDetails = new CustomUserDetails(user,authorities,user.getId());
+        CustomUserDetails userDetails = new CustomUserDetails(user, authorities, user.getId());
 
         return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
-
 }

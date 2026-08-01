@@ -71,6 +71,29 @@ public enum ErrorCode {
     CANNOT_BUY_OWN_PRODUCT(400, "Bạn không thể mua sản phẩm của chính mình!", HttpStatus.BAD_REQUEST),
 
 
+    INVALID_REQUEST(400, "Dữ liệu yêu cầu không hợp lệ!", HttpStatus.BAD_REQUEST),
+    INVALID_DELIVERY_TYPE(400, "Loại hình giao hàng không hợp lệ! Chỉ chấp nhận INSTANT hoặc PRE_ORDER.", HttpStatus.BAD_REQUEST),
+
+
+    ORDER_ACCESS_DENIED(403, "Bạn không có quyền thao tác trên đơn hàng này!", HttpStatus.FORBIDDEN),
+
+    ORDER_NOT_WAITING_APPROVAL(400, "Đơn hàng không ở trạng thái chờ duyệt!", HttpStatus.BAD_REQUEST),
+    ORDER_APPROVAL_TIMEOUT(400, "Đơn hàng đã quá thời hạn duyệt!", HttpStatus.BAD_REQUEST),
+
+
+    VARIANT_INACTIVE(400, "Phân loại sản phẩm không hoạt động hoặc đã bị khóa", HttpStatus.BAD_REQUEST),
+    OUT_OF_STOCK(400, "Sản phẩm này hiện đã hết hàng!", HttpStatus.BAD_REQUEST),
+    ORDER_CANNOT_CANCEL(400, "Không thể hủy đơn hàng ở trạng thái này!", HttpStatus.BAD_REQUEST),
+    UNAUTHORIZED_ACTION(403, "Bạn không có quyền thực hiện hành động này!", HttpStatus.FORBIDDEN),
+    ORDER_NOT_PROCESSING(400, "Đơn hàng không ở trạng thái đang xử lý!", HttpStatus.BAD_REQUEST),
+    ITEMS_MUST_BE_SAME_SHOP(400, "Tất cả sản phẩm trong đơn hàng phải thuộc cùng một gian hàng!", HttpStatus.BAD_REQUEST),
+
+    // Hệ thống & Cấu hình
+    SYSTEM_CONFIG_ERROR(500, "Lỗi cấu hình hệ thống! Vui lòng liên hệ quản trị viên.", HttpStatus.INTERNAL_SERVER_ERROR),
+    FEE_CONFIG_NOT_FOUND(500, "Không tìm thấy cấu hình phí sàn đang hoạt động!", HttpStatus.INTERNAL_SERVER_ERROR),
+    HOLD_RELEASE_INVALID_STATUS(400, "Trạng thái giữ tiền không hợp lệ để thực hiện thao tác này!", HttpStatus.BAD_REQUEST),
+
+
     ;
 
 

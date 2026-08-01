@@ -2,12 +2,17 @@ package com.commercehub.backend.wallet.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.user.entity.User;
+import com.commercehub.backend.user.repository.UserRepository;
 import com.commercehub.backend.wallet.entity.Deposit;
+import com.commercehub.backend.wallet.entity.Wallet;
 import com.commercehub.backend.wallet.repository.DepositRepository;
+import com.commercehub.backend.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Service
@@ -16,10 +21,39 @@ public class DepositService {
 
     private final DepositRepository depositRepository;
     private final WalletService walletService;
+    private final UserRepository userRepository;
+    private final WalletRepository walletRepository;
 
+    // ==========================================
+    // TẠO ĐƠN NẠP TIỀN (PENDING)
+    // ==========================================
+    @Transactional
+    public void createPendingDeposit(Long userId, BigDecimal amount, String txCode) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+
+        Deposit deposit = Deposit.builder()
+                .user(user)
+                .wallet(wallet)
+                .amount(amount)
+                .provider("VNPAY")
+                .transactionCode(txCode)
+                .status("PENDING")
+                .build();
+
+        depositRepository.save(deposit);
+    }
+
+    // ==========================================
+    // VNPay TRẢ VỀ THÀNH CÔNG
+    // ==========================================
     @Transactional
     public void processSuccess(String transactionCode) {
-        Deposit deposit = depositRepository.findByTransactionCode(transactionCode)
+        // ĐÃ SỬA THÀNH findByTransactionCodeWithLock ĐỂ TRÁNH LỖI NHÂN ĐÔI TIỀN
+        Deposit deposit = depositRepository.findByTransactionCodeWithLock(transactionCode)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!"PENDING".equals(deposit.getStatus())) {
@@ -41,9 +75,13 @@ public class DepositService {
         );
     }
 
+    // ==========================================
+    // VNPay TRẢ VỀ THẤT BẠI
+    // ==========================================
     @Transactional
     public void processFailed(String transactionCode) {
-        Deposit deposit = depositRepository.findByTransactionCode(transactionCode)
+        // ĐÃ SỬA THÀNH findByTransactionCodeWithLock
+        Deposit deposit = depositRepository.findByTransactionCodeWithLock(transactionCode)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!"PENDING".equals(deposit.getStatus())) return;

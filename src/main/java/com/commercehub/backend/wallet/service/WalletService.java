@@ -58,6 +58,9 @@ public class WalletService {
 
     @Transactional
     public void holdForSeller(Long sellerId, BigDecimal amount, Long orderId) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new AppException(ErrorCode.INVALID_AMOUNT);
+        }
         Wallet wallet = walletRepository.findByUserIdWithLock(sellerId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
 
@@ -79,8 +82,14 @@ public class WalletService {
             throw new AppException(ErrorCode.INVALID_AMOUNT);
         }
 
+        if (holdAmount.compareTo(sellerNet.add(platformFee)) != 0) {
+            throw new AppException(ErrorCode.INVALID_AMOUNT);
+        }
+
         Wallet sellerWallet = walletRepository.findByUserIdWithLock(sellerId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+
+        assertWalletActive(sellerWallet);
 
         BigDecimal holdBefore = sellerWallet.getHoldBalance();
 
@@ -129,6 +138,30 @@ public class WalletService {
 
         logTransaction(wallet.getId(), type, "AVAILABLE", amount, before, wallet.getAvailableBalance(), refId, refType);
     }
+
+    @Transactional
+    public void cancelHoldForSeller(Long sellerId, BigDecimal amount, Long refId) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new AppException(ErrorCode.INVALID_AMOUNT);
+        }
+
+        Wallet wallet = walletRepository.findByUserIdWithLock(sellerId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+        assertWalletActive(wallet);
+
+        // Đảm bảo tiền đang bị hold phải lớn hơn hoặc bằng số tiền muốn gỡ
+        if (wallet.getHoldBalance().compareTo(amount) < 0) {
+            throw new AppException(ErrorCode.INSUFFICIENT_HOLD_BALANCE);
+        }
+
+        BigDecimal before = wallet.getHoldBalance();
+        wallet.setHoldBalance(before.subtract(amount));
+        walletRepository.save(wallet);
+
+        // Ghi log giao dịch (Tiền âm vì trừ đi khỏi cục Hold)
+        logTransaction(wallet.getId(), "CANCEL_HOLD", "HOLD", amount.negate(), before, wallet.getHoldBalance(), refId, "ORDER_REFUND");
+    }
+
 
 
 

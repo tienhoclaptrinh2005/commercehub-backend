@@ -81,7 +81,6 @@ public class Product {
     OffsetDateTime updatedAt;
 
 
-
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @BatchSize(size = 20)

@@ -28,18 +28,18 @@ public class WithdrawalService {
     private final UserRepository userRepository;
 
 
-    // USER (SELLER)
+    // ==========================================
+    // USER (SELLER) YÊU CẦU RÚT TIỀN
+    // ==========================================
     @Transactional
     public void requestWithdrawal(Long userId, WithdrawalRequest request) {
 
-        // 1. Trừ tiền khả dụng trước (Bên trong deductBalance đã có PESSIMISTIC_WRITE lock)
-        walletService.deductBalance(userId, request.getAmount(), "WITHDRAW_PENDING", null, "WITHDRAWAL");
-
-        // 2. Lấy wallet KHÔNG lock chỉ để gán vào entity Withdrawal
-        Wallet wallet = walletRepository.findByUserId(userId)
+        // 1. ĐÃ SỬA THÀNH findByUserIdWithLock ĐỂ ÉP HIBERNATE KHÔNG DÙNG L1 CACHE
+        // Ngăn chặn triệt để hành vi spam request để rút vượt số dư
+        Wallet wallet = walletRepository.findByUserIdWithLock(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
 
-        // 3. Tạo bản ghi yêu cầu
+        // 2. Tạo bản ghi yêu cầu VÀ LƯU TRƯỚC để DB sinh ra ID
         Withdrawal withdrawal = Withdrawal.builder()
                 .wallet(wallet)
                 .amount(request.getAmount())
@@ -50,18 +50,33 @@ public class WithdrawalService {
                 .status("PENDING")
                 .build();
 
-        withdrawalRepository.save(withdrawal);
+        withdrawal = withdrawalRepository.save(withdrawal); // Nhận lại Entity đã có ID
+
+        // 3. Trừ tiền khả dụng và TRUYỀN ID CỦA ĐƠN RÚT TIỀN VÀO LỊCH SỬ GIAO DỊCH
+        walletService.deductBalance(
+                userId,
+                request.getAmount(),
+                "WITHDRAW_PENDING",
+                withdrawal.getId(),
+                "WITHDRAWAL"
+        );
+
+        log.info("User {} đã tạo yêu cầu rút tiền thành công. Withdrawal ID: {}", userId, withdrawal.getId());
     }
 
 
-    //  ADMIN
+    // ==========================================
+    // ADMIN DUYỆT / TỪ CHỐI RÚT TIỀN
+    // ==========================================
     @Transactional
     public void processWithdrawal(Long withdrawalId, Long adminId, String action, String note) {
-        Withdrawal withdrawal = withdrawalRepository.findById(withdrawalId)
+
+        // ĐÃ ĐỔI THÀNH findByIdWithLock ĐỂ CHỐNG ADMIN CLICK ĐÚP GÂY NHÂN ĐÔI TIỀN HOÀN
+        Withdrawal withdrawal = withdrawalRepository.findByIdWithLock(withdrawalId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!"PENDING".equals(withdrawal.getStatus())) {
-            throw new AppException(ErrorCode.INVALID_STATUS);
+            throw new AppException(ErrorCode.INVALID_STATUS); // Request thứ 2 sẽ bị văng lỗi ở đây ngay
         }
 
         User admin = userRepository.findById(adminId)
@@ -69,9 +84,18 @@ public class WithdrawalService {
 
         if ("APPROVE".equalsIgnoreCase(action)) {
             withdrawal.setStatus("DONE");
+            log.info("Admin {} đã DUYỆT đơn rút tiền ID {}", adminId, withdrawalId);
         } else if ("REJECT".equalsIgnoreCase(action)) {
             withdrawal.setStatus("REJECTED");
-            walletService.addBalance(withdrawal.getWallet().getUser().getId(), withdrawal.getAmount(), "WITHDRAW_CANCEL", withdrawal.getId(), "WITHDRAWAL");
+            // Hoàn lại tiền vào ví do bị từ chối rút
+            walletService.addBalance(
+                    withdrawal.getWallet().getUser().getId(),
+                    withdrawal.getAmount(),
+                    "WITHDRAW_CANCEL",
+                    withdrawal.getId(),
+                    "WITHDRAWAL"
+            );
+            log.info("Admin {} đã TỪ CHỐI đơn rút tiền ID {}", adminId, withdrawalId);
         } else {
             throw new AppException(ErrorCode.INVALID_STATUS);
         }

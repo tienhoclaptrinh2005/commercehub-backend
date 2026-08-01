@@ -16,7 +16,7 @@ import java.time.OffsetDateTime;
  *   2. HoldRelease record được tạo với scheduledReleaseAt = now + 7 ngày.
  *   3. Scheduler này chạy mỗi 5 phút, tìm các HoldRelease đã đến hạn (scheduledReleaseAt <= now).
  *   4. Với mỗi record: Trừ holdBalance, cộng availableBalance (net), thu phí sàn vào ví platform.
- *   5. Nếu Buyer confirm sớm → earlyRelease được gọi từ OrderService, không cần đợi scheduler.
+ *   5. Tiền tự động nhả sau 7 ngày qua scheduler, không cần xác nhận từ Buyer.
  */
 @Slf4j
 @Component

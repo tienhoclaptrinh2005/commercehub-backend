@@ -64,13 +64,16 @@ public class CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
-        if (request.getName() != null && !request.getName().equals(category.getName())) {
+        // ĐÃ FIX Bug #NEW7: Chạy mapper TRƯỚC để cập nhật các trường khác (description, sortOrder...)
+        // Mapper đã ignore name/slug, nhưng đặt trước để phòng ngừa lỗi nếu ai bỏ ignore sau này
+        categoryMapper.updateEntityFromRequest(request, category);
 
+        // Xử lý name/slug SAU mapper — đảm bảo không bị đè
+        if (request.getName() != null && !request.getName().equals(category.getName())) {
 
             if (categoryRepository.existsByName(request.getName())) {
                 throw new AppException(ErrorCode.CATEGORY_ALREADY_EXISTS);
             }
-
 
             String newSlug = SlugUtils.toSlug(request.getName());
             if (categoryRepository.existsBySlug(newSlug)) {
@@ -80,8 +83,6 @@ public class CategoryService {
             category.setName(request.getName());
             category.setSlug(newSlug);
         }
-
-        categoryMapper.updateEntityFromRequest(request, category);
 
         return categoryMapper.toResponse(categoryRepository.save(category));
     }

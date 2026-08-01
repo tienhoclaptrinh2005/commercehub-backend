@@ -2,6 +2,7 @@ package com.commercehub.backend.order.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.order.service.OrderService;
+import com.commercehub.backend.order.service.PreOrderApprovalService; // Import service mới
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.service.ShopService;
@@ -18,8 +19,7 @@ public class SellerOrderController {
 
     private final OrderService orderService;
     private final ShopService shopService;
-
-    // Hàm private tiện ích để lấy Shop từ User đang login (qua Service layer)
+    private final PreOrderApprovalService preOrderApprovalService; // Inject vào đây
     private Shop getCurrentSellerShop(Long userId) {
         return shopService.getShopByOwnerId(userId);
     }
@@ -40,5 +40,55 @@ public class SellerOrderController {
 
         Shop shop = getCurrentSellerShop(currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success("Success", orderService.getSellerOrderDetail(shop.getId(), id)));
+    }
+
+
+
+
+    //  PRE_ORDER
+    // POST /api/v1/seller/orders/{id}/accept
+    @PostMapping("/{id}/accept")
+    public ResponseEntity<ApiResponse<?>> acceptPreOrder(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable Long id) {
+        preOrderApprovalService.acceptOrder(currentUser.getId(), id);
+
+        return ResponseEntity.ok(ApiResponse.success("Đã duyệt đơn hàng thành công. Vui lòng tiến hành chuẩn bị hàng.", null));
+    }
+
+    // POST /api/v1/seller/orders/{id}/reject
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<ApiResponse<?>> rejectPreOrder(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason) { // Nhận lý do từ chối từ Frontend
+
+        preOrderApprovalService.rejectOrder(currentUser.getId(), id, reason);
+
+        return ResponseEntity.ok(ApiResponse.success("Đã từ chối đơn hàng và tự động hoàn tiền cho người mua.", null));
+    }
+
+    // POST /api/v1/seller/orders/{id}/complete
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<ApiResponse<?>> completePreOrder(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable Long id,
+            @RequestParam(required = false) String sellerNotes) {
+
+        preOrderApprovalService.completeOrder(currentUser.getId(), id, sellerNotes);
+
+        return ResponseEntity.ok(ApiResponse.success("Đã xác nhận giao hàng thành công! Tiền sẽ được cộng vào số dư khả dụng sau thời gian đối soát.", null));
+    }
+
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<ApiResponse<?>> cancelProcessingOrder(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason) {
+
+        preOrderApprovalService.cancelProcessingOrder(currentUser.getId(), id, reason);
+
+        return ResponseEntity.ok(ApiResponse.success("Đã hủy đơn hàng và tự động hoàn tiền cho người mua.", null));
     }
 }

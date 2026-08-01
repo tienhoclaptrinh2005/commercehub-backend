@@ -1,24 +1,21 @@
 package com.commercehub.backend.order.dto.request;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
+
+import java.util.List;
 
 @Data
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class CheckoutRequest {
 
-    @NotNull(message = "ID Phân loại sản phẩm (Variant) không được để trống")
-    Long productVariantId;
+    @NotEmpty(message = "Giỏ hàng không được để trống")
+    @Valid
+    List<CheckoutItemRequest> items;
 
-    @NotNull(message = "Số lượng không được để trống")
-    @Min(value = 1, message = "Số lượng mua ít nhất là 1")
-    @Max(value = 1000, message = "Số lượng mua tối đa là 1000")
-
-    Integer quantity;
-
-
+    // Tùy chọn phương thức thanh toán (mặc định là ví)
+    String paymentMethod = "WALLET";
 }

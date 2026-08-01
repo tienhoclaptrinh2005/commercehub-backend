@@ -191,8 +191,9 @@ public class ProductService {
         org.springframework.data.domain.Pageable pageable =
                 org.springframework.data.domain.PageRequest.of(validPage, validSize, org.springframework.data.domain.Sort.by("createdAt").descending());
 
+        // ĐÃ FIX Bug #L1: Dùng query mới để filter cả shop.status = ACTIVE
         org.springframework.data.domain.Page<ProductResponse> productPage =
-                productRepository.findByStatus("ACTIVE", pageable).map(this::mapToProductResponse);
+                productRepository.findActiveProductsFromActiveShops(pageable).map(this::mapToProductResponse);
         return PageResponse.of(productPage);
 
     }

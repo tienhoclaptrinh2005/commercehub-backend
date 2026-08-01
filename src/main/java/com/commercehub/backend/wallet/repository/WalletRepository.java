@@ -22,4 +22,5 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM Wallet w WHERE w.isPlatform = true")
     Optional<Wallet> findPlatformWalletWithLock();
+
 }

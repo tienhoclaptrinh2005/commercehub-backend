@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/checkout")
 @RequiredArgsConstructor
@@ -18,15 +20,15 @@ public class CheckoutController {
     // Tiêm (Inject) lớp Điều phối thay vì lớp xử lý trực tiếp
     private final CheckoutService checkoutService;
 
-    // POST /api/v1/checkout
-    @PostMapping
-    public ResponseEntity<ApiResponse<Long>> processCheckout(
+    @PostMapping("/checkout")
+    public ResponseEntity<ApiResponse<List<Long>>> checkout(
             @AuthenticationPrincipal CustomUserDetails currentUser,
-            @Valid @RequestBody CheckoutRequest request) {
+            @RequestBody @Valid CheckoutRequest request) {
 
-        // Giao toàn quyền quyết định luồng (Instant hay Pre-order) cho CheckoutService
-        Long orderId = checkoutService.processCheckout(currentUser.getId(), request);
+        // 1. Hứng kết quả bằng List<Long> thay vì Long
+        List<Long> orderIds = checkoutService.processCheckout(currentUser.getId(), request);
 
-        return ResponseEntity.ok(ApiResponse.success("Checkout thành công", orderId));
+        // 2. Trả về danh sách mã đơn hàng cho Frontend
+        return ResponseEntity.ok(ApiResponse.success("Checkout thành công", orderIds));
     }
 }

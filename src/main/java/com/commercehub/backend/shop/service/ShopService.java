@@ -15,6 +15,7 @@ import com.commercehub.backend.user.repository.RoleRepository;
 import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -82,7 +83,7 @@ public class ShopService {
         Role sellerRole = roleRepository.findByName("SELLER")
                 .orElseThrow(() -> {
                     log.error("CRITICAL ERROR: Không tìm thấy quyền 'SELLER' trong bảng Roles!");
-                    return new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+                    return new AppException(ErrorCode.SYSTEM_CONFIG_ERROR);
                 });
         if (!owner.getRoles().contains(sellerRole)) {
             owner.getRoles().add(sellerRole);
@@ -125,9 +126,7 @@ public class ShopService {
     }
 
 
-    /**
-     * Lấy Shop theo Owner ID — dùng cho các Controller/Service cần resolve shop của seller đang login.
-     */
+    @Cacheable(value = "shopByOwner", key = "#ownerId")
     @Transactional(readOnly = true)
     public Shop getShopByOwnerId(Long ownerId) {
         return shopRepository.findByOwnerId(ownerId)

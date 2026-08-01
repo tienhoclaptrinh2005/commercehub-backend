@@ -81,7 +81,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/reset-password",
                                 "/api/v1/auth/verify-email",
                                 "/api/v1/users/levels",
-                                "/error"
+                                "/error",
+                                "/api/v1/wallet/deposit/vnpay-ipn"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/{username}").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()

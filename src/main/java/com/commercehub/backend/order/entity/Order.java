@@ -84,7 +84,8 @@ public class Order {
     @Column(nullable = false)
     private Long version;
 
-
+    @Column(name = "processing_deadline_at")
+    private OffsetDateTime processingDeadlineAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
