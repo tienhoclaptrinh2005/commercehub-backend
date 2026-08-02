@@ -1,24 +1,23 @@
 package com.commercehub.backend.user.mapper;
 
+import com.commercehub.backend.user.dto.response.ProfileResponse;
+import com.commercehub.backend.user.dto.response.UserLevelResponse;
 import com.commercehub.backend.user.dto.response.UserResponse;
+import com.commercehub.backend.user.entity.LevelConfig;
 import com.commercehub.backend.user.entity.User;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
-@Component
-public class UserMapper {
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface UserMapper {
 
-    public UserResponse toUserResponse(User user) {
-        if (user == null) {
-            return null;
-        }
 
-        return UserResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .fullName(user.getFullName())
-                .avatarUrl(user.getAvatarUrl())
-                .userLevel(user.getUserLevel() != null ? user.getUserLevel().getLevel() : null)
-                .createdAt(user.getCreatedAt())
-                .build();
-    }
+    @Mapping(target = "userLevel", source = "userLevel.level")
+    UserResponse toUserResponse(User user);
+
+    @Mapping(target = "userLevel", source = "userLevel.level")
+    ProfileResponse toProfileResponse(User user);
+
+    UserLevelResponse toUserLevelResponse(LevelConfig config);
 }

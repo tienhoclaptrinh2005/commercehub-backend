@@ -51,6 +51,8 @@ public enum ErrorCode {
     INVALID_DELIVERY_TYPE_FOR_ASSET(400, "Bạn chỉ có thể nạp kho cho sản phẩm có hình thức Giao hàng tức thì (INSTANT)!" , HttpStatus.BAD_REQUEST),
     ACCOUNT_IN_TRANSACTION_OR_LOCKED(400,"Tài khoản đang giao dịch hoặc bị khóa, không thể xóa lúc này!",HttpStatus.BAD_REQUEST),
     INVALID_DELIVERY_TYPE_FOR_CONFIG(400, "Sản phẩm không thuộc loại đặt trước (PRE_ORDER) nên không thể cấu hình.", HttpStatus.BAD_REQUEST),
+    PRODUCT_NOT_PURCHASED(403, "Bạn chưa mua sản phẩm này hoặc đơn hàng chưa được giao thành công!",HttpStatus.FORBIDDEN),
+
 
     // Review
     CANNOT_REVIEW_OWN_PRODUCT(400, "Bạn không thể đánh giá hoặc mua sản phẩm của chính mình!", HttpStatus.BAD_REQUEST),

@@ -1,8 +1,6 @@
 package com.commercehub.backend.wallet.dto.response;
 
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
@@ -11,6 +9,8 @@ import java.util.UUID;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class WalletTransactionResponse {
     UUID id;

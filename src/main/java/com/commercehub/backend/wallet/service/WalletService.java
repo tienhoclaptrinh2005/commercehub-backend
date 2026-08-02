@@ -30,15 +30,11 @@ public class WalletService {
         return walletMapper.toWalletResponse(wallet);
     }
 
-
-
     @Transactional
     public void deductBalance(Long userId, BigDecimal amount, String type, Long refId, String refType) {
-
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException(ErrorCode.INVALID_AMOUNT);
         }
-
 
         Wallet wallet = walletRepository.findByUserIdWithLock(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
@@ -55,9 +51,8 @@ public class WalletService {
         logTransaction(wallet.getId(), type, "AVAILABLE", amount.negate(), before, wallet.getAvailableBalance(), refId, refType);
     }
 
-
     @Transactional
-    public void holdForSeller(Long sellerId, BigDecimal amount, Long orderId) {
+    public Wallet holdForSeller(Long sellerId, BigDecimal amount, Long orderId) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException(ErrorCode.INVALID_AMOUNT);
         }
@@ -71,11 +66,12 @@ public class WalletService {
         walletRepository.save(wallet);
 
         logTransaction(wallet.getId(), "SALE_HOLD", "HOLD", amount, before, wallet.getHoldBalance(), orderId, "ORDER");
+
+        return wallet;
     }
 
     @Transactional
     public void processHoldRelease(Long sellerId, BigDecimal holdAmount, BigDecimal sellerNet, BigDecimal platformFee, Long refId) {
-
         if (holdAmount == null || holdAmount.compareTo(BigDecimal.ZERO) <= 0 ||
                 sellerNet == null || sellerNet.compareTo(BigDecimal.ZERO) < 0 ||
                 platformFee == null || platformFee.compareTo(BigDecimal.ZERO) < 0) {
@@ -99,15 +95,12 @@ public class WalletService {
 
         sellerWallet.setHoldBalance(holdBefore.subtract(holdAmount));
 
-
         BigDecimal availBefore = sellerWallet.getAvailableBalance();
         sellerWallet.setAvailableBalance(availBefore.add(sellerNet));
         walletRepository.save(sellerWallet);
 
-
         logTransaction(sellerWallet.getId(), "HOLD_RELEASE", "HOLD", holdAmount.negate(), holdBefore, sellerWallet.getHoldBalance(), refId, "HOLD_RELEASE");
         logTransaction(sellerWallet.getId(), "HOLD_RELEASE_NET", "AVAILABLE", sellerNet, availBefore, sellerWallet.getAvailableBalance(), refId, "HOLD_RELEASE");
-
 
         if (platformFee.compareTo(BigDecimal.ZERO) > 0) {
             Wallet platformWallet = walletRepository.findPlatformWalletWithLock()
@@ -123,7 +116,6 @@ public class WalletService {
 
     @Transactional
     public void addBalance(Long userId, BigDecimal amount, String type, Long refId, String refType) {
-
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException(ErrorCode.INVALID_AMOUNT);
         }
@@ -149,7 +141,6 @@ public class WalletService {
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
         assertWalletActive(wallet);
 
-        // Đảm bảo tiền đang bị hold phải lớn hơn hoặc bằng số tiền muốn gỡ
         if (wallet.getHoldBalance().compareTo(amount) < 0) {
             throw new AppException(ErrorCode.INSUFFICIENT_HOLD_BALANCE);
         }
@@ -158,13 +149,8 @@ public class WalletService {
         wallet.setHoldBalance(before.subtract(amount));
         walletRepository.save(wallet);
 
-        // Ghi log giao dịch (Tiền âm vì trừ đi khỏi cục Hold)
         logTransaction(wallet.getId(), "CANCEL_HOLD", "HOLD", amount.negate(), before, wallet.getHoldBalance(), refId, "ORDER_REFUND");
     }
-
-
-
-
 
     private void logTransaction(Long walletId, String txType, String balType, BigDecimal amount, BigDecimal before, BigDecimal after, Long refId, String refType) {
         WalletTransaction tx = WalletTransaction.builder()
@@ -185,5 +171,4 @@ public class WalletService {
             throw new AppException(ErrorCode.WALLET_INACTIVE);
         }
     }
-
 }

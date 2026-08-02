@@ -6,6 +6,7 @@ import com.commercehub.backend.user.dto.request.UpdateAvatarRequest;
 import com.commercehub.backend.user.dto.request.UpdateProfileRequest;
 import com.commercehub.backend.user.dto.response.ProfileResponse;
 import com.commercehub.backend.user.entity.User;
+import com.commercehub.backend.user.mapper.UserMapper;
 import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,12 +17,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProfileService {
 
     private final UserRepository userRepository;
+    private final UserMapper userMapper;
+
 
     @Transactional(readOnly = true)
     public ProfileResponse getMyProfile(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return buildProfileResponse(user);
+        return userMapper.toProfileResponse(user);
     }
 
     @Transactional
@@ -52,7 +55,7 @@ public class ProfileService {
         }
 
         userRepository.save(user);
-        return buildProfileResponse(user);
+        return userMapper.toProfileResponse(user);
     }
 
     @Transactional
@@ -65,25 +68,6 @@ public class ProfileService {
         }
 
         userRepository.save(user);
-        return buildProfileResponse(user);
-    }
-
-    private ProfileResponse buildProfileResponse(User user) {
-        return ProfileResponse.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .phone(user.getPhone())
-                .username(user.getUsername())
-                .fullName(user.getFullName())
-                .avatarUrl(user.getAvatarUrl())
-                .status(user.getStatus())
-                .userLevel(user.getUserLevel() != null ? user.getUserLevel().getLevel() : null)
-                .accumulatedSpent(user.getAccumulatedSpent())
-                .accumulatedEarned(user.getAccumulatedEarned())
-                .isEmailVerified(user.getIsEmailVerified())
-                .isPhoneVerified(user.getIsPhoneVerified())
-                .createdAt(user.getCreatedAt())
-                .lastActiveAt(user.getLastActiveAt())
-                .build();
+        return userMapper.toProfileResponse(user);
     }
 }

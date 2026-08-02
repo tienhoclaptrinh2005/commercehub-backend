@@ -14,6 +14,7 @@ public interface CategoryMapper {
     Category toEntity(CreateCategoryRequest request);
 
     CategoryResponse toResponse(Category category);
+
     @Mapping(target = "name", ignore = true)
     @Mapping(target = "slug", ignore = true)
     void updateEntityFromRequest(UpdateCategoryRequest request, @MappingTarget Category category);

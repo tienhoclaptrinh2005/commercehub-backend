@@ -2,10 +2,12 @@ package com.commercehub.backend.product.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.product.dto.request.CreateProductReviewRequest;
 import com.commercehub.backend.product.dto.response.ProductReviewResponse;
 import com.commercehub.backend.product.entity.Product;
 import com.commercehub.backend.product.entity.ProductReview;
+import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.product.repository.ProductReviewRepository;
 import com.commercehub.backend.user.entity.User;
@@ -25,8 +27,8 @@ public class ProductReviewService {
     private final ProductReviewRepository reviewRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
-
-
+    private final ProductMapper productMapper;
+    private final OrderItemRepository orderItemRepository;
 
     @Transactional
     public ProductReviewResponse createReview(Long userId, CreateProductReviewRequest request) {
@@ -36,9 +38,13 @@ public class ProductReviewService {
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
 
-
         if (product.getShop().getOwner().getId().equals(userId)) {
             throw new AppException(ErrorCode.CANNOT_REVIEW_OWN_PRODUCT);
+        }
+
+        if (!orderItemRepository.existsByOrder_UserIdAndProductVariant_Product_IdAndOrder_Status(
+                userId, request.getProductId(), "DELIVERED")) {
+            throw new AppException(ErrorCode.PRODUCT_NOT_PURCHASED);
         }
 
         if (reviewRepository.existsByProductIdAndUserId(request.getProductId(), userId)) {
@@ -53,9 +59,8 @@ public class ProductReviewService {
                 .comment(request.getComment())
                 .build();
 
-        reviewRepository.save(review);
-
-        return mapToResponse(review);
+        ProductReview savedReview = reviewRepository.save(review);
+        return productMapper.toReviewResponse(savedReview);
     }
 
     @Transactional(readOnly = true)
@@ -65,19 +70,6 @@ public class ProductReviewService {
 
         Pageable pageable = PageRequest.of(validPage, validSize, Sort.by("createdAt").descending());
 
-        return reviewRepository.findByProductId(productId, pageable).map(this::mapToResponse);
-    }
-
-    private ProductReviewResponse mapToResponse(ProductReview review) {
-        return ProductReviewResponse.builder()
-                .id(review.getId())
-                .productId(review.getProduct().getId())
-                .userId(review.getUser().getId())
-                .reviewerName(review.getUser().getFullName())
-                .reviewerAvatar(review.getUser().getAvatarUrl())
-                .rating(review.getRating())
-                .comment(review.getComment())
-                .createdAt(review.getCreatedAt())
-                .build();
+        return reviewRepository.findByProductId(productId, pageable).map(productMapper::toReviewResponse);
     }
 }

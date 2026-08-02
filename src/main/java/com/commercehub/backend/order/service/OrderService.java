@@ -7,6 +7,7 @@ import com.commercehub.backend.order.dto.response.OrderItemResponse;
 import com.commercehub.backend.order.dto.response.OrderResponse;
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.mapper.OrderMapper;
 import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.order.repository.OrderRepository;
 
@@ -28,11 +29,11 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusService orderStatusService;
-
+    private final OrderMapper orderMapper;
 
     @Transactional(readOnly = true)
     public Page<OrderResponse> getBuyerOrders(Long buyerId, Pageable pageable) {
-        return orderRepository.findByUserId(buyerId, pageable).map(this::mapToOrderResponse);
+        return orderRepository.findByUserId(buyerId, pageable).map(orderMapper::toOrderResponse);
     }
 
     @Transactional(readOnly = true)
@@ -62,12 +63,12 @@ public class OrderService {
         if (!order.getUser().getId().equals(buyerId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        return mapToOrderDetailResponse(order);
+        return buildOrderDetail(order);
     }
 
     @Transactional(readOnly = true)
     public Page<OrderResponse> getSellerOrders(Long shopId, Pageable pageable) {
-        return orderRepository.findByShopId(shopId, pageable).map(this::mapToOrderResponse);
+        return orderRepository.findByShopId(shopId, pageable).map(orderMapper::toOrderResponse);
     }
 
     @Transactional(readOnly = true)
@@ -78,55 +79,19 @@ public class OrderService {
         if (!order.getShop().getId().equals(shopId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        return mapToOrderDetailResponse(order);
+        return buildOrderDetail(order);
     }
 
 
 
-    // --- Các hàm Mapping nội bộ ---
-    private OrderResponse mapToOrderResponse(Order order) {
-        return OrderResponse.builder()
-                .id(order.getId())
-                .orderCode(order.getOrderCode())
-                .shopId(order.getShop().getId())
-                .shopName(order.getShop().getName())
-                .deliveryType(order.getDeliveryType())
-                .status(order.getStatus())
-                .paymentStatus(order.getPaymentStatus())
-                .totalAmount(order.getTotalAmount())
-                .placedAt(order.getPlacedAt())
-                .build();
-    }
-
-    private OrderDetailResponse mapToOrderDetailResponse(Order order) {
+    private OrderDetailResponse buildOrderDetail(Order order) {
         var items = orderItemRepository.findByOrderId(order.getId()).stream()
-                .map(item -> OrderItemResponse.builder()
-                        .id(item.getId())
-                        .productName(item.getProductName())
-                        .variantName(item.getVariantName())
-                        .productType(item.getProductType())
-                        .deliveryType(item.getDeliveryType())
-                        .unitPrice(item.getUnitPrice())
-                        .quantity(item.getQuantity())
-                        .lineTotal(item.getLineTotal())
-                        .build())
+                .map(orderMapper::toOrderItemResponse)
                 .collect(Collectors.toList());
 
-        return OrderDetailResponse.builder()
-                .id(order.getId())
-                .orderCode(order.getOrderCode())
-                .shopId(order.getShop().getId())
-                .shopName(order.getShop().getName())
-                .deliveryType(order.getDeliveryType())
-                .status(order.getStatus())
-                .paymentStatus(order.getPaymentStatus())
-                .paymentMethod(order.getPaymentMethod())
-                .subtotalAmount(order.getSubtotalAmount())
-                .voucherDiscount(order.getVoucherDiscount())
-                .totalAmount(order.getTotalAmount())
-                .placedAt(order.getPlacedAt())
-                .deliveredAt(order.getDeliveredAt())
-                .items(items)
-                .build();
+        OrderDetailResponse response = orderMapper.toOrderDetailResponse(order);
+        response.setItems(items);
+
+        return response;
     }
 }

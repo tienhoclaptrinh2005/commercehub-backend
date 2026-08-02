@@ -1,13 +1,14 @@
 package com.commercehub.backend.product.mapper;
 
 import com.commercehub.backend.product.dto.request.CreateProductRequest;
+import com.commercehub.backend.product.dto.request.UpdateProductRequest;
 import com.commercehub.backend.product.dto.response.*;
-import com.commercehub.backend.product.entity.PreOrderConfig;
-import com.commercehub.backend.product.entity.Product;
-import com.commercehub.backend.product.entity.ProductImage;
-import com.commercehub.backend.product.entity.ProductVariant;
+import com.commercehub.backend.product.entity.*;
+import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
 import java.math.BigDecimal;
@@ -25,6 +26,11 @@ public interface ProductMapper {
     @Mapping(target = "failedDisputeCount", constant = "0L")
     Product toEntity(CreateProductRequest request);
 
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "category", ignore = true)
+    @Mapping(target = "slug", ignore = true)
+    void updateProductFromRequest(UpdateProductRequest request, @MappingTarget Product product);
+
     @Mapping(target = "productId", source = "product.id")
     ProductVariantResponse toVariantResponse(ProductVariant variant);
 
@@ -33,13 +39,12 @@ public interface ProductMapper {
     @Mapping(target = "productId", source = "product.id")
     PreOrderConfigResponse toPreOrderConfigResponse(PreOrderConfig config);
 
-
     @Mapping(target = "shopId", expression = "java(getShopId(product))")
     @Mapping(target = "shopName", expression = "java(getShopName(product))")
     @Mapping(target = "categoryId", expression = "java(getCategoryId(product))")
+    @Mapping(target = "categoryName", expression = "java(getCategoryName(product))")
     @Mapping(target = "stockCount", expression = "java(calculateTotalStock(product.getVariants()))")
     ProductResponse toResponse(Product product, BigDecimal minPrice);
-
 
     @Mapping(target = "shopId", expression = "java(getShopId(product))")
     @Mapping(target = "shopName", expression = "java(getShopName(product))")
@@ -49,7 +54,14 @@ public interface ProductMapper {
     @Mapping(target = "imageUrls", expression = "java(mapImages(product.getImages()))")
     ProductDetailResponse toDetailResponse(Product product);
 
+    @Mapping(target = "variantId", source = "productVariant.id")
+    DigitalAssetResponse toDigitalAssetResponse(DigitalAsset asset);
 
+    @Mapping(target = "productId", source = "product.id")
+    @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "reviewerName", source = "user.fullName")
+    @Mapping(target = "reviewerAvatar", source = "user.avatarUrl")
+    ProductReviewResponse toReviewResponse(ProductReview review);
 
     default Long getShopId(Product product) {
         return (product != null && product.getShop() != null) ? product.getShop().getId() : null;

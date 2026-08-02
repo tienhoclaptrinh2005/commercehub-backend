@@ -65,6 +65,9 @@ public class AuthService {
             throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
         User newUser = authMapper.toUserEntity(request);
+        newUser.setAccumulatedSpent(BigDecimal.ZERO);
+        newUser.setAccumulatedEarned(BigDecimal.ZERO);
+
         newUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         newUser.setUsername(generateUniqueUsername(request.getEmail()));
 
@@ -282,6 +285,10 @@ public class AuthService {
                         .status("ACTIVE")
                         .isEmailVerified(true)
                         .provider("GOOGLE")
+
+                        .accumulatedSpent(BigDecimal.ZERO)
+                        .accumulatedEarned(BigDecimal.ZERO)
+
                         .build();
 
 

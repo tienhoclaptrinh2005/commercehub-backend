@@ -1,12 +1,18 @@
 package com.commercehub.backend.order.dto.response;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
+
 @Builder
 public class OrderDetailResponse {
     private Long id;
@@ -25,4 +31,5 @@ public class OrderDetailResponse {
 
     // Danh sách sản phẩm trong đơn
     private List<OrderItemResponse> items;
+    List<OrderStatusLogResponse> statusLogs;
 }

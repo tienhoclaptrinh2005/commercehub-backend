@@ -7,6 +7,7 @@ import com.commercehub.backend.product.dto.request.UploadDigitalAssetRequest;
 import com.commercehub.backend.product.dto.response.DigitalAssetResponse;
 import com.commercehub.backend.product.entity.DigitalAsset;
 import com.commercehub.backend.product.entity.ProductVariant;
+import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.DigitalAssetRepository;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class DigitalAssetService {
 
     private final DigitalAssetRepository digitalAssetRepository;
     private final ProductVariantRepository variantRepository;
-
+    private final ProductMapper productMapper;
 
     // SELLER (Upload, Xem danh sách, Xóa)
 
@@ -75,13 +76,7 @@ public class DigitalAssetService {
         }
 
         return digitalAssetRepository.findByProductVariantIdOrderByCreatedAtDesc(variantId).stream()
-                .map(asset -> DigitalAssetResponse.builder()
-                        .id(asset.getId())
-                        .variantId(asset.getProductVariant().getId())
-                        .assetData(asset.getAssetData())
-                        .status(asset.getStatus())
-                        .createdAt(asset.getCreatedAt())
-                        .build())
+                .map(productMapper::toDigitalAssetResponse)
                 .collect(Collectors.toList());
     }
 

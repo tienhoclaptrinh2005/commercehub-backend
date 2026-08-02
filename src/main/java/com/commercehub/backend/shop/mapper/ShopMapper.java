@@ -17,6 +17,9 @@ import org.mapstruct.Builder;
         builder = @Builder(disableBuilder = false))
 public interface ShopMapper {
 
+    @Mapping(target = "slug", ignore = true)
+    @Mapping(target = "owner", ignore = true)
+    @Mapping(target = "status", constant = "ACTIVE")
     Shop toEntity(CreateShopRequest request);
 
     @Mapping(target = "ownerId", source = "owner.id")

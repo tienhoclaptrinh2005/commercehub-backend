@@ -27,8 +27,8 @@ public class HoldRelease {
     @JoinColumn(name = "wallet_id", nullable = false)
      Wallet wallet;
 
-    @Column(name = "order_item_id", nullable = false, unique = true)
-     Long orderItemId;
+    @Column(name = "order_id", nullable = false, unique = true)
+    Long orderId;
 
     @Column(name = "hold_amount", nullable = false, precision = 18, scale = 2)
      BigDecimal holdAmount;
