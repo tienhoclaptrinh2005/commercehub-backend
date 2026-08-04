@@ -51,13 +51,19 @@ public class DepositService {
     // VNPay TRẢ VỀ THÀNH CÔNG
     // ==========================================
     @Transactional
-    public void processSuccess(String transactionCode) {
+    public void processSuccess(String transactionCode, BigDecimal paidAmount) {
         // ĐÃ SỬA THÀNH findByTransactionCodeWithLock ĐỂ TRÁNH LỖI NHÂN ĐÔI TIỀN
         Deposit deposit = depositRepository.findByTransactionCodeWithLock(transactionCode)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!"PENDING".equals(deposit.getStatus())) {
             return; // Idempotency check: Tránh cộng tiền 2 lần nếu VNPay bắn IPN nhiều lần
+        }
+
+        // ĐỐI CHIẾU SỐ TIỀN: chỉ cộng ví đúng số tiền user đã đăng ký nạp.
+        // Lệch số tiền → giữ nguyên PENDING để admin đối soát thủ công.
+        if (paidAmount == null || deposit.getAmount().compareTo(paidAmount) != 0) {
+            throw new AppException(ErrorCode.DEPOSIT_AMOUNT_MISMATCH);
         }
 
         // Cập nhật trạng thái

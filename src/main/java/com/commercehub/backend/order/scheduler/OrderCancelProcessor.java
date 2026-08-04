@@ -25,23 +25,45 @@ public class OrderCancelProcessor {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void cancelSingleOrder(Long orderId, String reason) {
 
-        // 1. Re-fetch Order để khởi tạo lại Session an toàn, tránh lỗi Lazy
-        Order order = orderRepository.findById(orderId)
+        // 1. PESSIMISTIC LOCK: chống race với seller accept/complete/cancel.
+        // Nếu seller đang thao tác, cron sẽ đợi lock rồi đọc trạng thái MỚI NHẤT.
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
+
+        // 2. GUARD trạng thái: chỉ hủy đơn còn đang chờ/đang xử lý và CHƯA hoàn tiền.
+        // Đơn vừa được seller accept (PROCESSING với deadline mới) hoặc đã DELIVERED
+        // / CANCELLED / REFUNDED thì tuyệt đối không đụng vào tiền.
+        String status = order.getStatus();
+        boolean cancellableStatus = "WAITING_APPROVAL".equals(status) || "PROCESSING".equals(status);
+        if (!cancellableStatus || !"PAID".equals(order.getPaymentStatus())) {
+            log.info("Bỏ qua auto-cancel đơn ID {}: status={}, paymentStatus={} (không đủ điều kiện hủy).",
+                    orderId, status, order.getPaymentStatus());
+            return;
+        }
+
+        // 3. Re-check deadline sau khi có lock — seller có thể vừa accept làm deadline thay đổi
+        java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+        boolean waitingExpired = "WAITING_APPROVAL".equals(status)
+                && order.getApprovalDeadlineAt() != null && order.getApprovalDeadlineAt().isBefore(now);
+        boolean processingExpired = "PROCESSING".equals(status)
+                && order.getProcessingDeadlineAt() != null && order.getProcessingDeadlineAt().isBefore(now);
+        if (!waitingExpired && !processingExpired) {
+            log.info("Bỏ qua auto-cancel đơn ID {}: deadline đã được gia hạn (seller vừa thao tác).", orderId);
+            return;
+        }
 
         String oldStatus = order.getStatus();
 
-        // 2. Cập nhật trạng thái
+        // 4. Cập nhật trạng thái
         order.setStatus("CANCELLED_BY_SYSTEM");
         order.setPaymentStatus("REFUNDED");
         orderRepository.save(order);
 
-        // 3. Xử lý hoàn tiền
-        // Do đã re-fetch an toàn ở bước 1, gọi order.getShop().getOwner() giờ sẽ cực kỳ mượt mà
+        // 5. Hoàn tiền: gỡ hold của seller, trả tiền về ví buyer (cùng transaction)
         walletService.cancelHoldForSeller(order.getShop().getOwner().getId(), order.getTotalAmount(), order.getId());
         walletService.addBalance(order.getUser().getId(), order.getTotalAmount(), "ORDER_REFUND", order.getId(), reason);
 
-        // 4. Ghi log trạng thái
+        // 6. Ghi log trạng thái
         orderStatusService.logStatusChange(order, oldStatus, "CANCELLED_BY_SYSTEM", null, reason);
 
         log.info("CronJob đã hủy thành công đơn hàng ID: {}", orderId);

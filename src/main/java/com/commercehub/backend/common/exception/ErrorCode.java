@@ -65,6 +65,7 @@ public enum ErrorCode {
     INVALID_AMOUNT(400,"Số tiền không hợp lệ !" , HttpStatus.BAD_REQUEST),
     INSUFFICIENT_HOLD_BALANCE(400, "Số dư giữ không đủ ", HttpStatus.BAD_REQUEST),
     WALLET_INACTIVE(403, "Ví không hoạt động !", HttpStatus.FORBIDDEN),
+    DEPOSIT_AMOUNT_MISMATCH(400, "Số tiền VNPay báo về không khớp với số tiền của đơn nạp!", HttpStatus.BAD_REQUEST),
 
     //oder
     SHOP_SUSPENDED(403, "Gian hàng hiện đang bị tạm khóa, không thể đặt hàng!", HttpStatus.FORBIDDEN),
@@ -79,6 +80,10 @@ public enum ErrorCode {
 
     ORDER_ACCESS_DENIED(403, "Bạn không có quyền thao tác trên đơn hàng này!", HttpStatus.FORBIDDEN),
 
+    // Giỏ hàng
+    CART_ITEM_NOT_FOUND(404, "Không tìm thấy sản phẩm này trong giỏ hàng của bạn!", HttpStatus.NOT_FOUND),
+    CART_EMPTY(400, "Giỏ hàng của bạn đang trống!", HttpStatus.BAD_REQUEST),
+
     ORDER_NOT_WAITING_APPROVAL(400, "Đơn hàng không ở trạng thái chờ duyệt!", HttpStatus.BAD_REQUEST),
     ORDER_APPROVAL_TIMEOUT(400, "Đơn hàng đã quá thời hạn duyệt!", HttpStatus.BAD_REQUEST),
 
@@ -92,8 +97,29 @@ public enum ErrorCode {
 
     // Hệ thống & Cấu hình
     SYSTEM_CONFIG_ERROR(500, "Lỗi cấu hình hệ thống! Vui lòng liên hệ quản trị viên.", HttpStatus.INTERNAL_SERVER_ERROR),
-    FEE_CONFIG_NOT_FOUND(500, "Không tìm thấy cấu hình phí sàn đang hoạt động!", HttpStatus.INTERNAL_SERVER_ERROR),
     HOLD_RELEASE_INVALID_STATUS(400, "Trạng thái giữ tiền không hợp lệ để thực hiện thao tác này!", HttpStatus.BAD_REQUEST),
+
+
+    // Fee Module
+    FEE_CONFIG_NOT_FOUND(500, "Không tìm thấy cấu hình phí sàn đang hoạt động!", HttpStatus.INTERNAL_SERVER_ERROR),
+    FEE_LEDGER_NOT_FOUND(404, "Không tìm thấy bản ghi phí sàn!", HttpStatus.NOT_FOUND),
+    FEE_LEDGER_ALREADY_PROCESSED(400, "Bản ghi phí này đã được xử lý, không thể thay đổi!", HttpStatus.BAD_REQUEST),
+    FEE_LEDGER_INVALID_STATUS(400, "Trạng thái phí sàn không hợp lệ để thực hiện thao tác này!", HttpStatus.BAD_REQUEST),
+    FEE_CONFIG_ALREADY_ACTIVE(400, "Đã có cấu hình phí đang hoạt động. Hãy deactivate cấu hình cũ trước!", HttpStatus.BAD_REQUEST),
+    FEE_CALCULATION_ERROR(500, "Lỗi tính toán phí sàn, vui lòng kiểm tra cấu hình!", HttpStatus.INTERNAL_SERVER_ERROR),
+    FEE_INVARIANT_VIOLATED(500, "Lỗi bất biến phí sàn: holdAmount ≠ feeAmount + sellerNetAmount!", HttpStatus.INTERNAL_SERVER_ERROR),
+    SHOP_FEE_SUMMARY_NOT_FOUND(404, "Không tìm thấy tổng hợp phí sàn của shop!", HttpStatus.NOT_FOUND),
+
+
+    // Complaint / Dispute Module
+    HOLD_RELEASE_NOT_FOUND(404, "Không tìm thấy bản ghi giữ tiền cho sản phẩm này!", HttpStatus.NOT_FOUND),
+    ORDER_ITEM_NOT_FOUND(404, "Không tìm thấy dòng sản phẩm trong đơn hàng!", HttpStatus.NOT_FOUND),
+    COMPLAINT_NOT_ALLOWED(400, "Không thể khiếu nại lúc này! Sản phẩm phải đang ở trạng thái HOLDING và chưa hết thời hạn.", HttpStatus.BAD_REQUEST),
+    HOLD_RELEASE_NOT_COMPLAINED(400, "Sản phẩm này chưa ở trạng thái khiếu nại (COMPLAINED)!", HttpStatus.BAD_REQUEST),
+    HOLD_RELEASE_NOT_WARRANTY(400, "Sản phẩm này không đang trong quá trình bảo hành (WARRANTY_IN_PROGRESS)!", HttpStatus.BAD_REQUEST),
+    HOLD_RELEASE_NOT_DISPUTED(400, "Sản phẩm này chưa ở trạng thái tranh chấp (DISPUTED) để Admin phán xử!", HttpStatus.BAD_REQUEST),
+
+
 
 
     ;

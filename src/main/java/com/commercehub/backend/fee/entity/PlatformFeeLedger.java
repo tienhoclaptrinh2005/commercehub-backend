@@ -61,16 +61,13 @@ public class PlatformFeeLedger {
     private String adjustmentReason;
 
     @Column(nullable = false, length = 20)
-    private String status; // PENDING, COLLECTED, WAIVED, ADJUSTED, CANCELLED
+    private String status; // PENDING, COLLECTED, CANCELLED
 
     @Column(name = "fee_incurred_at", nullable = false)
     private OffsetDateTime feeIncurredAt;
 
     @Column(name = "collected_at")
     private OffsetDateTime collectedAt;
-
-    @Column(name = "waived_at")
-    private OffsetDateTime waivedAt;
 
     @Column(name = "cancelled_at")
     private OffsetDateTime cancelledAt;

@@ -80,6 +80,14 @@ public class Order {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    /**
+     * Idempotency key do client gửi kèm checkout — chống double-submit tạo
+     * 2 đơn và trừ ví 2 lần. Nhiều order có thể chung 1 key (1 lần checkout
+     * tách thành nhiều đơn theo shop/loại giao hàng).
+     */
+    @Column(name = "idempotency_key", length = 100)
+    private String idempotencyKey;
+
     @Version
     @Column(nullable = false)
     private Long version;

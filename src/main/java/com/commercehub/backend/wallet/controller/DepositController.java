@@ -36,8 +36,7 @@ public class DepositController {
     public ResponseEntity<ApiResponse<String>> createDepositUrl(
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody DepositRequest request) {
-
-        // ĐÃ FIX Bug #41: Dùng UUID tránh trùng txCode khi concurrent requests
+        
         String txCode = "VNPAY_" + UUID.randomUUID().toString().replace("-", "");
 
         depositService.createPendingDeposit(currentUser.getId(), request.getAmount(), txCode);
@@ -90,7 +89,16 @@ public class DepositController {
             String responseCode = params.get("vnp_ResponseCode");
 
             if ("00".equals(responseCode)) {
-                depositService.processSuccess(txnRef);
+                // ĐỐI CHIẾU SỐ TIỀN: vnp_Amount = số tiền thật × 100 (theo spec VNPay).
+                // Thiếu hoặc lệch số tiền → tuyệt đối không cộng ví.
+                String vnpAmountStr = params.get("vnp_Amount");
+                if (vnpAmountStr == null || vnpAmountStr.isBlank()) {
+                    log.error(" VNPay IPN: Thiếu vnp_Amount - TxnRef: {}. Từ chối xử lý.", txnRef);
+                    return ResponseEntity.badRequest().body(null);
+                }
+                java.math.BigDecimal paidAmount = new java.math.BigDecimal(vnpAmountStr).movePointLeft(2);
+
+                depositService.processSuccess(txnRef, paidAmount);
                 log.info(" VNPay IPN: Nạp tiền thành công - TxnRef: {}", txnRef);
             } else {
                 depositService.processFailed(txnRef);

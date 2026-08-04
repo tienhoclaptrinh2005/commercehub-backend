@@ -15,16 +15,33 @@ import java.util.Optional;
 @Repository
 public interface HoldReleaseRepository extends JpaRepository<HoldRelease, Long> {
 
+    /** Tìm tất cả HoldRelease HOLDING đã đến hạn để Scheduler xử lý. */
     @Query("SELECT h FROM HoldRelease h " +
             "JOIN FETCH h.wallet w " +
             "JOIN FETCH w.user " +
             "WHERE h.status = 'HOLDING' AND h.scheduledReleaseAt <= :now")
     List<HoldRelease> findDueReleases(@Param("now") OffsetDateTime now);
-    HoldRelease findByOrderItemId(Long orderItemId);
 
+    /** Tìm tất cả HoldRelease theo orderId (1 order → nhiều item). */
+    List<HoldRelease> findByOrderId(Long orderId);
+
+    /** Tìm HoldRelease theo orderItemId (không có lock — dùng cho đọc). */
+    Optional<HoldRelease> findByOrderItemId(Long orderItemId);
+
+
+    /** Tìm HoldRelease theo id với Pessimistic Lock (dùng trong HoldReleaseProcessor và adminResolve). */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT h FROM HoldRelease h WHERE h.id = :id")
+    @Query("SELECT h FROM HoldRelease h JOIN FETCH h.wallet w JOIN FETCH w.user WHERE h.id = :id")
     Optional<HoldRelease> findByIdWithLock(@Param("id") Long id);
 
-    HoldRelease findByFeeLedgerId(Long feeLedgerId);
+    /** Tra cứu HoldRelease từ FeeLedger (dùng cho Admin/reporting). */
+    Optional<HoldRelease> findByFeeLedgerId(Long feeLedgerId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT h FROM HoldRelease h WHERE h.orderItemId = :orderItemId")
+    Optional<HoldRelease> findByOrderItemIdWithLock(@Param("orderItemId") Long orderItemId);
+
+
+
+
 }

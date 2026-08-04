@@ -35,11 +35,24 @@ public class WithdrawalService {
     public void requestWithdrawal(Long userId, WithdrawalRequest request) {
 
         // 1. ĐÃ SỬA THÀNH findByUserIdWithLock ĐỂ ÉP HIBERNATE KHÔNG DÙNG L1 CACHE
-        // Ngăn chặn triệt để hành vi spam request để rút vượt số dư
+        // Ngăn chặn triệt để hành vi spam request để rút vượt số dư.
+        // Lock ví cũng serialize các request song song của cùng user →
+        // idempotency check bên dưới an toàn với race.
         Wallet wallet = walletRepository.findByUserIdWithLock(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
 
-        // 2. Tạo bản ghi yêu cầu VÀ LƯU TRƯỚC để DB sinh ra ID
+        // 2. Idempotency: client retry cùng key → không tạo đơn rút mới, không trừ ví lần 2
+        String idempotencyKey = request.getIdempotencyKey();
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            var existing = withdrawalRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Withdrawal idempotency hit — user {} key {} → đơn rút ID {}",
+                        userId, idempotencyKey, existing.get().getId());
+                return;
+            }
+        }
+
+        // 3. Tạo bản ghi yêu cầu VÀ LƯU TRƯỚC để DB sinh ra ID
         Withdrawal withdrawal = Withdrawal.builder()
                 .wallet(wallet)
                 .amount(request.getAmount())
@@ -47,12 +60,13 @@ public class WithdrawalService {
                 .bankName(request.getBankName())
                 .accountNumber(request.getAccountNumber())
                 .accountName(request.getAccountName())
+                .idempotencyKey(idempotencyKey)
                 .status("PENDING")
                 .build();
 
         withdrawal = withdrawalRepository.save(withdrawal); // Nhận lại Entity đã có ID
 
-        // 3. Trừ tiền khả dụng và TRUYỀN ID CỦA ĐƠN RÚT TIỀN VÀO LỊCH SỬ GIAO DỊCH
+        // 4. Trừ tiền khả dụng và TRUYỀN ID CỦA ĐƠN RÚT TIỀN VÀO LỊCH SỬ GIAO DỊCH
         walletService.deductBalance(
                 userId,
                 request.getAmount(),

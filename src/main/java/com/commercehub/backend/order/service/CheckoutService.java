@@ -4,8 +4,11 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.dto.request.CheckoutItemRequest;
 import com.commercehub.backend.order.dto.request.CheckoutRequest;
+import com.commercehub.backend.order.entity.Order;
+import com.commercehub.backend.order.repository.OrderRepository;
 import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
+import com.commercehub.backend.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,8 @@ public class CheckoutService {
     private final ProductVariantRepository variantRepository;
     private final InstantOrderService instantOrderService;
     private final PreOrderService preOrderService;
+    private final OrderRepository orderRepository;
+    private final WalletRepository walletRepository;
 
 
     @Transactional
@@ -31,6 +36,23 @@ public class CheckoutService {
 
         if (request.getItems() == null || request.getItems().isEmpty()) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // Khóa ví buyer NGAY từ đầu để serialize các lần checkout song song của
+        // cùng 1 user — nền tảng cho idempotency check bên dưới hoạt động chính xác.
+        walletRepository.findByUserIdWithLock(buyerId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+
+        // Idempotency: client gửi lại cùng key (retry mạng, double-click)
+        // → trả về danh sách đơn đã tạo, KHÔNG trừ ví lần 2.
+        String idempotencyKey = request.getIdempotencyKey();
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            List<Order> existingOrders = orderRepository.findByUserIdAndIdempotencyKey(buyerId, idempotencyKey);
+            if (!existingOrders.isEmpty()) {
+                List<Long> existingIds = existingOrders.stream().map(Order::getId).toList();
+                log.info("Checkout idempotency hit — user {} key {} → trả lại đơn cũ {}", buyerId, idempotencyKey, existingIds);
+                return existingIds;
+            }
         }
 
         Map<String, List<CheckoutItemRequest>> groupedItems = new HashMap<>();
@@ -57,6 +79,7 @@ public class CheckoutService {
             CheckoutRequest subRequest = new CheckoutRequest();
             subRequest.setItems(itemsInGroup);
             subRequest.setPaymentMethod(request.getPaymentMethod());
+            subRequest.setIdempotencyKey(idempotencyKey);
 
             if (groupKey.endsWith("INSTANT")) {
                 Long orderId = instantOrderService.checkoutInstant(buyerId, subRequest);

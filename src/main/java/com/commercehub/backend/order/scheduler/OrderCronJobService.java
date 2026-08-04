@@ -4,6 +4,7 @@ import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,7 @@ public class OrderCronJobService {
     private final OrderCancelProcessor orderCancelProcessor;
 
     @Scheduled(cron = "0 0/30 * * * *")
+    @SchedulerLock(name = "order_autoCancelExpiredProcessing", lockAtMostFor = "25m", lockAtLeastFor = "30s")
     public void autoCancelExpiredProcessingOrders() {
         List<Order> expiredOrders = orderRepository.findByStatusAndProcessingDeadlineAtBefore("PROCESSING", OffsetDateTime.now());
 
@@ -36,6 +38,7 @@ public class OrderCronJobService {
     }
 
     @Scheduled(cron = "0 0/30 * * * *")
+    @SchedulerLock(name = "order_autoCancelExpiredWaitingApproval", lockAtMostFor = "25m", lockAtLeastFor = "30s")
     public void autoCancelExpiredWaitingApproval() {
         List<Order> expiredOrders = orderRepository.findByStatusAndApprovalDeadlineAtBefore("WAITING_APPROVAL", OffsetDateTime.now());
 

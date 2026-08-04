@@ -3,6 +3,7 @@ package com.commercehub.backend.wallet.scheduler;
 import com.commercehub.backend.wallet.service.HoldReleaseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -30,6 +31,7 @@ public class HoldReleaseScheduler {
      * Cron: giây 0, mỗi 5 phút, mọi giờ, mọi ngày.
      */
     @Scheduled(cron = "0 */5 * * * *")
+    @SchedulerLock(name = "holdRelease_releaseHeldFunds", lockAtMostFor = "10m", lockAtLeastFor = "30s")
     public void releaseHeldFunds() {
         log.info("⏰ [HoldReleaseScheduler] Bắt đầu quét các khoản hold đến hạn...");
         try {

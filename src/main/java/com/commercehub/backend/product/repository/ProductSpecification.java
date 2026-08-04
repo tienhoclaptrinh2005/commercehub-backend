@@ -15,7 +15,6 @@ public class ProductSpecification {
 
             predicates.add(cb.equal(root.get("status"), "ACTIVE"));
 
-            // ĐÃ FIX Bug #NEW4: Ẩn sản phẩm từ shop bị BANNED/INACTIVE trên trang tìm kiếm
             predicates.add(cb.equal(root.get("shop").get("status"), "ACTIVE"));
 
             if (keyword != null && !keyword.trim().isEmpty()) {

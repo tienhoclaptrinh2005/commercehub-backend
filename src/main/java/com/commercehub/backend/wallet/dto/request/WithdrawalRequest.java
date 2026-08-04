@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
@@ -27,4 +28,11 @@ public class WithdrawalRequest {
 
     @NotBlank(message = "Tên chủ tài khoản không được để trống")
     String accountName;
+
+    /**
+     * Khóa idempotency do client sinh (UUID) — retry cùng key sẽ không tạo
+     * yêu cầu rút mới, không trừ ví lần 2.
+     */
+    @Size(max = 100, message = "Idempotency key tối đa 100 ký tự")
+    String idempotencyKey;
 }

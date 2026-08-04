@@ -24,4 +24,7 @@ public interface WithdrawalRepository extends JpaRepository<Withdrawal, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM Withdrawal w JOIN FETCH w.wallet wl JOIN FETCH wl.user WHERE w.id = :id")
     Optional<Withdrawal> findByIdWithLock(@Param("id") Long id);
+
+    /** Idempotency: tra cứu yêu cầu rút theo key client gửi lên. */
+    Optional<Withdrawal> findByIdempotencyKey(String idempotencyKey);
 }

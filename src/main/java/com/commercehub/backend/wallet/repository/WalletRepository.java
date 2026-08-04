@@ -23,4 +23,7 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
     @Query("SELECT w FROM Wallet w WHERE w.isPlatform = true")
     Optional<Wallet> findPlatformWalletWithLock();
 
+    /** Kiểm tra ví platform đã tồn tại chưa (dùng cho seeder lúc khởi động). */
+    boolean existsByIsPlatformTrue();
+
 }

@@ -51,6 +51,25 @@ public class OrderItem {
     @Column(name = "line_total", nullable = false, precision = 18, scale = 2)
     private BigDecimal lineTotal;
 
+    // =========================================================
+    // SNAPSHOT PHÍ SÀN — chốt tại thời điểm buyer thanh toán.
+    // Khi shop complete đơn PRE_ORDER, hệ thống dùng lại snapshot này
+    // thay vì tính theo config hiện tại (admin đổi rate không ảnh hưởng
+    // các đơn đã thanh toán). Bất biến: feeAmount + sellerNetAmount = lineTotal.
+    // =========================================================
+
+    @Column(name = "fee_config_id")
+    private Long feeConfigId;
+
+    @Column(name = "fee_rate_snapshot", precision = 5, scale = 4)
+    private BigDecimal feeRateSnapshot;
+
+    @Column(name = "fee_amount", precision = 18, scale = 2)
+    private BigDecimal feeAmount;
+
+    @Column(name = "seller_net_amount", precision = 18, scale = 2)
+    private BigDecimal sellerNetAmount;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

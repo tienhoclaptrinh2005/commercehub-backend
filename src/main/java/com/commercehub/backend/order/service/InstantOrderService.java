@@ -22,7 +22,6 @@ import com.commercehub.backend.user.repository.UserRepository;
 import com.commercehub.backend.wallet.entity.HoldRelease;
 import com.commercehub.backend.wallet.entity.Wallet;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
-import com.commercehub.backend.wallet.repository.WalletRepository;
 import com.commercehub.backend.wallet.service.WalletService;
 import com.commercehub.backend.common.util.OrderCodeGenerator;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +36,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Checkout INSTANT: giao hàng ngay, tiền buyer bị trừ và hold vào ví seller.
+ *
+ * Mô hình tiền PER-ITEM (mỗi OrderItem có đúng 1 HoldRelease + 1 FeeLedger):
+ *   - lineTotal = feeAmount + sellerNetAmount (bất biến từng dòng)
+ *   - Tổng hold của order = tổng lineTotal = totalAmount buyer đã trả
+ *   → Khớp sổ 100%: ví buyer + hold seller + phí sàn = tiền nạp ban đầu.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -64,6 +71,7 @@ public class InstantOrderService {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
 
+        // Gộp các dòng trùng variant
         Map<Long, CheckoutItemRequest> mergedMap = new LinkedHashMap<>();
         for (CheckoutItemRequest item : request.getItems()) {
             if (mergedMap.containsKey(item.getProductVariantId())) {
@@ -83,11 +91,8 @@ public class InstantOrderService {
         List<List<DigitalAsset>> allocatedAssetsList = new ArrayList<>();
 
         BigDecimal orderTotalAmount = BigDecimal.ZERO;
-        BigDecimal totalFeeAmount = BigDecimal.ZERO;
-        BigDecimal totalSellerNetAmount = BigDecimal.ZERO;
-        Long appliedFeeConfigId = null;
-        BigDecimal appliedFeeRateSnapshot = null;
 
+        // ================= 1. VALIDATE + KHÓA KHO =================
         for (CheckoutItemRequest itemReq : consolidatedItems) {
             ProductVariant variant = variantRepository.findById(itemReq.getProductVariantId())
                     .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
@@ -96,9 +101,13 @@ public class InstantOrderService {
                 throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE_FOR_ASSET);
             }
 
+            Shop currentShop = variant.getProduct().getShop();
             if (targetShop == null) {
-                targetShop = variant.getProduct().getShop();
+                targetShop = currentShop;
                 sellerId = targetShop.getOwner().getId();
+            } else if (!targetShop.getId().equals(currentShop.getId())) {
+                // 1 order chỉ thuộc 1 shop — chặn trộn sản phẩm nhiều shop
+                throw new AppException(ErrorCode.ITEMS_MUST_BE_SAME_SHOP);
             }
 
             if (buyerId.equals(sellerId)) {
@@ -119,21 +128,12 @@ public class InstantOrderService {
             BigDecimal lineTotal = variant.getPrice().multiply(new BigDecimal(itemReq.getQuantity()));
             orderTotalAmount = orderTotalAmount.add(lineTotal);
 
-            FeeResult feeResult = feeCalculationService.calculateFee(lineTotal);
-            totalFeeAmount = totalFeeAmount.add(feeResult.getFeeAmount());
-            totalSellerNetAmount = totalSellerNetAmount.add(feeResult.getSellerNetAmount());
-
-
-            if (appliedFeeConfigId == null) {
-                appliedFeeConfigId = feeResult.getFeeConfigId();
-                appliedFeeRateSnapshot = feeResult.getFeeRateSnapshot();
-            }
-
             processedVariants.add(variant);
             allocatedAssetsList.add(assetsToSell);
         }
 
-
+        // ================= 2. TẠO ORDER =================
+        // Thanh toán hiện tại luôn qua VÍ (nạp trước - mua sau).
         Order order = Order.builder()
                 .orderCode(OrderCodeGenerator.generate(targetShop.getId()))
                 .user(buyer)
@@ -141,49 +141,23 @@ public class InstantOrderService {
                 .deliveryType("INSTANT")
                 .subtotalAmount(orderTotalAmount)
                 .totalAmount(orderTotalAmount)
-                .paymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "WALLET")
+                .paymentMethod("WALLET")
                 .paymentStatus("PAID")
                 .status("DELIVERED")
                 .placedAt(OffsetDateTime.now())
                 .deliveredAt(OffsetDateTime.now())
+                .idempotencyKey(request.getIdempotencyKey())
                 .build();
         order = orderRepository.save(order);
 
+        // ================= 3. LUÂN CHUYỂN TIỀN =================
         walletService.deductBalance(buyerId, orderTotalAmount, "ORDER_PAYMENT", order.getId(), "ORDER");
-
         Wallet sellerWallet = walletService.holdForSeller(sellerId, orderTotalAmount, order.getId());
 
         orderStatusService.logStatusChange(order, null, "DELIVERED", buyerId, "Checkout tức thì - giao hàng ngay");
 
-        HoldRelease holdRelease = HoldRelease.builder()
-                .wallet(sellerWallet)
-                .orderId(order.getId())
-                .holdAmount(orderTotalAmount)
-                .feeAmount(totalFeeAmount)
-                .sellerNetAmount(totalSellerNetAmount)
-                .status("HOLDING")
-                .scheduledReleaseAt(OffsetDateTime.now().plusDays(7))
-                .build();
-        holdRelease = holdReleaseRepository.save(holdRelease);
-
-        PlatformFeeLedger feeLedger = PlatformFeeLedger.builder()
-                .orderId(order.getId())
-                .shopId(targetShop.getId())
-                .sellerWalletId(sellerWallet.getId())
-                .feeConfigId(appliedFeeConfigId)
-                .feeRateSnapshot(appliedFeeRateSnapshot) // Tỉ lệ phí (%)
-                .saleAmount(orderTotalAmount)
-                .feeAmount(totalFeeAmount)
-                .sellerNetAmount(totalSellerNetAmount)
-                .status("PENDING")
-                .feeIncurredAt(OffsetDateTime.now())
-                .holdReleaseId(holdRelease.getId())
-                .build();
-        feeLedger = feeLedgerRepository.save(feeLedger);
-
-        holdRelease.setFeeLedgerId(feeLedger.getId());
-        holdReleaseRepository.save(holdRelease);
-
+        // ================= 4. TẠO ITEM + HOLD + LEDGER PER-ITEM =================
+        OffsetDateTime scheduledReleaseAt = OffsetDateTime.now().plusDays(7);
 
         for (int i = 0; i < consolidatedItems.size(); i++) {
             CheckoutItemRequest itemReq = consolidatedItems.get(i);
@@ -191,6 +165,9 @@ public class InstantOrderService {
             List<DigitalAsset> assetsToSell = allocatedAssetsList.get(i);
 
             BigDecimal lineTotal = variant.getPrice().multiply(new BigDecimal(itemReq.getQuantity()));
+
+            // Tính phí sàn cho dòng này (snapshot tại thời điểm thanh toán)
+            FeeResult feeResult = feeCalculationService.calculateFee(lineTotal);
 
             OrderItem orderItem = OrderItem.builder()
                     .order(order)
@@ -202,9 +179,47 @@ public class InstantOrderService {
                     .unitPrice(variant.getPrice())
                     .quantity(itemReq.getQuantity())
                     .lineTotal(lineTotal)
+                    .feeConfigId(feeResult.getFeeConfigId())
+                    .feeRateSnapshot(feeResult.getFeeRateSnapshot())
+                    .feeAmount(feeResult.getFeeAmount())
+                    .sellerNetAmount(feeResult.getSellerNetAmount())
                     .build();
-            orderItemRepository.save(orderItem);
+            orderItem = orderItemRepository.save(orderItem);
 
+            // 1 OrderItem ↔ 1 HoldRelease: khiếu nại/hoàn tiền được xử lý theo từng dòng
+            HoldRelease holdRelease = HoldRelease.builder()
+                    .wallet(sellerWallet)
+                    .orderId(order.getId())
+                    .orderItemId(orderItem.getId())
+                    .holdAmount(lineTotal)
+                    .feeAmount(feeResult.getFeeAmount())
+                    .sellerNetAmount(feeResult.getSellerNetAmount())
+                    .status("HOLDING")
+                    .scheduledReleaseAt(scheduledReleaseAt)
+                    .build();
+            holdRelease = holdReleaseRepository.save(holdRelease);
+
+            // 1 OrderItem ↔ 1 FeeLedger
+            PlatformFeeLedger feeLedger = PlatformFeeLedger.builder()
+                    .orderId(order.getId())
+                    .orderItemId(orderItem.getId())
+                    .shopId(targetShop.getId())
+                    .sellerWalletId(sellerWallet.getId())
+                    .feeConfigId(feeResult.getFeeConfigId())
+                    .feeRateSnapshot(feeResult.getFeeRateSnapshot())
+                    .saleAmount(lineTotal)
+                    .feeAmount(feeResult.getFeeAmount())
+                    .sellerNetAmount(feeResult.getSellerNetAmount())
+                    .status("PENDING")
+                    .feeIncurredAt(OffsetDateTime.now())
+                    .holdReleaseId(holdRelease.getId())
+                    .build();
+            feeLedger = feeLedgerRepository.save(feeLedger);
+
+            holdRelease.setFeeLedgerId(feeLedger.getId());
+            holdReleaseRepository.save(holdRelease);
+
+            // Giao hàng: đánh dấu asset đã bán
             for (DigitalAsset asset : assetsToSell) {
                 asset.setStatus("SOLD");
                 asset.setOrderItemId(orderItem.getId());
@@ -217,7 +232,7 @@ public class InstantOrderService {
             variantRepository.save(variant);
         }
 
-        log.info(" Checkout INSTANT thành công - Order ID: {} | Tổng: {}", order.getId(), orderTotalAmount);
+        log.info("Checkout INSTANT thành công - Order ID: {} | Tổng: {}", order.getId(), orderTotalAmount);
 
         return order.getId();
     }

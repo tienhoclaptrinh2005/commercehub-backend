@@ -2,7 +2,7 @@ package com.commercehub.backend.wallet.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
-import com.commercehub.backend.fee.repository.PlatformFeeLedgerRepository;
+import com.commercehub.backend.fee.service.PlatformFeeLedgerService;
 import com.commercehub.backend.wallet.entity.HoldRelease;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ public class HoldReleaseService {
 
     private final HoldReleaseRepository holdReleaseRepository;
     private final HoldReleaseProcessor holdReleaseProcessor;
-    private final PlatformFeeLedgerRepository feeLedgerRepository;
+    private final PlatformFeeLedgerService platformFeeLedgerService;
     private final WalletService walletService;
 
     public void processDueReleases(OffsetDateTime now) {
@@ -35,38 +35,44 @@ public class HoldReleaseService {
         }
     }
 
-
+    // =========================================================
     // LOGIC KHIẾU NẠI (DISPUTE) BẢO VỆ NGƯỜI MUA
+    // =========================================================
 
+    /**
+     * Đóng băng khoản giữ tiền của 1 OrderItem khi Buyer khiếu nại.
+     * Dùng PESSIMISTIC LOCK để không race với HoldReleaseProcessor:
+     * hoặc freeze thắng (scheduler thấy DISPUTED sẽ bỏ qua),
+     * hoặc scheduler thắng (freeze thấy RELEASED sẽ báo lỗi trạng thái).
+     */
     @Transactional
     public void freezeForDispute(Long orderItemId) {
-        HoldRelease hr = holdReleaseRepository.findByOrderItemId(orderItemId);
-        if (hr == null) {
-            throw new AppException(ErrorCode.RECORD_NOT_FOUND);
-        }
+        HoldRelease hr = holdReleaseRepository.findByOrderItemIdWithLock(orderItemId)
+                .orElseThrow(() -> new AppException(ErrorCode.HOLD_RELEASE_NOT_FOUND));
 
         if (!"HOLDING".equals(hr.getStatus())) {
             throw new AppException(ErrorCode.HOLD_RELEASE_INVALID_STATUS);
         }
 
-        // Đổi trạng thái sang DISPUTED.
-        // Con Robot CronJob sẽ mù màu với đơn này (vì nó chỉ quét status = 'HOLDING')
         hr.setStatus("DISPUTED");
+        hr.setComplainedAt(OffsetDateTime.now());
         holdReleaseRepository.save(hr);
 
-        log.info("❄️ Đã ĐÓNG BĂNG số tiền của OrderItem ID {} do có khiếu nại từ người mua.", orderItemId);
+        log.info("Đã ĐÓNG BĂNG số tiền của OrderItem ID {} do có khiếu nại từ người mua.", orderItemId);
     }
 
-
+    /**
+     * Admin phán xử tranh chấp.
+     * Dùng PESSIMISTIC LOCK — chỉ xử lý được khi đang DISPUTED (terminal-safe).
+     */
     @Transactional
     public void resolveDispute(Long holdReleaseId, boolean isBuyerWin, Long buyerId, Long sellerId, Long orderId) {
 
-        // 1. Tìm bản ghi HoldRelease (Ưu tiên dùng hàm có Lock nếu bạn đã tạo)
-        HoldRelease hr = holdReleaseRepository.findById(holdReleaseId)
-                .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
+        HoldRelease hr = holdReleaseRepository.findByIdWithLock(holdReleaseId)
+                .orElseThrow(() -> new AppException(ErrorCode.HOLD_RELEASE_NOT_FOUND));
 
         if (!"DISPUTED".equals(hr.getStatus())) {
-            throw new AppException(ErrorCode.INVALID_STATUS);
+            throw new AppException(ErrorCode.HOLD_RELEASE_NOT_DISPUTED);
         }
 
         if (isBuyerWin) {
@@ -74,31 +80,34 @@ public class HoldReleaseService {
             // KỊCH BẢN 1: BUYER THẮNG KIỆN
             hr.setStatus("REFUNDED");
 
-            // BƯỚC 1: Gỡ phong tỏa tiền trong ví của Seller (Hủy Hold)
-            walletService.cancelHoldForSeller(sellerId, hr.getHoldAmount(), orderId);
+            // BƯỚC 1: Gỡ phong tỏa tiền trong ví của Seller (Hủy Hold).
+            // refId = hr.getId() để mỗi HoldRelease chỉ hoàn đúng 1 lần
+            // (1 đơn có thể có nhiều item tranh chấp riêng biệt).
+            walletService.cancelHoldForSeller(sellerId, hr.getHoldAmount(), hr.getId());
 
-            // BƯỚC 2: Hoàn lại tiền mặt vào ví khả dụng cho Buyer
+            // BƯỚC 2: Hoàn lại tiền vào ví khả dụng cho Buyer
             walletService.addBalance(
                     buyerId,
                     hr.getHoldAmount(),
                     "DISPUTE_REFUND",
-                    orderId,
-                    "Hoàn tiền do thắng tranh chấp đơn hàng"
+                    hr.getId(),
+                    "HOLD_RELEASE"
             );
 
-            // BƯỚC 3: Hủy hóa đơn thu phí sàn (Vì giao dịch này coi như xịt, sàn không được thu phí)
+            // BƯỚC 3: Hủy hóa đơn thu phí sàn (giao dịch thất bại, sàn không thu phí)
             if (hr.getFeeLedgerId() != null) {
-                feeLedgerRepository.findById(hr.getFeeLedgerId()).ifPresent(feeLedger -> {
-                    feeLedger.setStatus("CANCELLED");
-                    feeLedgerRepository.save(feeLedger);
-                });
+                platformFeeLedgerService.markAsCancelled(
+                        hr.getFeeLedgerId(),
+                        "Buyer thắng dispute - Order ID " + orderId,
+                        null
+                );
             }
 
             log.info("Tranh chấp ID {}: BUYER thắng. Đã hoàn {} cho Buyer ID {}", holdReleaseId, hr.getHoldAmount(), buyerId);
 
         } else {
             // KỊCH BẢN 2: SELLER THẮNG KIỆN
-            // Trả lại trạng thái HOLDING để con Robot Cronjob tiếp tục đếm ngày và tự nhả tiền cho Seller
+            // Trả lại trạng thái HOLDING để scheduler tiếp tục đếm ngày và tự nhả tiền cho Seller
             hr.setStatus("HOLDING");
             log.info("Tranh chấp ID {}: SELLER thắng. Tiếp tục giam tiền chờ nhả tự động.", holdReleaseId);
         }

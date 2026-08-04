@@ -8,7 +8,10 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "shop_fee_summaries")
+@Table(name = "shop_fee_summaries", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_shop_fee_summary_period",
+                columnNames = {"shop_id", "period_year", "period_month"})
+})
 @Getter
 @Setter
 @Builder
@@ -40,10 +43,6 @@ public class ShopFeeSummary {
     @Column(name = "total_net", nullable = false, precision = 18, scale = 2)
     @Builder.Default
     private BigDecimal totalNet = BigDecimal.ZERO;
-
-    @Column(name = "total_waived", nullable = false, precision = 18, scale = 2)
-    @Builder.Default
-    private BigDecimal totalWaived = BigDecimal.ZERO;
 
     @Column(name = "total_refunded", nullable = false, precision = 18, scale = 2)
     @Builder.Default

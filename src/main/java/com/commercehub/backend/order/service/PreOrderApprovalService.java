@@ -19,10 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.commercehub.backend.wallet.entity.HoldRelease;
 import com.commercehub.backend.fee.entity.PlatformFeeLedger;
-
 import com.commercehub.backend.fee.dto.FeeResult;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -43,7 +41,9 @@ public class PreOrderApprovalService {
 
     @Transactional
     public void acceptOrder(Long sellerId, Long orderId) {
-        Order order = orderRepository.findById(orderId)
+        // PESSIMISTIC LOCK: chống race với cron auto-cancel — không bao giờ
+        // xảy ra "buyer đã được hoàn tiền nhưng đơn vẫn chuyển PROCESSING".
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
         if (!order.getShop().getOwner().getId().equals(sellerId)) {
@@ -80,7 +80,7 @@ public class PreOrderApprovalService {
 
     @Transactional
     public void rejectOrder(Long sellerId, Long orderId, String rejectReason) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!order.getShop().getOwner().getId().equals(sellerId)) {
@@ -129,7 +129,9 @@ public class PreOrderApprovalService {
 
     @Transactional
     public void completeOrder(Long sellerId, Long orderId, String sellerNotes) {
-        Order order = orderRepository.findById(orderId)
+        // PESSIMISTIC LOCK: chống double-click Complete tạo 2 bộ HoldRelease,
+        // và chống race với cron auto-cancel đơn quá hạn.
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!order.getShop().getOwner().getId().equals(sellerId)) {
@@ -154,12 +156,6 @@ public class PreOrderApprovalService {
 
         List<OrderItem> items = orderItemRepository.findByOrder(order);
 
-        BigDecimal totalOrderAmount = order.getTotalAmount();
-        BigDecimal totalFeeAmount = BigDecimal.ZERO;
-        BigDecimal totalSellerNetAmount = BigDecimal.ZERO;
-        Long appliedFeeConfigId = null;
-        BigDecimal appliedFeeRateSnapshot = null;
-
         for (OrderItem item : items) {
             preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
                 if (sellerNotes != null && !sellerNotes.trim().isEmpty()) {
@@ -168,52 +164,67 @@ public class PreOrderApprovalService {
                 }
             });
 
-            FeeResult feeResult = feeCalculationService.calculateFee(item.getLineTotal());
-            totalFeeAmount = totalFeeAmount.add(feeResult.getFeeAmount());
-            totalSellerNetAmount = totalSellerNetAmount.add(feeResult.getSellerNetAmount());
+            // Dùng SNAPSHOT phí đã chốt lúc buyer thanh toán (checkout).
+            // Fallback tính theo config hiện tại cho các đơn cũ tạo trước khi có snapshot.
+            FeeResult feeResult = resolveFeeForItem(item);
 
-            if (appliedFeeConfigId == null) {
-                appliedFeeConfigId = feeResult.getFeeConfigId();
-                appliedFeeRateSnapshot = feeResult.getFeeRateSnapshot();
-            }
+            HoldRelease holdRelease = HoldRelease.builder()
+                    .wallet(sellerWallet)
+                    .orderId(order.getId())
+                    .orderItemId(item.getId())
+                    .holdAmount(item.getLineTotal())
+                    .feeAmount(feeResult.getFeeAmount())
+                    .sellerNetAmount(feeResult.getSellerNetAmount())
+                    .status("HOLDING")
+                    .scheduledReleaseAt(OffsetDateTime.now().plusDays(7))
+                    .build();
+            holdRelease = holdReleaseRepository.save(holdRelease);
+
+            PlatformFeeLedger feeLedger = PlatformFeeLedger.builder()
+                    .orderId(order.getId())
+                    .orderItemId(item.getId())
+                    .shopId(order.getShop().getId())
+                    .sellerWalletId(sellerWallet.getId())
+                    .feeConfigId(feeResult.getFeeConfigId())
+                    .feeRateSnapshot(feeResult.getFeeRateSnapshot())
+                    .saleAmount(item.getLineTotal())
+                    .feeAmount(feeResult.getFeeAmount())
+                    .sellerNetAmount(feeResult.getSellerNetAmount())
+                    .status("PENDING")
+                    .feeIncurredAt(OffsetDateTime.now())
+                    .holdReleaseId(holdRelease.getId())
+                    .build();
+            feeLedger = feeLedgerRepository.save(feeLedger);
+
+            // Cập nhật lại FeeLedgerId vào HoldRelease
+            holdRelease.setFeeLedgerId(feeLedger.getId());
+            holdReleaseRepository.save(holdRelease);
         }
 
-        HoldRelease holdRelease = HoldRelease.builder()
-                .wallet(sellerWallet)
-                .orderId(order.getId())
-                .holdAmount(totalOrderAmount)
-                .feeAmount(totalFeeAmount)
-                .sellerNetAmount(totalSellerNetAmount)
-                .status("HOLDING")
-                .scheduledReleaseAt(OffsetDateTime.now().plusDays(7))
-                .build();
-        holdRelease = holdReleaseRepository.save(holdRelease);
-
-        PlatformFeeLedger feeLedger = PlatformFeeLedger.builder()
-                .orderId(order.getId())
-                .shopId(order.getShop().getId())
-                .sellerWalletId(sellerWallet.getId())
-                .feeConfigId(appliedFeeConfigId)
-                .feeRateSnapshot(appliedFeeRateSnapshot)
-                .saleAmount(totalOrderAmount)
-                .feeAmount(totalFeeAmount)
-                .sellerNetAmount(totalSellerNetAmount)
-                .status("PENDING")
-                .feeIncurredAt(OffsetDateTime.now())
-                .holdReleaseId(holdRelease.getId())
-                .build();
-        feeLedger = feeLedgerRepository.save(feeLedger);
-
-        holdRelease.setFeeLedgerId(feeLedger.getId());
-        holdReleaseRepository.save(holdRelease);
-
         orderStatusService.logStatusChange(order, oldStatus, "DELIVERED", sellerId, "Shop đã hoàn tất giao hàng/dịch vụ.");
-        log.info(" Shop Owner {} đã COMPLETE đơn {}. Đã tính phí và tạo lịch nhả tiền.", sellerId, orderId);
+        log.info(" Shop Owner {} đã COMPLETE đơn {}. Đã tính phí và tạo lịch nhả tiền cho từng item.", sellerId, orderId);
+    }
+
+    /**
+     * Lấy FeeResult cho 1 OrderItem: ưu tiên snapshot đã chốt lúc checkout;
+     * đơn cũ chưa có snapshot thì tính theo config hiện tại.
+     */
+    private FeeResult resolveFeeForItem(OrderItem item) {
+        if (item.getFeeAmount() != null && item.getSellerNetAmount() != null
+                && item.getFeeConfigId() != null) {
+            return FeeResult.builder()
+                    .feeConfigId(item.getFeeConfigId())
+                    .feeRateSnapshot(item.getFeeRateSnapshot())
+                    .feeAmount(item.getFeeAmount())
+                    .sellerNetAmount(item.getSellerNetAmount())
+                    .build();
+        }
+        return feeCalculationService.calculateFee(item.getLineTotal());
     }
 
     @Transactional
     public void cancelOrderByBuyer(Long buyerId, Long orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!order.getUser().getId().equals(buyerId)) {
@@ -238,7 +249,7 @@ public class PreOrderApprovalService {
 
     @Transactional
     public void cancelProcessingOrder(Long sellerId, Long orderId, String cancelReason) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!order.getShop().getOwner().getId().equals(sellerId)) {

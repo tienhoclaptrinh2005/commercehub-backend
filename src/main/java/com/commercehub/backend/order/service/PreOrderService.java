@@ -2,6 +2,8 @@ package com.commercehub.backend.order.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.fee.dto.FeeResult;
+import com.commercehub.backend.fee.service.FeeCalculationService;
 import com.commercehub.backend.order.dto.request.CheckoutItemRequest;
 import com.commercehub.backend.order.dto.request.CheckoutRequest;
 import com.commercehub.backend.order.entity.Order;
@@ -40,9 +42,8 @@ public class PreOrderService {
     private final PreOrderItemRepository preOrderItemRepository;
     private final UserRepository userRepository;
     private final OrderStatusService orderStatusService;
-
-    // Inject WalletService để trừ tiền ngay lúc đặt
     private final WalletService walletService;
+    private final FeeCalculationService feeCalculationService;
 
     @Transactional
     public Long checkoutPreOrder(Long buyerId, CheckoutRequest request) {
@@ -104,22 +105,19 @@ public class PreOrderService {
                 .deliveryType("PRE_ORDER")
                 .subtotalAmount(totalOrderAmount)
                 .totalAmount(totalOrderAmount)
-                .paymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "WALLET")
+                .paymentMethod("WALLET") // Hệ thống hiện tại: nạp ví trước - mua hàng trừ ví
                 .paymentStatus("PAID")
                 .status("WAITING_APPROVAL")
                 .placedAt(OffsetDateTime.now())
                 .approvalDeadlineAt(OffsetDateTime.now().plusHours(48))
+                .idempotencyKey(request.getIdempotencyKey())
                 .build();
 
         order = orderRepository.save(order);
 
-        // =========================================================================
-        // TRỪ TIỀN NGAY THEO LOGIC MỚI
-        // ĐÃ FIX Bug #24: Truyền order.getId() làm refId thay vì null
-        // =========================================================================
+
         walletService.deductBalance(buyerId, totalOrderAmount, "ORDER_PAYMENT", order.getId(), "ORDER_PRE");
         walletService.holdForSeller(sellerId, totalOrderAmount, order.getId());
-        // =========================================================================
 
         orderStatusService.logStatusChange(
                 order, null, "WAITING_APPROVAL", buyerId, "Đã thanh toán và đặt hàng thành công, chờ Shop duyệt"
@@ -127,6 +125,11 @@ public class PreOrderService {
 
         // 3. Tạo OrderItem và PreOrderItem
         for (ItemProcessContext ctx : processedItems) {
+            // SNAPSHOT phí sàn tại thời điểm buyer thanh toán — khi shop complete
+            // đơn, hệ thống dùng lại snapshot này (admin đổi rate sau đó không
+            // ảnh hưởng các đơn đã trả tiền).
+            FeeResult feeResult = feeCalculationService.calculateFee(ctx.getItemSubtotal());
+
             OrderItem orderItem = OrderItem.builder()
                     .order(order)
                     .productVariant(ctx.getVariant())
@@ -137,6 +140,10 @@ public class PreOrderService {
                     .unitPrice(ctx.getVariant().getPrice())
                     .quantity(ctx.getQuantity())
                     .lineTotal(ctx.getItemSubtotal())
+                    .feeConfigId(feeResult.getFeeConfigId())
+                    .feeRateSnapshot(feeResult.getFeeRateSnapshot())
+                    .feeAmount(feeResult.getFeeAmount())
+                    .sellerNetAmount(feeResult.getSellerNetAmount())
                     .build();
             orderItem = orderItemRepository.save(orderItem);
 

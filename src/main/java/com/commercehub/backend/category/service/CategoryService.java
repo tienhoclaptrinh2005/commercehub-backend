@@ -64,8 +64,6 @@ public class CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
-        // ĐÃ FIX Bug #NEW7: Chạy mapper TRƯỚC để cập nhật các trường khác (description, sortOrder...)
-        // Mapper đã ignore name/slug, nhưng đặt trước để phòng ngừa lỗi nếu ai bỏ ignore sau này
         categoryMapper.updateEntityFromRequest(request, category);
 
         // Xử lý name/slug SAU mapper — đảm bảo không bị đè
