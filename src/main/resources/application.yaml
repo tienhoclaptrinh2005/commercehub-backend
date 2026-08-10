@@ -16,7 +16,7 @@ spring:
         format_sql: true
 
 google:
-  client-id: "xxxxx.apps.googleusercontent.com"
+  client-id: "1060424015252-neu3kv70tuss4g3md3g74njho7mihpja.apps.googleusercontent.com"
 
 jwt:
   secret: ${JWT_SECRET:V29ya2luZ0hhcmRPbkNvbW1lcmNlSHViUHJvamVjdDIwMjZTZWN1cmVLZXlWMzg5NDU=}

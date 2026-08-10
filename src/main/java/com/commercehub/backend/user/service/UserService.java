@@ -1,58 +1,78 @@
 package com.commercehub.backend.user.service;
 
+import com.commercehub.backend.common.exception.AppException;
+import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.order.service.OrderStatisticsService;
 import com.commercehub.backend.user.dto.response.UserResponse;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.mapper.UserMapper;
 import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.commercehub.backend.common.exception.AppException;
-import com.commercehub.backend.common.exception.ErrorCode;
+
+import java.time.OffsetDateTime;
+import java.util.Locale;
+import java.util.regex.Pattern;
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
+    private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-z0-9_.]{3,100}$");
+
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final OrderStatisticsService orderStatisticsService;
 
     @Transactional(readOnly = true)
     public UserResponse getUserByUsername(String username) {
-        return userRepository.findByUsername(username)
-                .map(userMapper::toUserResponse)
+        User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        long completedPurchaseCount = orderStatisticsService.countCompletedPurchases(user.getId());
+        long successfulSaleCount = orderStatisticsService.countSuccessfulSalesByOwner(user.getId());
+
+        return userMapper.toUserResponse(user, completedPurchaseCount, successfulSaleCount);
     }
 
     @Transactional
     public void updateUsername(Long userId, String newUsername) {
+        if (newUsername == null) {
+            throw new AppException(ErrorCode.INVALID_USERNAME_FORMAT);
+        }
 
-        User user = userRepository.findById(userId)
+        String normalizedUsername = newUsername.trim().toLowerCase(Locale.ROOT);
+
+        if (!USERNAME_PATTERN.matcher(normalizedUsername).matches()) {
+            throw new AppException(ErrorCode.INVALID_USERNAME_FORMAT);
+        }
+
+        User user = userRepository.findByIdForUsernameUpdate(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-
-        if (newUsername == null || newUsername.trim().isEmpty()) {
-            throw new AppException(ErrorCode.INVALID_USERNAME_FORMAT);
+        // Gửi lại đúng username hiện tại là thao tác không thay đổi và không tiêu thụ lượt đổi.
+        if (normalizedUsername.equals(user.getUsername())) {
+            return;
         }
 
-        String sanitizedUsername = newUsername.trim().toLowerCase().replaceAll("[^a-zA-Z0-9_.]", "");
-
-        if (sanitizedUsername.length() < 3 || sanitizedUsername.length() > 100) {
-            throw new AppException(ErrorCode.INVALID_USERNAME_FORMAT);
+        if (user.getUsernameChangedAt() != null) {
+            throw new AppException(ErrorCode.USERNAME_CHANGE_LIMIT_REACHED);
         }
 
-        if (!sanitizedUsername.equals(user.getUsername())) {
-
-            if (userRepository.existsByUsername(sanitizedUsername)) {
-                throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
-            }
-
-            user.setUsername(sanitizedUsername);
-            userRepository.save(user);
+        if (userRepository.existsByUsername(normalizedUsername)) {
+            throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
         }
 
+        user.setUsername(normalizedUsername);
+        user.setUsernameChangedAt(OffsetDateTime.now());
 
-
+        try {
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException exception) {
+            // Unique constraint là lớp bảo vệ cuối khi hai tài khoản chọn cùng username đồng thời.
+            throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
+        }
     }
-
-
 }

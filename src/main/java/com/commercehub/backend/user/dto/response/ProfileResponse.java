@@ -27,5 +27,8 @@ public class ProfileResponse {
     Boolean isPhoneVerified;
     OffsetDateTime createdAt;
     OffsetDateTime lastActiveAt;
+    long completedPurchaseCount;
+    long successfulSaleCount;
+    Boolean usernameChangeAllowed;
 
 }

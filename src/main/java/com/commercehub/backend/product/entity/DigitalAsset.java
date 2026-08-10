@@ -25,6 +25,11 @@ public class DigitalAsset {
     @Column(name = "asset_type", nullable = false, length = 50)
     private String assetType;
 
+    // Nguyên văn 1 dòng TXT giao cho khách (1 dòng import = 1 asset).
+    // Đây là nguồn nội dung giao hàng; asset_data giữ vai trò dữ liệu cũ/metadata.
+    @Column(name = "delivery_content", columnDefinition = "TEXT")
+    private String deliveryContent;
+
     @Column(name = "asset_data", columnDefinition = "TEXT", nullable = false)
     private String assetData;
 

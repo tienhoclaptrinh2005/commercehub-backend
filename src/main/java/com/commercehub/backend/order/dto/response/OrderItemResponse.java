@@ -19,4 +19,7 @@ public class OrderItemResponse {
     private BigDecimal unitPrice;
     private Integer quantity;
     private BigDecimal lineTotal;
+
+    // Chỉ có giá trị với item PRE_ORDER (service tự gắn trong chi tiết đơn)
+    private PreOrderItemResponse preOrder;
 }

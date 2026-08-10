@@ -37,6 +37,11 @@ public class AssetDeliveryLog {
     @JoinColumn(name = "buyer_id", nullable = false)
     User buyer;
 
+    // Bản chụp CỐ ĐỊNH nội dung đã giao — buyer mở lại đơn đọc từ đây,
+    // không đọc lại digital_assets (kho có thể bị sửa/thu hồi sau khi bán).
+    @Column(name = "delivery_content_snapshot", columnDefinition = "TEXT")
+    String deliveryContentSnapshot;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "asset_data_snapshot", columnDefinition = "jsonb", nullable = false)
     String assetDataSnapshot;

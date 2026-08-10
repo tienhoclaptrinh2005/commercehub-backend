@@ -8,6 +8,7 @@ import com.commercehub.backend.product.dto.response.DigitalAssetResponse;
 import com.commercehub.backend.product.entity.DigitalAsset;
 import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.mapper.ProductMapper;
+import com.commercehub.backend.product.repository.AssetDeliveryLogRepository;
 import com.commercehub.backend.product.repository.DigitalAssetRepository;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class DigitalAssetService {
 
     private final DigitalAssetRepository digitalAssetRepository;
+    private final AssetDeliveryLogRepository deliveryLogRepository;
     private final ProductVariantRepository variantRepository;
     private final ProductMapper productMapper;
 
@@ -52,7 +54,8 @@ public class DigitalAssetService {
             DigitalAsset asset = DigitalAsset.builder()
                     .productVariant(variant)
                     .assetType(variant.getProduct().getProductType())
-                    // Lưu ý: Database column là JSONB, nếu rawData là JSON String thì JPA sẽ tự map (tùy cấu hình Dialect)
+                    // 1 dòng TXT = 1 asset: deliveryContent là nội dung giao khách
+                    .deliveryContent(rawData.trim())
                     .assetData(rawData.trim())
                     .status("AVAILABLE")
                     .build();
@@ -104,14 +107,34 @@ public class DigitalAssetService {
     // BUYER
 
 
+    /**
+     * Nội dung đã giao của đơn INSTANT — đọc từ SNAPSHOT asset_delivery_logs,
+     * không đọc lại kho (kho bị sửa/thu hồi sau khi bán không ảnh hưởng buyer).
+     * Đơn cũ tạo trước khi có delivery log: fallback đọc từ digital_assets như trước.
+     */
     @Transactional(readOnly = true)
     public List<DeliveredAssetResponse> getDeliveredAssetsByOrderId(Long orderId) {
+        List<DeliveredAssetResponse> fromLogs = deliveryLogRepository.findByOrderId(orderId).stream()
+                .map(log -> DeliveredAssetResponse.builder()
+                        .id(log.getId())
+                        .orderItemId(log.getOrderItemId())
+                        .assetType(log.getAsset().getAssetType())
+                        .content(log.getDeliveryContentSnapshot())
+                        .deliveredAt(log.getDeliveredAt())
+                        .build())
+                .collect(Collectors.toList());
+        if (!fromLogs.isEmpty()) {
+            return fromLogs;
+        }
+
         return digitalAssetRepository.findDeliveredAssetsByOrderId(orderId).stream()
                 .map(asset -> DeliveredAssetResponse.builder()
                         .id(asset.getId())
                         .orderItemId(asset.getOrderItemId())
                         .assetType(asset.getAssetType())
-                        .assetData(asset.getAssetData())
+                        .content(asset.getDeliveryContent() != null && !asset.getDeliveryContent().isBlank()
+                                ? asset.getDeliveryContent() : asset.getAssetData())
+                        .deliveredAt(asset.getDeliveredAt())
                         .build())
                 .collect(Collectors.toList());
     }

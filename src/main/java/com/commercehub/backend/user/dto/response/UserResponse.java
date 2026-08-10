@@ -19,4 +19,6 @@ public class UserResponse {
     String avatarUrl;
     Integer userLevel;
     OffsetDateTime createdAt;
+    long completedPurchaseCount;
+    long successfulSaleCount;
 }

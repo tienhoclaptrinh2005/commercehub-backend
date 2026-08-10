@@ -12,6 +12,7 @@ import com.commercehub.backend.product.entity.DigitalAsset;
 import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.repository.DigitalAssetRepository;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
+import com.commercehub.backend.product.service.AssetDeliveryService;
 import com.commercehub.backend.fee.dto.FeeResult;
 import com.commercehub.backend.fee.entity.PlatformFeeLedger;
 import com.commercehub.backend.fee.repository.PlatformFeeLedgerRepository;
@@ -60,6 +61,7 @@ public class InstantOrderService {
     private final HoldReleaseRepository holdReleaseRepository;
     private final FeeCalculationService feeCalculationService;
     private final PlatformFeeLedgerRepository feeLedgerRepository;
+    private final AssetDeliveryService assetDeliveryService;
 
     @Transactional
     public Long checkoutInstant(Long buyerId, CheckoutRequest request) {
@@ -219,7 +221,8 @@ public class InstantOrderService {
             holdRelease.setFeeLedgerId(feeLedger.getId());
             holdReleaseRepository.save(holdRelease);
 
-            // Giao hàng: đánh dấu asset đã bán
+            // Giao hàng: đánh dấu asset đã bán + SNAPSHOT nguyên văn nội dung vào
+            // asset_delivery_logs — buyer xem lại đơn đọc từ snapshot, không đọc lại kho
             for (DigitalAsset asset : assetsToSell) {
                 asset.setStatus("SOLD");
                 asset.setOrderItemId(orderItem.getId());
@@ -227,6 +230,10 @@ public class InstantOrderService {
                 asset.setDeliveredAt(OffsetDateTime.now());
             }
             assetRepository.saveAll(assetsToSell);
+
+            for (DigitalAsset asset : assetsToSell) {
+                assetDeliveryService.logDelivery(asset, orderItem.getId(), buyer, "AUTO");
+            }
 
             variant.setStockCount(variant.getStockCount() - itemReq.getQuantity());
             variantRepository.save(variant);

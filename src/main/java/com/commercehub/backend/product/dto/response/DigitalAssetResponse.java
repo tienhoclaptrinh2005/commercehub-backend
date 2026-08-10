@@ -14,6 +14,7 @@ import java.time.OffsetDateTime;
 public class DigitalAssetResponse {
     Long id;
     Long variantId;
+    String deliveryContent;   // nội dung sẽ giao cho khách (nguyên văn 1 dòng TXT)
     String assetData;
     String status;
     OffsetDateTime createdAt;

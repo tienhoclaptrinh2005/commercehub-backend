@@ -3,7 +3,9 @@ package com.commercehub.backend.order.scheduler;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.entity.Order;
+import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.order.repository.OrderRepository;
+import com.commercehub.backend.order.repository.PreOrderItemRepository;
 import com.commercehub.backend.order.service.OrderStatusService;
 import com.commercehub.backend.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderCancelProcessor {
 
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final PreOrderItemRepository preOrderItemRepository;
     private final WalletService walletService;
     private final OrderStatusService orderStatusService;
 
@@ -62,6 +66,13 @@ public class OrderCancelProcessor {
         // 5. Hoàn tiền: gỡ hold của seller, trả tiền về ví buyer (cùng transaction)
         walletService.cancelHoldForSeller(order.getShop().getOwner().getId(), order.getTotalAmount(), order.getId());
         walletService.addBalance(order.getUser().getId(), order.getTotalAmount(), "ORDER_REFUND", order.getId(), reason);
+
+        // Đồng bộ vòng đời pre_order_items khi hệ thống tự hủy
+        orderItemRepository.findByOrder(order).forEach(item ->
+                preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
+                    preItem.setStatus("CANCELLED");
+                    preOrderItemRepository.save(preItem);
+                }));
 
         // 6. Ghi log trạng thái
         orderStatusService.logStatusChange(order, oldStatus, "CANCELLED_BY_SYSTEM", null, reason);

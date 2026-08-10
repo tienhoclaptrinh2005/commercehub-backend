@@ -3,6 +3,7 @@ package com.commercehub.backend.shop.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.common.util.SlugUtils;
+import com.commercehub.backend.order.service.OrderStatisticsService;
 import com.commercehub.backend.shop.dto.request.CreateShopRequest;
 import com.commercehub.backend.shop.dto.request.UpdateShopRequest;
 import com.commercehub.backend.shop.dto.response.ShopResponse;
@@ -35,6 +36,7 @@ public class ShopService {
     private final ShopMapper shopMapper;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final OrderStatisticsService orderStatisticsService;
 
     @Transactional(readOnly = true)
     public Page<ShopResponse> getAllActiveShops(int page, int size) {
@@ -52,7 +54,12 @@ public class ShopService {
         if (!"ACTIVE".equals(shop.getStatus())) {
             throw new AppException(ErrorCode.SHOP_NOT_FOUND);
         }
-        return shopMapper.toResponse(shop);
+
+        long ownerCompletedPurchaseCount = orderStatisticsService
+                .countCompletedPurchases(shop.getOwner().getId());
+        long successfulSaleCount = orderStatisticsService.countSuccessfulSales(shop.getId());
+
+        return shopMapper.toResponse(shop, ownerCompletedPurchaseCount, successfulSaleCount);
     }
 
     @Transactional

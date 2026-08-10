@@ -1,11 +1,13 @@
 package com.commercehub.backend.order.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.order.dto.request.DeliverPreOrderRequest;
 import com.commercehub.backend.order.service.OrderService;
 import com.commercehub.backend.order.service.PreOrderApprovalService; // Import service mới
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.service.ShopService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -69,13 +71,15 @@ public class SellerOrderController {
     }
 
     // POST /api/v1/seller/orders/{id}/complete
+    // Body: deliveryContentType (ACCOUNT/KEY/MESSAGE/OTHER) + deliveryContent (bắt buộc)
+    // + sellerNotes (ghi chú nội bộ, tùy chọn)
     @PostMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<?>> completePreOrder(
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @PathVariable Long id,
-            @RequestParam(required = false) String sellerNotes) {
+            @RequestBody @Valid DeliverPreOrderRequest request) {
 
-        preOrderApprovalService.completeOrder(currentUser.getId(), id, sellerNotes);
+        preOrderApprovalService.completeOrder(currentUser.getId(), id, request);
 
         return ResponseEntity.ok(ApiResponse.success("Đã xác nhận giao hàng thành công! Tiền sẽ được cộng vào số dư khả dụng sau thời gian đối soát.", null));
     }

@@ -4,6 +4,7 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.fee.repository.PlatformFeeLedgerRepository;
 import com.commercehub.backend.fee.service.FeeCalculationService;
+import com.commercehub.backend.order.dto.request.DeliverPreOrderRequest;
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
 import com.commercehub.backend.order.repository.OrderItemRepository;
@@ -67,6 +68,16 @@ public class PreOrderApprovalService {
         order.setProcessingDeadlineAt(OffsetDateTime.now().plusHours(24));
         orderRepository.save(order);
 
+        // Đồng bộ vòng đời pre_order_items: PENDING → ACCEPTED (+ acceptedAt)
+        OffsetDateTime acceptedAt = OffsetDateTime.now();
+        for (OrderItem item : orderItemRepository.findByOrder(order)) {
+            preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
+                preItem.setStatus("ACCEPTED");
+                preItem.setAcceptedAt(acceptedAt);
+                preOrderItemRepository.save(preItem);
+            });
+        }
+
         orderStatusService.logStatusChange(
                 order,
                 oldStatus,
@@ -111,14 +122,14 @@ public class PreOrderApprovalService {
                 "ORDER"
         );
 
-        if (rejectReason != null && !rejectReason.trim().isEmpty()) {
-            List<OrderItem> items = orderItemRepository.findByOrder(order);
-            for (OrderItem item : items) {
-                preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
+        for (OrderItem item : orderItemRepository.findByOrder(order)) {
+            preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
+                preItem.setStatus("REJECTED");
+                if (rejectReason != null && !rejectReason.trim().isEmpty()) {
                     preItem.setSellerNotes(rejectReason);
-                    preOrderItemRepository.save(preItem);
-                });
-            }
+                }
+                preOrderItemRepository.save(preItem);
+            });
         }
 
         String logNote = "Shop đã từ chối đơn hàng. Lý do: " + (rejectReason != null ? rejectReason : "Không có");
@@ -127,8 +138,13 @@ public class PreOrderApprovalService {
         log.info(" Shop Owner ID {} đã REJECT đơn {}. Đã hoàn {} vào ví Buyer.", sellerId, orderId, order.getTotalAmount());
     }
 
+    /**
+     * Shop giao kết quả đơn PRE_ORDER: nội dung giao khách (account/key/tin nhắn)
+     * lưu vào pre_order_items.delivery_content — buyer xem lại vĩnh viễn trong đơn.
+     * KHÔNG dùng sellerNotes để giao hàng (chỉ là ghi chú nội bộ, không trả cho buyer).
+     */
     @Transactional
-    public void completeOrder(Long sellerId, Long orderId, String sellerNotes) {
+    public void completeOrder(Long sellerId, Long orderId, DeliverPreOrderRequest request) {
         // PESSIMISTIC LOCK: chống double-click Complete tạo 2 bộ HoldRelease,
         // và chống race với cron auto-cancel đơn quá hạn.
         Order order = orderRepository.findByIdWithLock(orderId)
@@ -147,8 +163,9 @@ public class PreOrderApprovalService {
         }
 
         String oldStatus = order.getStatus();
+        OffsetDateTime deliveredAt = OffsetDateTime.now();
         order.setStatus("DELIVERED");
-        order.setDeliveredAt(OffsetDateTime.now());
+        order.setDeliveredAt(deliveredAt);
         orderRepository.save(order);
 
         Wallet sellerWallet = walletRepository.findByUserId(sellerId)
@@ -158,10 +175,15 @@ public class PreOrderApprovalService {
 
         for (OrderItem item : items) {
             preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
-                if (sellerNotes != null && !sellerNotes.trim().isEmpty()) {
-                    preItem.setSellerNotes(sellerNotes);
-                    preOrderItemRepository.save(preItem);
+                preItem.setDeliveryContent(request.getDeliveryContent());
+                preItem.setDeliveryContentType(request.getDeliveryContentType());
+                preItem.setStatus("DELIVERED");
+                preItem.setDeliveredAt(deliveredAt);
+                preItem.setCompletedAt(deliveredAt);
+                if (request.getSellerNotes() != null && !request.getSellerNotes().trim().isEmpty()) {
+                    preItem.setSellerNotes(request.getSellerNotes());
                 }
+                preOrderItemRepository.save(preItem);
             });
 
             // Dùng SNAPSHOT phí đã chốt lúc buyer thanh toán (checkout).
@@ -244,6 +266,13 @@ public class PreOrderApprovalService {
 
         walletService.addBalance(buyerId, order.getTotalAmount(), "ORDER_REFUND", order.getId(), "ORDER");
 
+        for (OrderItem item : orderItemRepository.findByOrder(order)) {
+            preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
+                preItem.setStatus("CANCELLED");
+                preOrderItemRepository.save(preItem);
+            });
+        }
+
         orderStatusService.logStatusChange(order, oldStatus, "CANCELLED", buyerId, "Người mua đã chủ động hủy đơn hàng trước khi Shop tiếp nhận.");
     }
 
@@ -269,14 +298,14 @@ public class PreOrderApprovalService {
 
         walletService.addBalance(order.getUser().getId(), order.getTotalAmount(), "ORDER_REFUND", order.getId(), "ORDER");
 
-        if (cancelReason != null && !cancelReason.trim().isEmpty()) {
-            List<OrderItem> items = orderItemRepository.findByOrder(order);
-            for (OrderItem item : items) {
-                preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
+        for (OrderItem item : orderItemRepository.findByOrder(order)) {
+            preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
+                preItem.setStatus("CANCELLED");
+                if (cancelReason != null && !cancelReason.trim().isEmpty()) {
                     preItem.setSellerNotes(cancelReason);
-                    preOrderItemRepository.save(preItem);
-                });
-            }
+                }
+                preOrderItemRepository.save(preItem);
+            });
         }
 
         orderStatusService.logStatusChange(order, oldStatus, "CANCELLED_BY_SELLER", sellerId, "Shop hủy đơn đang xử lý. Lý do: " + cancelReason);

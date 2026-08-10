@@ -37,5 +37,66 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     /** Tra cứu các đơn đã tạo bởi 1 lần checkout (idempotency). */
     List<Order> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
 
+    /**
+     * Đếm số đơn mua đã hoàn tất để hiển thị trên profile buyer.
+     *
+     * Một đơn chỉ được tính khi đã giao, đã thanh toán và MỌI OrderItem đều có
+     * HoldRelease ở trạng thái RELEASED. Điều kiện này loại các đơn còn trong
+     * T+7, đang tranh chấp hoặc đã hoàn tiền theo từng item.
+     */
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM orders o
+            WHERE o.user_id = :userId
+              AND o.status = 'DELIVERED'
+              AND o.payment_status = 'PAID'
+              AND EXISTS (
+                  SELECT 1
+                  FROM order_items oi
+                  WHERE oi.order_id = o.id
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM order_items oi
+                  WHERE oi.order_id = o.id
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM hold_releases hr
+                        WHERE hr.order_item_id = oi.id
+                          AND hr.status = 'RELEASED'
+                    )
+              )
+            """, nativeQuery = true)
+    long countCompletedPurchasesByUserId(@Param("userId") Long userId);
+
+    /**
+     * Đếm số đơn bán đã quyết toán thành công của một shop.
+     * Dùng cùng định nghĩa hoàn tất với số đơn mua của buyer.
+     */
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM orders o
+            WHERE o.shop_id = :shopId
+              AND o.status = 'DELIVERED'
+              AND o.payment_status = 'PAID'
+              AND EXISTS (
+                  SELECT 1
+                  FROM order_items oi
+                  WHERE oi.order_id = o.id
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM order_items oi
+                  WHERE oi.order_id = o.id
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM hold_releases hr
+                        WHERE hr.order_item_id = oi.id
+                          AND hr.status = 'RELEASED'
+                    )
+              )
+            """, nativeQuery = true)
+    long countSuccessfulSalesByShopId(@Param("shopId") Long shopId);
+
 
 }

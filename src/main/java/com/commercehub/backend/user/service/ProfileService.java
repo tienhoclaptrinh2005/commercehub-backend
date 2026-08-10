@@ -2,6 +2,7 @@ package com.commercehub.backend.user.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.order.service.OrderStatisticsService;
 import com.commercehub.backend.user.dto.request.UpdateAvatarRequest;
 import com.commercehub.backend.user.dto.request.UpdateProfileRequest;
 import com.commercehub.backend.user.dto.response.ProfileResponse;
@@ -18,13 +19,14 @@ public class ProfileService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final OrderStatisticsService orderStatisticsService;
 
 
     @Transactional(readOnly = true)
     public ProfileResponse getMyProfile(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return userMapper.toProfileResponse(user);
+        return buildProfileResponse(user);
     }
 
     @Transactional
@@ -55,7 +57,7 @@ public class ProfileService {
         }
 
         userRepository.save(user);
-        return userMapper.toProfileResponse(user);
+        return buildProfileResponse(user);
     }
 
     @Transactional
@@ -68,6 +70,13 @@ public class ProfileService {
         }
 
         userRepository.save(user);
-        return userMapper.toProfileResponse(user);
+        return buildProfileResponse(user);
+    }
+
+    private ProfileResponse buildProfileResponse(User user) {
+        long completedPurchaseCount = orderStatisticsService.countCompletedPurchases(user.getId());
+        long successfulSaleCount = orderStatisticsService.countSuccessfulSalesByOwner(user.getId());
+
+        return userMapper.toProfileResponse(user, completedPurchaseCount, successfulSaleCount);
     }
 }

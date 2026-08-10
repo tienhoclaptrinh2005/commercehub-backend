@@ -16,8 +16,28 @@ public interface UserMapper {
     @Mapping(target = "userLevel", source = "userLevel.level")
     UserResponse toUserResponse(User user);
 
+    @Mapping(target = "userLevel", source = "user.userLevel.level")
+    @Mapping(target = "completedPurchaseCount", source = "completedPurchaseCount")
+    @Mapping(target = "successfulSaleCount", source = "successfulSaleCount")
+    UserResponse toUserResponse(
+            User user,
+            long completedPurchaseCount,
+            long successfulSaleCount
+    );
+
     @Mapping(target = "userLevel", source = "userLevel.level")
+    @Mapping(target = "usernameChangeAllowed", expression = "java(user.getUsernameChangedAt() == null)")
     ProfileResponse toProfileResponse(User user);
+
+    @Mapping(target = "userLevel", source = "user.userLevel.level")
+    @Mapping(target = "completedPurchaseCount", source = "completedPurchaseCount")
+    @Mapping(target = "successfulSaleCount", source = "successfulSaleCount")
+    @Mapping(target = "usernameChangeAllowed", expression = "java(user.getUsernameChangedAt() == null)")
+    ProfileResponse toProfileResponse(
+            User user,
+            long completedPurchaseCount,
+            long successfulSaleCount
+    );
 
     UserLevelResponse toUserLevelResponse(LevelConfig config);
 }

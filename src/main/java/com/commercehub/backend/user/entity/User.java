@@ -29,6 +29,9 @@ public class User {
     @Column(unique = true, length = 100)
     private String username;
 
+    @Column(name = "username_changed_at")
+    private OffsetDateTime usernameChangedAt;
+
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 

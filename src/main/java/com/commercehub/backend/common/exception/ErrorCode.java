@@ -22,6 +22,7 @@ public enum ErrorCode {
     REFRESH_TOKEN_EXPIRED(401, "Refresh Token đã hết hạn. Vui lòng đăng nhập lại!", HttpStatus.UNAUTHORIZED),
     USERNAME_ALREADY_EXISTS(400,"Tên đăng nhập (username) đã tồn tại!",HttpStatus.BAD_REQUEST),
     INVALID_USERNAME_FORMAT(400, "Username không hợp lệ! (Từ 3-100 ký tự, không chứa khoảng trắng và ký tự đặc biệt)", HttpStatus.BAD_REQUEST),
+    USERNAME_CHANGE_LIMIT_REACHED(409, "Username chỉ được đổi một lần duy nhất!", HttpStatus.CONFLICT),
     ACCOUNT_LOCKED(403, "Tài khoản của bạn đã bị khóa!", HttpStatus.FORBIDDEN),
     CANNOT_CHANGE_GOOGLE_PASSWORD(400, "Tài khoản liên kết với Google không thể thực hiện đổi mật khẩu tại đây!", HttpStatus.BAD_REQUEST),
     PASSWORD_SAME_AS_OLD( 400, "Mật khẩu mới không được trùng mật khẩu cũ!", HttpStatus.BAD_REQUEST),
