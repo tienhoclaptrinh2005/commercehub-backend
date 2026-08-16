@@ -3,6 +3,8 @@ package com.commercehub.backend.user.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.service.OrderStatisticsService;
+import com.commercehub.backend.shop.entity.Shop;
+import com.commercehub.backend.shop.repository.ShopRepository;
 import com.commercehub.backend.user.dto.response.UserResponse;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.mapper.UserMapper;
@@ -25,16 +27,32 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final OrderStatisticsService orderStatisticsService;
+    private final ShopRepository shopRepository;
 
     @Transactional(readOnly = true)
     public UserResponse getUserByUsername(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new AppException(ErrorCode.USER_NOT_FOUND);
+        }
+
         long completedPurchaseCount = orderStatisticsService.countCompletedPurchases(user.getId());
         long successfulSaleCount = orderStatisticsService.countSuccessfulSalesByOwner(user.getId());
 
-        return userMapper.toUserResponse(user, completedPurchaseCount, successfulSaleCount);
+        UserResponse response = userMapper.toUserResponse(
+                user,
+                completedPurchaseCount,
+                successfulSaleCount
+        );
+
+        shopRepository.findByOwnerId(user.getId())
+                .filter(shop -> "ACTIVE".equals(shop.getStatus()))
+                .map(Shop::getId)
+                .ifPresent(response::setShopId);
+
+        return response;
     }
 
     @Transactional

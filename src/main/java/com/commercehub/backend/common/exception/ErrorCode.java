@@ -32,13 +32,15 @@ public enum ErrorCode {
     // Lỗi Danh Mục
     CATEGORY_NOT_FOUND(404, "Không tìm thấy danh mục này!", HttpStatus.NOT_FOUND),
     CATEGORY_ALREADY_EXISTS(400, "Tên danh mục hoặc đường dẫn (slug) đã tồn tại!", HttpStatus.BAD_REQUEST),
+    CATEGORY_PARENT_INVALID(400, "Danh mục cha không hợp lệ. Hệ thống chỉ hỗ trợ tối đa 2 cấp danh mục!", HttpStatus.BAD_REQUEST),
+    CATEGORY_MUST_BE_LEAF(400, "Sản phẩm chỉ được gắn với danh mục con!", HttpStatus.BAD_REQUEST),
 
     // Lỗi Shop
     SHOP_NOT_FOUND(404, "Không tìm thấy gian hàng!", HttpStatus.NOT_FOUND),
     SHOP_ALREADY_EXISTS(400, "Tên gian hàng đã tồn tại, vui lòng chọn tên khác!", HttpStatus.BAD_REQUEST),
     SHOP_CREATION_NOT_ALLOWED(403, "Cấp độ tài khoản của bạn chưa đủ điều kiện để mở gian hàng!", HttpStatus.FORBIDDEN),
     SHOP_LIMIT_REACHED(400, "Bạn đã đạt số lượng gian hàng tối đa cho phép của cấp độ hiện tại!", HttpStatus.BAD_REQUEST),
-    INVALID_STATUS(400, "Trạng thái không hợp lệ! (Chỉ chấp nhận ACTIVE, INACTIVE, BANNED)", HttpStatus.BAD_REQUEST),
+    INVALID_STATUS(400, "Trạng thái không hợp lệ!", HttpStatus.BAD_REQUEST),
     SHOP_UNAUTHORIZED(403, "Gian hàng của bạn đang bị khóa hoặc chưa được phê duyệt!", HttpStatus.FORBIDDEN),
     USER_ALREADY_HAS_SHOP(400, "Mỗi tài khoản chỉ được phép mở duy nhất 1 gian hàng!", HttpStatus.BAD_REQUEST),
 
@@ -46,6 +48,8 @@ public enum ErrorCode {
     PRODUCT_ALREADY_EXISTS(400, "Sản phẩm này đã tồn tại trong gian hàng của bạn!", HttpStatus.BAD_REQUEST),
     PRODUCT_NOT_FOUND(404, "Sản phẩm không tồn tại hoặc đã bị xóa!", HttpStatus.NOT_FOUND),
     PRODUCT_LIMIT_REACHED(403, "Gian hàng của bạn đã đạt giới hạn số lượng sản phẩm tối đa cho phép của cấp độ hiện tại!", HttpStatus.FORBIDDEN),
+    VARIANT_ALREADY_EXISTS(400, "Tên gói/biến thể đã tồn tại trong sản phẩm này!", HttpStatus.BAD_REQUEST),
+    VARIANT_INVALID_STATUS(400, "Trạng thái biến thể không hợp lệ! Chỉ chấp nhận ACTIVE hoặc INACTIVE.", HttpStatus.BAD_REQUEST),
     PRE_ORDER_CONFIG_NOT_FOUND(404, "Chưa thiết lập cấu hình đặt trước!", HttpStatus.NOT_FOUND),
     RECORD_NOT_FOUND(404 , "Không tìm thấy bản ghi!", HttpStatus.NOT_FOUND),
     CANNOT_DELETE_SOLD_ASSET (400, "Tài khoản đã được bán, không thể xóa khỏi lịch sử!",HttpStatus.BAD_REQUEST),

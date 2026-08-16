@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/seller/products")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('SELLER')")
 public class SellerProductController {
 
     private final ProductService productService;
@@ -63,7 +64,7 @@ public class SellerProductController {
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @PathVariable Long productId,
-            @RequestBody UpdateProductRequest request) {
+            @Valid @RequestBody UpdateProductRequest request) {
 
         ProductResponse response = productService.updateProduct(currentUser.getUser().getId(), productId, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật sản phẩm thành công!", response));

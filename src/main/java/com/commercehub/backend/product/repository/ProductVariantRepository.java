@@ -13,6 +13,22 @@ import java.util.List;
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
     List<ProductVariant> findByProductIdAndStatusOrderBySortOrderAsc(Long productId, String status);
 
+    @Query("SELECT CASE WHEN COUNT(v) > 0 THEN true ELSE false END " +
+            "FROM ProductVariant v " +
+            "WHERE v.product.id = :productId " +
+            "AND LOWER(TRIM(v.name)) = LOWER(TRIM(:name))")
+    boolean existsByNormalizedName(@Param("productId") Long productId,
+                                   @Param("name") String name);
+
+    @Query("SELECT CASE WHEN COUNT(v) > 0 THEN true ELSE false END " +
+            "FROM ProductVariant v " +
+            "WHERE v.product.id = :productId " +
+            "AND v.id <> :id " +
+            "AND LOWER(TRIM(v.name)) = LOWER(TRIM(:name))")
+    boolean existsByNormalizedNameAndIdNot(@Param("productId") Long productId,
+                                           @Param("name") String name,
+                                           @Param("id") Long id);
+
 
     @Modifying
     @Query("UPDATE ProductVariant v SET v.stockCount = COALESCE(v.stockCount, 0) + :delta WHERE v.id = :variantId")

@@ -1,5 +1,6 @@
 package com.commercehub.backend.product.dto.request;
 
+import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,4 +15,7 @@ public class UpdateProductRequest {
     String shortDescription;
     String description;
     String status;
+
+    @Size(max = 500, message = "Đường dẫn ảnh sản phẩm không được vượt quá 500 ký tự!")
+    String thumbnailUrl;
 }

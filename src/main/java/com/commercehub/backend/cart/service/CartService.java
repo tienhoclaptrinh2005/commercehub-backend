@@ -97,7 +97,8 @@ public class CartService {
         if (!"ACTIVE".equals(variant.getStatus()) || !"ACTIVE".equals(product.getStatus())) {
             throw new AppException(ErrorCode.PRODUCT_NOT_AVAILABLE);
         }
-        if (!"ACTIVE".equals(product.getShop().getStatus())) {
+        if (!"ACTIVE".equals(product.getShop().getStatus())
+                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())) {
             throw new AppException(ErrorCode.SHOP_SUSPENDED);
         }
         if (product.getShop().getOwner().getId().equals(userId)) {
@@ -141,6 +142,15 @@ public class CartService {
                 .orElseThrow(() -> new AppException(ErrorCode.CART_ITEM_NOT_FOUND));
 
         ProductVariant variant = item.getProductVariant();
+        Product product = variant.getProduct();
+        if (!"ACTIVE".equals(variant.getStatus())
+                || !"ACTIVE".equals(product.getStatus())) {
+            throw new AppException(ErrorCode.PRODUCT_NOT_AVAILABLE);
+        }
+        if (!"ACTIVE".equals(product.getShop().getStatus())
+                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())) {
+            throw new AppException(ErrorCode.SHOP_SUSPENDED);
+        }
         if ("INSTANT".equals(variant.getProduct().getDeliveryType())
                 && request.getQuantity() > variant.getStockCount()) {
             throw new AppException(ErrorCode.OUT_OF_STOCK);
@@ -235,7 +245,8 @@ public class CartService {
 
         boolean active = "ACTIVE".equals(variant.getStatus())
                 && "ACTIVE".equals(product.getStatus())
-                && "ACTIVE".equals(product.getShop().getStatus());
+                && "ACTIVE".equals(product.getShop().getStatus())
+                && "ACTIVE".equals(product.getShop().getOwner().getStatus());
         boolean inStock = !"INSTANT".equals(product.getDeliveryType())
                 || variant.getStockCount() >= item.getQuantity();
 

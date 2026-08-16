@@ -12,9 +12,8 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface ProductMapper {
@@ -24,6 +23,8 @@ public interface ProductMapper {
     @Mapping(target = "status", constant = "ACTIVE")
     @Mapping(target = "soldCount", constant = "0L")
     @Mapping(target = "failedDisputeCount", constant = "0L")
+    @Mapping(target = "variants", ignore = true)
+    @Mapping(target = "preOrderConfig", ignore = true)
     Product toEntity(CreateProductRequest request);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
@@ -34,8 +35,6 @@ public interface ProductMapper {
     @Mapping(target = "productId", source = "product.id")
     ProductVariantResponse toVariantResponse(ProductVariant variant);
 
-    ProductImageResponse toImageResponse(ProductImage image);
-
     @Mapping(target = "productId", source = "product.id")
     PreOrderConfigResponse toPreOrderConfigResponse(PreOrderConfig config);
 
@@ -44,6 +43,7 @@ public interface ProductMapper {
     @Mapping(target = "categoryId", expression = "java(getCategoryId(product))")
     @Mapping(target = "categoryName", expression = "java(getCategoryName(product))")
     @Mapping(target = "stockCount", expression = "java(calculateTotalStock(product.getVariants()))")
+    @Mapping(target = "variants", expression = "java(mapActiveVariants(product.getVariants()))")
     ProductResponse toResponse(Product product, BigDecimal minPrice);
 
     @Mapping(target = "shopId", expression = "java(getShopId(product))")
@@ -51,7 +51,7 @@ public interface ProductMapper {
     @Mapping(target = "categoryId", expression = "java(getCategoryId(product))")
     @Mapping(target = "categoryName", expression = "java(getCategoryName(product))")
     @Mapping(target = "stockCount", expression = "java(calculateTotalStock(product.getVariants()))")
-    @Mapping(target = "imageUrls", expression = "java(mapImages(product.getImages()))")
+    @Mapping(target = "variants", expression = "java(mapActiveVariants(product.getVariants()))")
     ProductDetailResponse toDetailResponse(Product product);
 
     @Mapping(target = "variantId", source = "productVariant.id")
@@ -79,15 +79,6 @@ public interface ProductMapper {
         return (product != null && product.getCategory() != null) ? product.getCategory().getName() : null;
     }
 
-    default List<String> mapImages(List<ProductImage> images) {
-        if (images == null || images.isEmpty()) {
-            return new ArrayList<>();
-        }
-        return images.stream()
-                .map(ProductImage::getImageUrl)
-                .collect(Collectors.toList());
-    }
-
     default Integer calculateTotalStock(List<ProductVariant> variants) {
         if (variants == null || variants.isEmpty()) {
             return 0;
@@ -96,5 +87,20 @@ public interface ProductMapper {
                 .filter(v -> "ACTIVE".equals(v.getStatus()))
                 .mapToInt(ProductVariant::getStockCount)
                 .sum();
+    }
+
+    default List<ProductVariantResponse> mapActiveVariants(List<ProductVariant> variants) {
+        if (variants == null || variants.isEmpty()) {
+            return List.of();
+        }
+
+        return variants.stream()
+                .filter(variant -> "ACTIVE".equals(variant.getStatus()))
+                .sorted(Comparator.comparing(
+                        ProductVariant::getSortOrder,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ))
+                .map(this::toVariantResponse)
+                .toList();
     }
 }

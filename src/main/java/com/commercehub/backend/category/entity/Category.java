@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "categories")
 @Getter
@@ -28,11 +31,20 @@ public class Category  {
     @Column(name = "icon_url")
      String iconUrl;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    Category parent;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "parent")
+    List<Category> children = new ArrayList<>();
+
     @Builder.Default
     @Column(name = "is_active", columnDefinition = "boolean default true")
      Boolean isActive = true;
 
-    @Column(name = "sort_order")
-     Integer sortOrder;
+    @Builder.Default
+    @Column(name = "sort_order", nullable = false)
+     Integer sortOrder = 0;
 
 }

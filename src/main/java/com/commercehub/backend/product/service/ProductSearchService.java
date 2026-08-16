@@ -1,5 +1,9 @@
 package com.commercehub.backend.product.service;
 
+import com.commercehub.backend.category.entity.Category;
+import com.commercehub.backend.category.repository.CategoryRepository;
+import com.commercehub.backend.common.exception.AppException;
+import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.product.dto.request.ProductFilterRequest;
 import com.commercehub.backend.product.dto.response.ProductResponse;
@@ -18,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +30,7 @@ public class ProductSearchService {
 
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
+    private final CategoryRepository categoryRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> searchProducts(ProductFilterRequest request, int page, int size) {
@@ -33,9 +39,11 @@ public class ProductSearchService {
 
         Pageable pageable = PageRequest.of(validPage, validSize, Sort.by("createdAt").descending());
 
+        List<Long> categoryIds = resolveCategoryIds(request.getCategoryId());
+
         Specification<Product> spec = ProductSpecification.filterProducts(
                 request.getKeyword(),
-                request.getCategoryId(),
+                categoryIds,
                 request.getShopId()
         );
 
@@ -54,5 +62,26 @@ public class ProductSearchService {
 
         return PageResponse.of(productPage);
 
+    }
+
+    private List<Long> resolveCategoryIds(Long categoryId) {
+        if (categoryId == null) {
+            return null;
+        }
+
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        if (Boolean.FALSE.equals(category.getIsActive())
+                || (category.getParent() != null
+                && Boolean.FALSE.equals(category.getParent().getIsActive()))) {
+            throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
+        }
+
+        if (category.getParent() != null) {
+            return List.of(category.getId());
+        }
+
+        return categoryRepository.findActiveChildIds(category.getId());
     }
 }

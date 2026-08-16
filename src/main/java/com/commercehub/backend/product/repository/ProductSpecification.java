@@ -7,15 +7,24 @@ import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ProductSpecification {
+public final class ProductSpecification {
 
-    public static Specification<Product> filterProducts(String keyword, Long categoryId, Long shopId) {
+    private ProductSpecification() {
+    }
+
+    public static Specification<Product> filterProducts(String keyword, List<Long> categoryIds, Long shopId) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
             predicates.add(cb.equal(root.get("status"), "ACTIVE"));
 
             predicates.add(cb.equal(root.get("shop").get("status"), "ACTIVE"));
+
+            predicates.add(cb.equal(root.get("shop").get("owner").get("status"), "ACTIVE"));
+
+            predicates.add(cb.isTrue(root.get("category").get("isActive")));
+
+            predicates.add(cb.isTrue(root.get("category").get("parent").get("isActive")));
 
             if (keyword != null && !keyword.trim().isEmpty()) {
                 String likeKeyword = "%" + keyword.trim().toLowerCase() + "%";
@@ -26,8 +35,10 @@ public class ProductSpecification {
             }
 
 
-            if (categoryId != null) {
-                predicates.add(cb.equal(root.get("category").get("id"), categoryId));
+            if (categoryIds != null) {
+                predicates.add(categoryIds.isEmpty()
+                        ? cb.disjunction()
+                        : root.get("category").get("id").in(categoryIds));
             }
 
 

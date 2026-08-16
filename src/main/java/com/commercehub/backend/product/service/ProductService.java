@@ -11,12 +11,9 @@ import com.commercehub.backend.product.dto.request.UpdateProductRequest;
 import com.commercehub.backend.product.dto.response.ProductDetailResponse;
 import com.commercehub.backend.product.dto.response.ProductResponse;
 import com.commercehub.backend.product.entity.Product;
-import com.commercehub.backend.product.entity.ProductImage;
 import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.mapper.ProductMapper;
-import com.commercehub.backend.product.repository.ProductImageRepository;
 import com.commercehub.backend.product.repository.ProductRepository;
-import com.commercehub.backend.product.repository.ProductVariantRepository;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -36,16 +36,14 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final ProductMapper productMapper;
 
-//    private final ProductImageRepository imageRepository;
-//    private final ProductVariantRepository variantRepository;
-
     @Transactional
     public ProductResponse createProduct(Long userId, CreateProductRequest request) {
 
         Shop shop = shopRepository.findByOwnerId(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
-        if (!"ACTIVE".equals(shop.getStatus())) {
+        if (!"ACTIVE".equals(shop.getStatus())
+                || !"ACTIVE".equals(shop.getOwner().getStatus())) {
             throw new AppException(ErrorCode.SHOP_UNAUTHORIZED);
         }
 
@@ -60,8 +58,7 @@ public class ProductService {
             throw new AppException(ErrorCode.PRODUCT_ALREADY_EXISTS);
         }
 
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+        Category category = getSellableCategory(request.getCategoryId());
 
         Product product = productMapper.toEntity(request);
         product.setShop(shop);
@@ -76,10 +73,16 @@ public class ProductService {
         product.setSlug(generatedSlug);
 
         if (request.getVariants() != null) {
+            Set<String> variantNames = new HashSet<>();
             for (var variantRequest : request.getVariants()) {
+                String variantName = variantRequest.getName().trim();
+                if (!variantNames.add(variantName.toLowerCase(Locale.ROOT))) {
+                    throw new AppException(ErrorCode.VARIANT_ALREADY_EXISTS);
+                }
+
                 ProductVariant variant = ProductVariant.builder()
                         .product(product)
-                        .name(variantRequest.getName())
+                        .name(variantName)
                         .durationDays(variantRequest.getDurationDays())
                         .price(variantRequest.getPrice())
                         .sortOrder(variantRequest.getSortOrder())
@@ -90,32 +93,20 @@ public class ProductService {
             }
         }
 
-        if (request.getImageUrls() != null) {
-            int order = 1;
-            for (String url : request.getImageUrls()) {
-                ProductImage image = ProductImage.builder()
-                        .product(product)
-                        .imageUrl(url)
-                        .sortOrder(order++)
-                        .build();
-                product.getImages().add(image);
-            }
-        }
-
         Product savedProduct = productRepository.save(product);
         return mapToProductResponse(savedProduct);
     }
 
     @Transactional(readOnly = true)
     public ProductDetailResponse getProductBySlug(String slug) {
-        Product product = productRepository.findBySlugAndStatusNot(slug, "DELETED")
+        Product product = productRepository.findPublicBySlug(slug)
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
         return productMapper.toDetailResponse(product);
     }
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getProductsByShop(Long shopId) {
-        return productRepository.findAllByShopIdAndStatusNot(shopId, "DELETED")
+        return productRepository.findPublicProductsByShopId(shopId)
                 .stream()
                 .map(this::mapToProductResponse)
                 .toList();
@@ -129,6 +120,7 @@ public class ProductService {
         if (!product.getShop().getOwner().getId().equals(userId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
+        validateShopCanSell(product.getShop());
 
         product.setStatus("DELETED");
         productRepository.save(product);
@@ -143,6 +135,7 @@ public class ProductService {
         if (!product.getShop().getOwner().getId().equals(userId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
+        validateShopCanSell(product.getShop());
 
         if ("DELETED".equals(product.getStatus())) {
             throw new AppException(ErrorCode.PRODUCT_NOT_FOUND);
@@ -169,8 +162,7 @@ public class ProductService {
         }
 
         if (request.getCategoryId() != null && (product.getCategory() == null || !request.getCategoryId().equals(product.getCategory().getId()))) {
-            Category category = categoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+            Category category = getSellableCategory(request.getCategoryId());
             product.setCategory(category);
         }
 
@@ -202,5 +194,29 @@ public class ProductService {
                 : BigDecimal.ZERO;
 
         return productMapper.toResponse(product, minPrice);
+    }
+
+    private Category getSellableCategory(Long categoryId) {
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        if (Boolean.FALSE.equals(category.getIsActive())
+                || (category.getParent() != null
+                && Boolean.FALSE.equals(category.getParent().getIsActive()))) {
+            throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
+        }
+
+        if (category.getParent() == null) {
+            throw new AppException(ErrorCode.CATEGORY_MUST_BE_LEAF);
+        }
+
+        return category;
+    }
+
+    private void validateShopCanSell(Shop shop) {
+        if (!"ACTIVE".equals(shop.getStatus())
+                || !"ACTIVE".equals(shop.getOwner().getStatus())) {
+            throw new AppException(ErrorCode.SHOP_UNAUTHORIZED);
+        }
     }
 }

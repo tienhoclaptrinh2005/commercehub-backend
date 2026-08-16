@@ -9,10 +9,12 @@ import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -23,20 +25,23 @@ public class ProductVariantService {
 
     @Transactional
     public ProductVariant createVariant(Long sellerId, CreateVariantRequest request) {
+        if (request.getProductId() == null) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
 
-        if ("DELETED".equals(product.getStatus())) {
-            throw new AppException(ErrorCode.PRODUCT_NOT_FOUND);
-        }
+        validateSellerCanEdit(product, sellerId);
 
-        if (!product.getShop().getOwner().getId().equals(sellerId)) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
+        String normalizedName = request.getName().trim();
+        if (variantRepository.existsByNormalizedName(product.getId(), normalizedName)) {
+            throw new AppException(ErrorCode.VARIANT_ALREADY_EXISTS);
         }
 
         ProductVariant variant = ProductVariant.builder()
                 .product(product)
-                .name(request.getName())
+                .name(normalizedName)
                 .price(request.getPrice())
                 .durationDays(request.getDurationDays())
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0)
@@ -44,7 +49,7 @@ public class ProductVariantService {
                 .status("ACTIVE")
                 .build();
 
-        return variantRepository.save(variant);
+        return saveVariant(variant);
     }
 
     @Transactional
@@ -52,13 +57,18 @@ public class ProductVariantService {
         ProductVariant variant = variantRepository.findById(variantId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
-
-        if (!variant.getProduct().getShop().getOwner().getId().equals(sellerId)) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
+        validateSellerCanEdit(variant.getProduct(), sellerId);
 
         if (request.getName() != null) {
-            variant.setName(request.getName());
+            String normalizedName = request.getName().trim();
+            if (normalizedName.isEmpty()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            if (variantRepository.existsByNormalizedNameAndIdNot(
+                    variant.getProduct().getId(), normalizedName, variant.getId())) {
+                throw new AppException(ErrorCode.VARIANT_ALREADY_EXISTS);
+            }
+            variant.setName(normalizedName);
         }
         if (request.getPrice() != null) {
             variant.setPrice(request.getPrice());
@@ -70,13 +80,45 @@ public class ProductVariantService {
             variant.setSortOrder(request.getSortOrder());
         }
         if (request.getStatus() != null) {
-            variant.setStatus(request.getStatus());
+            String normalizedStatus = request.getStatus().trim().toUpperCase(Locale.ROOT);
+            if (!List.of("ACTIVE", "INACTIVE").contains(normalizedStatus)) {
+                throw new AppException(ErrorCode.VARIANT_INVALID_STATUS);
+            }
+            variant.setStatus(normalizedStatus);
         }
 
-        return variantRepository.save(variant);
+        return saveVariant(variant);
     }
     @Transactional(readOnly = true)
     public List<ProductVariant> getVariantsByProduct(Long productId) {
-        return variantRepository.findByProductIdAndStatusOrderBySortOrderAsc(productId, "ACTIVE");
+        Product product = productRepository.findPublicById(productId)
+                .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        return product.getVariants().stream()
+                .filter(variant -> "ACTIVE".equals(variant.getStatus()))
+                .sorted(java.util.Comparator.comparing(ProductVariant::getSortOrder))
+                .toList();
+    }
+
+    private void validateSellerCanEdit(Product product, Long sellerId) {
+        if ("DELETED".equals(product.getStatus())) {
+            throw new AppException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+        if (!product.getShop().getOwner().getId().equals(sellerId)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        if (!"ACTIVE".equals(product.getShop().getStatus())
+                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())) {
+            throw new AppException(ErrorCode.SHOP_UNAUTHORIZED);
+        }
+    }
+
+    private ProductVariant saveVariant(ProductVariant variant) {
+        try {
+            // Flush ngay để bắt được cả trường hợp hai request đồng thời vượt qua bước kiểm tra tồn tại.
+            return variantRepository.saveAndFlush(variant);
+        } catch (DataIntegrityViolationException exception) {
+            throw new AppException(ErrorCode.VARIANT_ALREADY_EXISTS);
+        }
     }
 }

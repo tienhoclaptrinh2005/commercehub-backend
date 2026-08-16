@@ -38,6 +38,7 @@ public class DigitalAssetService {
         if (!variant.getProduct().getShop().getOwner().getId().equals(sellerId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
+        validateShopCanSell(variant);
         if (!"INSTANT".equals(variant.getProduct().getDeliveryType())) {
             throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE_FOR_ASSET);
         }
@@ -77,6 +78,7 @@ public class DigitalAssetService {
         if (!variant.getProduct().getShop().getOwner().getId().equals(sellerId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
+        validateShopCanSell(variant);
 
         return digitalAssetRepository.findByProductVariantIdOrderByCreatedAtDesc(variantId).stream()
                 .map(productMapper::toDigitalAssetResponse)
@@ -91,6 +93,7 @@ public class DigitalAssetService {
         if (!asset.getProductVariant().getProduct().getShop().getOwner().getId().equals(sellerId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
+        validateShopCanSell(asset.getProductVariant());
         String status = asset.getStatus();
         if ("SOLD".equals(asset.getStatus())) {
             throw new AppException(ErrorCode.CANNOT_DELETE_SOLD_ASSET);
@@ -137,5 +140,12 @@ public class DigitalAssetService {
                         .deliveredAt(asset.getDeliveredAt())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    private void validateShopCanSell(ProductVariant variant) {
+        if (!"ACTIVE".equals(variant.getProduct().getShop().getStatus())
+                || !"ACTIVE".equals(variant.getProduct().getShop().getOwner().getStatus())) {
+            throw new AppException(ErrorCode.SHOP_UNAUTHORIZED);
+        }
     }
 }

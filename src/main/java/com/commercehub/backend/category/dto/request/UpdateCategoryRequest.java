@@ -1,5 +1,6 @@
 package com.commercehub.backend.category.dto.request;
 
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -18,5 +19,8 @@ public class UpdateCategoryRequest {
      Boolean isActive;
 
      Integer sortOrder;
+
+     @Positive(message = "ID danh mục cha phải là số dương!")
+     Long parentId;
 
 }

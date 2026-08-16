@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/seller/pre-order-configs")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('SELLER')")
 public class PreOrderConfigController {
 
     private final PreOrderConfigService preOrderConfigService;
@@ -36,9 +37,15 @@ public class PreOrderConfigController {
     }
 
     @GetMapping("/product/{productId}")
-    public ResponseEntity<ApiResponse<PreOrderConfigResponse>> getConfig(@PathVariable Long productId) {
+    @PreAuthorize("hasRole('SELLER')")
+    public ResponseEntity<ApiResponse<PreOrderConfigResponse>> getConfig(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable Long productId) {
 
-        var config = preOrderConfigService.getConfigByProductId(productId);
+        var config = preOrderConfigService.getConfigByProductId(
+                currentUser.getUser().getId(),
+                productId
+        );
 
         return ResponseEntity.ok(ApiResponse.success(
                 "Lấy thông tin cấu hình thành công!",

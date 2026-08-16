@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -15,12 +16,36 @@ import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpecificationExecutor<Product> {
-    @EntityGraph(attributePaths = {"shop", "category", "variants", "images"})
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "variants", "preOrderConfig"})
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.slug = :slug " +
+            "AND p.status = 'ACTIVE' " +
+            "AND p.shop.status = 'ACTIVE' " +
+            "AND p.shop.owner.status = 'ACTIVE' " +
+            "AND p.category.isActive = true " +
+            "AND p.category.parent.isActive = true")
+    Optional<Product> findPublicBySlug(@Param("slug") String slug);
 
-    Optional<Product> findBySlugAndStatusNot(String slug, String status);
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "variants", "preOrderConfig"})
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.id = :productId " +
+            "AND p.status = 'ACTIVE' " +
+            "AND p.shop.status = 'ACTIVE' " +
+            "AND p.shop.owner.status = 'ACTIVE' " +
+            "AND p.category.isActive = true " +
+            "AND p.category.parent.isActive = true")
+    Optional<Product> findPublicById(@Param("productId") Long productId);
 
-    @EntityGraph(attributePaths = {"shop", "category"})
-    List<Product> findAllByShopIdAndStatusNot(Long shopId, String status);
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "category"})
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.shop.id = :shopId " +
+            "AND p.status = 'ACTIVE' " +
+            "AND p.shop.status = 'ACTIVE' " +
+            "AND p.shop.owner.status = 'ACTIVE' " +
+            "AND p.category.isActive = true " +
+            "AND p.category.parent.isActive = true " +
+            "ORDER BY p.createdAt DESC")
+    List<Product> findPublicProductsByShopId(@Param("shopId") Long shopId);
 
     List<Product> findAllByCategoryIdAndStatus(Long categoryId, String status);
 
@@ -39,7 +64,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpe
 
 
     @EntityGraph(attributePaths = {"shop", "category"})
-    @Query("SELECT p FROM Product p WHERE p.status = 'ACTIVE' AND p.shop.status = 'ACTIVE'")
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.status = 'ACTIVE' " +
+            "AND p.shop.status = 'ACTIVE' " +
+            "AND p.shop.owner.status = 'ACTIVE' " +
+            "AND p.category.isActive = true " +
+            "AND p.category.parent.isActive = true")
     Page<Product> findActiveProductsFromActiveShops(Pageable pageable);
 
 }

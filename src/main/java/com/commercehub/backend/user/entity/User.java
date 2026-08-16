@@ -89,7 +89,11 @@ public class User {
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id")
+            inverseJoinColumns = @JoinColumn(name = "role_id"),
+            uniqueConstraints = @UniqueConstraint(
+                    name = "uq_user_roles_one_role_per_user",
+                    columnNames = "user_id"
+            )
     )
     private Set<Role> roles = new HashSet<>();
 

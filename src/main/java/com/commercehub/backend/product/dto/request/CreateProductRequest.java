@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -39,7 +40,8 @@ public class CreateProductRequest {
             message = "Hình thức giao hàng không hợp lệ! Vui lòng chọn INSTANT hoặc PRE_ORDER.")
     String deliveryType = "INSTANT";
 
-    List<String> imageUrls;
+    @Size(max = 500, message = "Đường dẫn ảnh sản phẩm không được vượt quá 500 ký tự!")
+    String thumbnailUrl;
 
 
     @NotEmpty(message = "Sản phẩm phải có ít nhất 1 gói/biến thể!")

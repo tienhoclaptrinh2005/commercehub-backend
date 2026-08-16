@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -26,6 +27,10 @@ public interface ShopRepository extends JpaRepository<Shop, Long> {
 
     @EntityGraph(attributePaths = {"owner"})
     Page<Shop> findByStatus(String status, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"owner"})
+    @Query("SELECT s FROM Shop s WHERE s.status = 'ACTIVE' AND s.owner.status = 'ACTIVE'")
+    Page<Shop> findAllPublicActive(Pageable pageable);
 
 
 

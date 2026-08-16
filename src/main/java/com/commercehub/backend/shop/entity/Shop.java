@@ -56,7 +56,7 @@ public class Shop  {
 
     @Column(nullable = false, length = 30)
     @Builder.Default
-     String status = "ACTIVE";
+     String status = "PENDING";
 
     @Column(name = "rating_avg", nullable = false, precision = 3, scale = 2)
     @Builder.Default

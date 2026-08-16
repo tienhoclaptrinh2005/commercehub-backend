@@ -15,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/seller/digital-assets")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('SELLER')")
 public class DigitalAssetController {
 
     private final DigitalAssetService digitalAssetService;

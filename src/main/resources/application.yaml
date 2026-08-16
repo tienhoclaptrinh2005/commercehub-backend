@@ -20,11 +20,59 @@ google:
 
 jwt:
   secret: ${JWT_SECRET:V29ya2luZ0hhcmRPbkNvbW1lcmNlSHViUHJvamVjdDIwMjZTZWN1cmVLZXlWMzg5NDU=}
-  expiration: 86400000 # Thời gian sống của Access Token 1 ngày = 86400000 ms
+  expiration: 900000 # Access Token 15 phút
   refreshExpiration: 604800000 # Thời gian sống của Refresh Token7 ngày = 604800000 ms
 
+auth:
+  refresh-cookie:
+    name: ${AUTH_REFRESH_COOKIE_NAME:commercehub_refresh}
+    # Localhost chạy HTTP phải để false. Production bắt buộc AUTH_COOKIE_SECURE=true.
+    secure: ${AUTH_COOKIE_SECURE:false}
+    same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
+    max-age-seconds: 604800
 
 vnpay:
   hash-secret: ${VNPAY_HASH_SECRET:CHUOI_BI_MAT_CUA_BAN_DO_VNPAY_CAP}
   tmn-code: ${VNPAY_TMN_CODE:MA_WEBSITE_VNPAY_CAP}
   pay-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+
+
+#  server:
+#    port: ${SERVER_PORT:8080}
+#
+#  spring:
+#    datasource:
+#      url: ${DB_URL}
+#      username: ${DB_USERNAME}
+#      password: ${DB_PASSWORD}
+#
+#    jpa:
+#      hibernate:
+#        ddl-auto: validate
+#      show-sql: false
+#      properties:
+#        hibernate:
+#          format_sql: false
+#
+#  google:
+#    client-id: ${GOOGLE_CLIENT_ID}
+#
+#  jwt:
+#    secret: ${JWT_SECRET}
+#    expiration: ${JWT_ACCESS_EXPIRATION_MS:900000}
+#    refreshExpiration: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+#
+#  auth:
+#    refresh-cookie:
+#      name: ${AUTH_REFRESH_COOKIE_NAME:commercehub_refresh}
+#      secure: ${AUTH_COOKIE_SECURE:true}
+#      same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
+#      max-age-seconds: ${AUTH_REFRESH_COOKIE_MAX_AGE:604800}
+#
+#  vnpay:
+#    hash-secret: ${VNPAY_HASH_SECRET}
+#    tmn-code: ${VNPAY_TMN_CODE}
+#    pay-url: ${VNPAY_PAY_URL}
+#
+#
+

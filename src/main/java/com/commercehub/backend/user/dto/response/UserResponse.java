@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import java.time.OffsetDateTime;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -21,4 +22,6 @@ public class UserResponse {
     OffsetDateTime createdAt;
     long completedPurchaseCount;
     long successfulSaleCount;
+    Set<String> roles;
+    Long shopId;
 }

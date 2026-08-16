@@ -8,6 +8,7 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.security.JwtTokenProvider;
+import com.commercehub.backend.shop.repository.ShopRepository;
 import com.commercehub.backend.user.entity.LevelConfig;
 import com.commercehub.backend.user.entity.Role;
 import com.commercehub.backend.user.entity.User;
@@ -32,6 +33,7 @@ import com.commercehub.backend.auth.mapper.AuthMapper;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -55,6 +57,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final LevelConfigRepository levelConfigRepository;
     private final WalletRepository walletRepository;
+    private final ShopRepository shopRepository;
 
     @Value("${google.client-id:xxxxxxxx.googleusercontent.com}")
     private String googleClientId;
@@ -114,14 +117,7 @@ public class AuthService {
                 .build();
         refreshTokenRepository.save(refreshToken);
 
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshTokenString)
-                .userId(newUser.getId())
-                .username(newUser.getUsername())
-                .email(newUser.getEmail())
-                .fullName(newUser.getFullName())
-                .build();
+        return buildAuthResponse(newUser, accessToken, refreshTokenString);
     }
 
     @Transactional
@@ -149,19 +145,12 @@ public class AuthService {
         user.setLastActiveAt(OffsetDateTime.now());
         userRepository.save(user);
 
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshTokenString)
-                .userId(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .build();
+        return buildAuthResponse(user, accessToken, refreshTokenString);
     }
 
     @Transactional
-    public AuthResponse refreshToken(RefreshTokenRequest request) {
-        RefreshToken oldRefreshToken = refreshTokenRepository.findByTokenAndRevokedFalse(request.getRefreshToken())
+    public AuthResponse refreshToken(String refreshTokenValue) {
+        RefreshToken oldRefreshToken = refreshTokenRepository.findActiveTokenForUpdate(refreshTokenValue)
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
 
         if (oldRefreshToken.getExpiresAt().isBefore(OffsetDateTime.now())) {
@@ -171,6 +160,12 @@ public class AuthService {
         }
 
         User user = oldRefreshToken.getUser();
+
+        if (!"ACTIVE".equals(user.getStatus())) {
+            oldRefreshToken.setRevoked(true);
+            refreshTokenRepository.save(oldRefreshToken);
+            throw new AppException(ErrorCode.ACCOUNT_LOCKED);
+        }
 
         oldRefreshToken.setRevoked(true);
         refreshTokenRepository.save(oldRefreshToken);
@@ -191,28 +186,15 @@ public class AuthService {
         Authentication authentication = createAuthentication(user);
         String newAccessToken = jwtTokenProvider.generateAccessToken(authentication);
 
-        return AuthResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(newRefreshTokenString)
-                .userId(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .build();
+        return buildAuthResponse(user, newAccessToken, newRefreshTokenString);
     }
 
     @Transactional
-    public void logout(LogoutRequest request, Long currentUserId) {
-        RefreshToken refreshToken = refreshTokenRepository.findByTokenAndRevokedFalse(request.getRefreshToken())
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
-
-        if (!refreshToken.getUser().getId().equals(currentUserId)) {
-            log.warn("Cảnh báo bảo mật: User ID {} cố gắng thu hồi Refresh Token của User ID {}", currentUserId, refreshToken.getUser().getId());
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
-
-        refreshToken.setRevoked(true);
-        refreshTokenRepository.save(refreshToken);
+    public void logout(String refreshTokenValue) {
+        refreshTokenRepository.findActiveTokenForUpdate(refreshTokenValue).ifPresent(refreshToken -> {
+            refreshToken.setRevoked(true);
+            refreshTokenRepository.save(refreshToken);
+        });
     }
 
 
@@ -257,6 +239,10 @@ public class AuthService {
             }
 
             GoogleIdToken.Payload payload = idToken.getPayload();
+            if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
+                log.warn("Google từ chối đăng nhập vì email chưa được xác minh.");
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
             String email = payload.getEmail();
             String name = (String) payload.get("name");
             String pictureUrl = (String) payload.get("picture");
@@ -305,7 +291,7 @@ public class AuthService {
 
             } else {
                 if (!"ACTIVE".equals(user.getStatus())) {
-                    throw new AppException(ErrorCode.UNAUTHORIZED);
+                    throw new AppException(ErrorCode.ACCOUNT_LOCKED);
                 }
             }
 
@@ -325,14 +311,7 @@ public class AuthService {
             user.setLastActiveAt(OffsetDateTime.now());
             userRepository.save(user);
 
-            return AuthResponse.builder()
-                    .accessToken(accessToken)
-                    .refreshToken(refreshTokenString)
-                    .userId(user.getId())
-                    .username(user.getUsername())
-                    .email(user.getEmail())
-                    .fullName(user.getFullName())
-                    .build();
+            return buildAuthResponse(user, accessToken, refreshTokenString);
         } catch (AppException e) {
             throw e;
 
@@ -364,5 +343,24 @@ public class AuthService {
         CustomUserDetails userDetails = new CustomUserDetails(user, authorities, user.getId());
 
         return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    }
+
+    private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {
+        var shop = shopRepository.findByOwnerId(user.getId()).orElse(null);
+        Set<String> roles = user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet());
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .userId(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .roles(roles)
+                .shopId(shop == null ? null : shop.getId())
+                .shopStatus(shop == null ? null : shop.getStatus())
+                .build();
     }
 }

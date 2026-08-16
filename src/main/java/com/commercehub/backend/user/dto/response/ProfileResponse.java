@@ -5,6 +5,7 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -30,5 +31,8 @@ public class ProfileResponse {
     long completedPurchaseCount;
     long successfulSaleCount;
     Boolean usernameChangeAllowed;
+    Set<String> roles;
+    Long shopId;
+    String shopStatus;
 
 }

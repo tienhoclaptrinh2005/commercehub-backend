@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -25,20 +26,21 @@ public class CategoryService {
     // Lấy toàn bộ danh mục đang hoạt động và xếp đúng vị trí để đưa lên Giao diện trang chủ
     @Transactional(readOnly = true)
     public List<CategoryResponse> getAllActiveCategories() {
-        return categoryRepository.findAllByIsActiveTrueOrderBySortOrderAsc()
+        return categoryRepository.findAllByParentIsNullAndIsActiveTrueOrderBySortOrderAsc()
                 .stream()
-                .map(categoryMapper::toResponse)
+                .map(this::toHierarchyResponse)
                 .toList();
     }
+
     @Transactional(readOnly = true)
     public CategoryResponse getCategoryBySlug(String slug) {
         Category category = categoryRepository.findBySlug(slug)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
-        if (Boolean.FALSE.equals(category.getIsActive())) {
+        if (!isVisible(category)) {
             throw new AppException(ErrorCode.CATEGORY_NOT_FOUND);
         }
-        return categoryMapper.toResponse(category);
+        return toHierarchyResponse(category);
     }
 
     @Transactional
@@ -55,8 +57,10 @@ public class CategoryService {
         }
         category.setSlug(generatedSlug);
         category.setIsActive(true);
+        category.setSortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder());
+        category.setParent(resolveParent(request.getParentId(), null));
 
-        return categoryMapper.toResponse(categoryRepository.save(category));
+        return toHierarchyResponse(categoryRepository.save(category));
     }
 
     @Transactional
@@ -82,7 +86,17 @@ public class CategoryService {
             category.setSlug(newSlug);
         }
 
-        return categoryMapper.toResponse(categoryRepository.save(category));
+        if (request.getParentId() != null) {
+            category.setParent(resolveParent(request.getParentId(), category.getId()));
+        }
+
+        if (Boolean.TRUE.equals(category.getIsActive())
+                && category.getParent() != null
+                && Boolean.FALSE.equals(category.getParent().getIsActive())) {
+            throw new AppException(ErrorCode.CATEGORY_PARENT_INVALID);
+        }
+
+        return toHierarchyResponse(categoryRepository.save(category));
     }
 
     @Transactional
@@ -90,7 +104,66 @@ public class CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
+        if (category.getParent() == null) {
+            List<Category> children = categoryRepository.findAllByParentIdOrderBySortOrderAsc(id);
+            children.forEach(child -> child.setIsActive(false));
+            categoryRepository.saveAll(children);
+        }
+
         category.setIsActive(false);
         categoryRepository.save(category);
+    }
+
+    private Category resolveParent(Long parentId, Long currentCategoryId) {
+        if (parentId == null) {
+            return null;
+        }
+
+        if (parentId.equals(currentCategoryId)) {
+            throw new AppException(ErrorCode.CATEGORY_PARENT_INVALID);
+        }
+
+        Category parent = categoryRepository.findById(parentId)
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        if (Boolean.FALSE.equals(parent.getIsActive()) || parent.getParent() != null) {
+            throw new AppException(ErrorCode.CATEGORY_PARENT_INVALID);
+        }
+
+        if (currentCategoryId != null && categoryRepository.existsByParentId(currentCategoryId)) {
+            throw new AppException(ErrorCode.CATEGORY_PARENT_INVALID);
+        }
+
+        return parent;
+    }
+
+    private boolean isVisible(Category category) {
+        return Boolean.TRUE.equals(category.getIsActive())
+                && (category.getParent() == null
+                || Boolean.TRUE.equals(category.getParent().getIsActive()));
+    }
+
+    private CategoryResponse toHierarchyResponse(Category category) {
+        CategoryResponse response = categoryMapper.toResponse(category);
+
+        if (category.getParent() == null) {
+            response.setChildren(category.getChildren().stream()
+                    .filter(child -> Boolean.TRUE.equals(child.getIsActive()))
+                    .sorted(Comparator.comparing(
+                            child -> child.getSortOrder() == null ? 0 : child.getSortOrder()
+                    ))
+                    .map(this::toLeafResponse)
+                    .toList());
+        } else {
+            response.setChildren(List.of());
+        }
+
+        return response;
+    }
+
+    private CategoryResponse toLeafResponse(Category category) {
+        CategoryResponse response = categoryMapper.toResponse(category);
+        response.setChildren(List.of());
+        return response;
     }
 }

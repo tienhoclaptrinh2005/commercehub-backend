@@ -115,7 +115,8 @@ public class InstantOrderService {
             if (buyerId.equals(sellerId)) {
                 throw new AppException(ErrorCode.CANNOT_BUY_OWN_PRODUCT);
             }
-            if (!"ACTIVE".equals(targetShop.getStatus())) {
+            if (!"ACTIVE".equals(targetShop.getStatus())
+                    || !"ACTIVE".equals(targetShop.getOwner().getStatus())) {
                 throw new AppException(ErrorCode.SHOP_SUSPENDED);
             }
             if (!"ACTIVE".equals(variant.getProduct().getStatus()) || !"ACTIVE".equals(variant.getStatus())) {

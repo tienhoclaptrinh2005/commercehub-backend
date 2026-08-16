@@ -3,7 +3,6 @@ package com.commercehub.backend.product.dto.response;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -28,12 +27,11 @@ public class ProductDetailResponse {
     String status;
     Long soldCount;
     Long failedDisputeCount;
+    String thumbnailUrl;
     OffsetDateTime createdAt;
-    Integer stockCount = 0;
+    Integer stockCount;
 
-    List<ProductImageResponse> images;
     List<ProductVariantResponse> variants;
-     List<String> imageUrls;
 
     // Nếu là hàng Đặt trước (PRE_ORDER) thì sẽ có object này
     PreOrderConfigResponse preOrderConfig;

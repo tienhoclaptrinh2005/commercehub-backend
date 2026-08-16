@@ -28,12 +28,11 @@ public class ProductResponse {
     String status;
     Long soldCount;
     String thumbnailUrl;
-    Integer stockCount = 0;
+    Integer stockCount;
 
     OffsetDateTime createdAt;
     OffsetDateTime updatedAt;
 
     List<ProductVariantResponse> variants;
-    List<String> imageUrls;
     BigDecimal minPrice;
 }

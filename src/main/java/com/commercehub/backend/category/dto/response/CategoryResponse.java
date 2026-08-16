@@ -7,7 +7,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
-import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -20,7 +21,9 @@ public class CategoryResponse {
      String iconUrl;
      Boolean isActive;
      Integer sortOrder;
-
-
+     Long parentId;
+     String parentName;
+     @Builder.Default
+     List<CategoryResponse> children = new ArrayList<>();
 
 }

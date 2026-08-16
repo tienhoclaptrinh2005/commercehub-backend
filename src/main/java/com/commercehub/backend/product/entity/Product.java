@@ -86,10 +86,6 @@ public class Product {
     @BatchSize(size = 20)
     List<ProductVariant> variants = new ArrayList<>();
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    List<ProductImage> images = new ArrayList<>();
-
     @OneToOne(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     PreOrderConfig preOrderConfig;
 }

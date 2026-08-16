@@ -65,6 +65,9 @@ public class ProductReviewService {
 
     @Transactional(readOnly = true)
     public Page<ProductReviewResponse> getReviewsByProduct(Long productId, int page, int size) {
+        productRepository.findPublicById(productId)
+                .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+
         int validPage = Math.max(0, page);
         int validSize = (size <= 0 || size > 100) ? 10 : size;
 

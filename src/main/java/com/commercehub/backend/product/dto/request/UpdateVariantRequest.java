@@ -1,6 +1,7 @@
 package com.commercehub.backend.product.dto.request;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,7 +20,7 @@ public class UpdateVariantRequest {
     @Min(value = 1, message = "Thời hạn sử dụng tối thiểu là 1 ngày!")
     Integer durationDays;
 
-    @Min(value = 0, message = "Giá bán không được nhỏ hơn 0!")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Giá bán phải lớn hơn 0!")
     BigDecimal price;
 
     Integer sortOrder;

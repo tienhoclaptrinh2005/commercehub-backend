@@ -32,6 +32,8 @@ public class PreOrderConfigService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
+        validateShopCanSell(product);
+
         if (!"PRE_ORDER".equals(product.getDeliveryType())) {
             throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE_FOR_CONFIG);
         }
@@ -56,8 +58,23 @@ public class PreOrderConfigService {
     }
 
     @Transactional(readOnly = true)
-    public PreOrderConfig getConfigByProductId(Long productId) {
+    public PreOrderConfig getConfigByProductId(Long sellerId, Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        if (!product.getShop().getOwner().getId().equals(sellerId)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+        validateShopCanSell(product);
+
         return configRepository.findByProductId(productId)
                 .orElseThrow(() -> new AppException(ErrorCode.PRE_ORDER_CONFIG_NOT_FOUND));
+    }
+
+    private void validateShopCanSell(Product product) {
+        if (!"ACTIVE".equals(product.getShop().getStatus())
+                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())) {
+            throw new AppException(ErrorCode.SHOP_UNAUTHORIZED);
+        }
     }
 }
