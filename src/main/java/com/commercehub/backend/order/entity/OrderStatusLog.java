@@ -3,6 +3,8 @@ package com.commercehub.backend.order.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 
@@ -35,8 +37,9 @@ public class OrderStatusLog {
     @Column(columnDefinition = "TEXT")
     private String note;
 
-    @Column(columnDefinition = "JSONB")
-    private String meta; // Dùng String lưu JSONB tạm thời, nếu project dùng thư viện Hypersistence thì đổi thành @Type(JsonType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private String meta;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

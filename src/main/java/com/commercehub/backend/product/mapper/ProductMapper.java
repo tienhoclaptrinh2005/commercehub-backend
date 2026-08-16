@@ -40,19 +40,36 @@ public interface ProductMapper {
 
     @Mapping(target = "shopId", expression = "java(getShopId(product))")
     @Mapping(target = "shopName", expression = "java(getShopName(product))")
+    @Mapping(target = "sellerUsername", expression = "java(getSellerUsername(product))")
+    @Mapping(target = "sellerAvatarUrl", expression = "java(getSellerAvatarUrl(product))")
     @Mapping(target = "categoryId", expression = "java(getCategoryId(product))")
     @Mapping(target = "categoryName", expression = "java(getCategoryName(product))")
     @Mapping(target = "stockCount", expression = "java(calculateTotalStock(product.getVariants()))")
     @Mapping(target = "variants", expression = "java(mapActiveVariants(product.getVariants()))")
-    ProductResponse toResponse(Product product, BigDecimal minPrice);
+    @Mapping(target = "averageRating", source = "averageRating")
+    @Mapping(target = "reviewCount", source = "reviewCount")
+    ProductResponse toResponse(
+            Product product,
+            BigDecimal minPrice,
+            BigDecimal averageRating,
+            Long reviewCount
+    );
 
     @Mapping(target = "shopId", expression = "java(getShopId(product))")
     @Mapping(target = "shopName", expression = "java(getShopName(product))")
+    @Mapping(target = "sellerUsername", expression = "java(getSellerUsername(product))")
+    @Mapping(target = "sellerAvatarUrl", expression = "java(getSellerAvatarUrl(product))")
     @Mapping(target = "categoryId", expression = "java(getCategoryId(product))")
     @Mapping(target = "categoryName", expression = "java(getCategoryName(product))")
     @Mapping(target = "stockCount", expression = "java(calculateTotalStock(product.getVariants()))")
     @Mapping(target = "variants", expression = "java(mapActiveVariants(product.getVariants()))")
-    ProductDetailResponse toDetailResponse(Product product);
+    @Mapping(target = "averageRating", source = "averageRating")
+    @Mapping(target = "reviewCount", source = "reviewCount")
+    ProductDetailResponse toDetailResponse(
+            Product product,
+            BigDecimal averageRating,
+            Long reviewCount
+    );
 
     @Mapping(target = "variantId", source = "productVariant.id")
     DigitalAssetResponse toDigitalAssetResponse(DigitalAsset asset);
@@ -69,6 +86,22 @@ public interface ProductMapper {
 
     default String getShopName(Product product) {
         return (product != null && product.getShop() != null) ? product.getShop().getName() : null;
+    }
+
+    default String getSellerUsername(Product product) {
+        return (product != null
+                && product.getShop() != null
+                && product.getShop().getOwner() != null)
+                ? product.getShop().getOwner().getUsername()
+                : null;
+    }
+
+    default String getSellerAvatarUrl(Product product) {
+        return (product != null
+                && product.getShop() != null
+                && product.getShop().getOwner() != null)
+                ? product.getShop().getOwner().getAvatarUrl()
+                : null;
     }
 
     default Long getCategoryId(Product product) {

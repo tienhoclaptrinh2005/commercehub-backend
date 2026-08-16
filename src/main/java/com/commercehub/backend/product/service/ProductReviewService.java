@@ -20,9 +20,18 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class ProductReviewService {
+
+    private static final BigDecimal DEFAULT_PRODUCT_RATING = new BigDecimal("5.00");
 
     private final ProductReviewRepository reviewRepository;
     private final ProductRepository productRepository;
@@ -73,6 +82,46 @@ public class ProductReviewService {
 
         Pageable pageable = PageRequest.of(validPage, validSize, Sort.by("createdAt").descending());
 
-        return reviewRepository.findByProductId(productId, pageable).map(productMapper::toReviewResponse);
+        return reviewRepository.findByProductIdAndIsVisibleTrue(productId, pageable)
+                .map(productMapper::toReviewResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public RatingSummary getRatingSummary(Long productId) {
+        return getRatingSummaries(List.of(productId))
+                .getOrDefault(productId, RatingSummary.unrated());
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, RatingSummary> getRatingSummaries(Collection<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> distinctProductIds = productIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (distinctProductIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return reviewRepository.findVisibleRatingAggregatesByProductIds(distinctProductIds)
+                .stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        ProductReviewRepository.ProductRatingAggregate::getProductId,
+                        aggregate -> new RatingSummary(
+                                BigDecimal.valueOf(aggregate.getAverageRating())
+                                        .setScale(2, RoundingMode.HALF_UP),
+                                aggregate.getReviewCount()
+                        )
+                ));
+    }
+
+    public record RatingSummary(BigDecimal averageRating, long reviewCount) {
+        public static RatingSummary unrated() {
+            return new RatingSummary(DEFAULT_PRODUCT_RATING, 0L);
+        }
     }
 }

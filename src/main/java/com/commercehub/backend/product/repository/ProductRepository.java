@@ -54,16 +54,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpe
     boolean existsBySlug(String slug);
     long countByShopIdAndStatusNot(Long shopId, String status);
 
-    @EntityGraph(attributePaths = {"shop", "category"})
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "category"})
     Page<Product> findByStatus(String status, Pageable pageable);
     boolean existsByNameAndShopIdAndStatusNot(String name, Long shopId, String status);
 
     @Override
-    @EntityGraph(attributePaths = {"shop", "category"})
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "category"})
     Page<Product> findAll(Specification<Product> spec, Pageable pageable);
 
 
-    @EntityGraph(attributePaths = {"shop", "category"})
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "category"})
     @Query("SELECT p FROM Product p " +
             "WHERE p.status = 'ACTIVE' " +
             "AND p.shop.status = 'ACTIVE' " +

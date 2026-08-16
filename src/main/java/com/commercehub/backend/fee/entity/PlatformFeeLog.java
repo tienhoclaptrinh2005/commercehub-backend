@@ -3,6 +3,8 @@ package com.commercehub.backend.fee.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -38,7 +40,8 @@ public class PlatformFeeLog {
     @Column(columnDefinition = "TEXT")
     private String reason;
 
-    @Column(columnDefinition = "JSONB")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
     private String meta;
 
     @CreationTimestamp

@@ -24,7 +24,7 @@ public class PreOrderItem {
     @JoinColumn(name = "order_item_id", nullable = false, unique = true)
     private OrderItem orderItem;
 
-    @Column(name = "buyer_inputs", columnDefinition = "JSONB")
+    @Column(name = "buyer_inputs", columnDefinition = "TEXT")
     private String buyerInputs;
 
     // PENDING → ACCEPTED → PROCESSING → DELIVERED | REJECTED | CANCELLED

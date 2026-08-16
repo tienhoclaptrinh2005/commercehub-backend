@@ -9,15 +9,33 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
+
 @Repository
 public interface ProductReviewRepository extends JpaRepository<ProductReview, Long> {
 
     @EntityGraph(attributePaths = {"user"})
-    Page<ProductReview> findByProductId(Long productId, Pageable pageable);
+    Page<ProductReview> findByProductIdAndIsVisibleTrue(Long productId, Pageable pageable);
 
     boolean existsByProductIdAndUserId(Long productId, Long userId);
 
-    // Tính điểm đánh giá trung bình
-    @Query("SELECT AVG(r.rating) FROM ProductReview r WHERE r.product.id = :productId")
-    Double calculateAverageRating(@Param("productId") Long productId);
+    @Query("""
+            SELECT r.product.id AS productId,
+                   AVG(r.rating) AS averageRating,
+                   COUNT(r.id) AS reviewCount
+            FROM ProductReview r
+            WHERE r.product.id IN :productIds
+              AND r.isVisible = true
+            GROUP BY r.product.id
+            """)
+    List<ProductRatingAggregate> findVisibleRatingAggregatesByProductIds(
+            @Param("productIds") Collection<Long> productIds
+    );
+
+    interface ProductRatingAggregate {
+        Long getProductId();
+        Double getAverageRating();
+        Long getReviewCount();
+    }
 }

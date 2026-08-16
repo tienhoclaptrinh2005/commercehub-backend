@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ public class ProductService {
     private final ShopRepository shopRepository;
     private final CategoryRepository categoryRepository;
     private final ProductMapper productMapper;
+    private final ProductReviewService productReviewService;
 
     @Transactional
     public ProductResponse createProduct(Long userId, CreateProductRequest request) {
@@ -101,14 +103,29 @@ public class ProductService {
     public ProductDetailResponse getProductBySlug(String slug) {
         Product product = productRepository.findPublicBySlug(slug)
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
-        return productMapper.toDetailResponse(product);
+        ProductReviewService.RatingSummary rating =
+                productReviewService.getRatingSummary(product.getId());
+        return productMapper.toDetailResponse(
+                product,
+                rating.averageRating(),
+                rating.reviewCount()
+        );
     }
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getProductsByShop(Long shopId) {
-        return productRepository.findPublicProductsByShopId(shopId)
+        List<Product> products = productRepository.findPublicProductsByShopId(shopId);
+        Map<Long, ProductReviewService.RatingSummary> ratings = loadRatingSummaries(products);
+
+        return products
                 .stream()
-                .map(this::mapToProductResponse)
+                .map(product -> mapToProductResponse(
+                        product,
+                        ratings.getOrDefault(
+                                product.getId(),
+                                ProductReviewService.RatingSummary.unrated()
+                        )
+                ))
                 .toList();
     }
 
@@ -179,12 +196,31 @@ public class ProductService {
         org.springframework.data.domain.Pageable pageable =
                 org.springframework.data.domain.PageRequest.of(validPage, validSize, org.springframework.data.domain.Sort.by("createdAt").descending());
 
-        org.springframework.data.domain.Page<ProductResponse> productPage =
-                productRepository.findActiveProductsFromActiveShops(pageable).map(this::mapToProductResponse);
-        return PageResponse.of(productPage);
+        org.springframework.data.domain.Page<Product> products =
+                productRepository.findActiveProductsFromActiveShops(pageable);
+        Map<Long, ProductReviewService.RatingSummary> ratings =
+                loadRatingSummaries(products.getContent());
+
+        return PageResponse.of(products.map(product -> mapToProductResponse(
+                product,
+                ratings.getOrDefault(
+                        product.getId(),
+                        ProductReviewService.RatingSummary.unrated()
+                )
+        )));
     }
 
     private ProductResponse mapToProductResponse(Product product) {
+        return mapToProductResponse(
+                product,
+                productReviewService.getRatingSummary(product.getId())
+        );
+    }
+
+    private ProductResponse mapToProductResponse(
+            Product product,
+            ProductReviewService.RatingSummary rating
+    ) {
         BigDecimal minPrice = (product.getVariants() != null && !product.getVariants().isEmpty())
                 ? product.getVariants().stream()
                 .filter(v -> "ACTIVE".equals(v.getStatus()))
@@ -193,7 +229,20 @@ public class ProductService {
                 .orElse(BigDecimal.ZERO)
                 : BigDecimal.ZERO;
 
-        return productMapper.toResponse(product, minPrice);
+        return productMapper.toResponse(
+                product,
+                minPrice,
+                rating.averageRating(),
+                rating.reviewCount()
+        );
+    }
+
+    private Map<Long, ProductReviewService.RatingSummary> loadRatingSummaries(
+            List<Product> products
+    ) {
+        return productReviewService.getRatingSummaries(
+                products.stream().map(Product::getId).toList()
+        );
     }
 
     private Category getSellableCategory(Long categoryId) {

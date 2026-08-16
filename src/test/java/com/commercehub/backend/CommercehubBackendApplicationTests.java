@@ -5,6 +5,7 @@ import com.commercehub.backend.product.dto.request.CreateVariantRequest;
 import com.commercehub.backend.auth.dto.response.AuthResponse;
 import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
+import com.commercehub.backend.product.service.ProductReviewService;
 import com.commercehub.backend.shop.dto.request.CreateShopRequest;
 import com.commercehub.backend.shop.mapper.ShopMapper;
 import com.commercehub.backend.shop.repository.ShopRepository;
@@ -25,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @SpringBootTest
 class CommercehubBackendApplicationTests {
@@ -34,6 +36,9 @@ class CommercehubBackendApplicationTests {
 
 	@Autowired
 	private ProductMapper productMapper;
+
+	@Autowired
+	private ProductReviewService productReviewService;
 
 	@Autowired
 	private ShopRepository shopRepository;
@@ -109,6 +114,24 @@ class CommercehubBackendApplicationTests {
 
 		assertTrue(product.getVariants().isEmpty());
 		assertEquals(request.getThumbnailUrl(), product.getThumbnailUrl());
+	}
+
+	@Test
+	@Transactional
+	void unratedProductDefaultsToFiveStars() {
+		var products = productRepository.findActiveProductsFromActiveShops(PageRequest.of(0, 100));
+		assumeFalse(products.isEmpty());
+
+		var unratedProduct = products.getContent().stream()
+				.filter(product -> productReviewService
+						.getRatingSummary(product.getId())
+						.reviewCount() == 0)
+				.findFirst();
+		assumeTrue(unratedProduct.isPresent());
+
+		var rating = productReviewService.getRatingSummary(unratedProduct.get().getId());
+		assertEquals(0L, rating.reviewCount());
+		assertEquals(new BigDecimal("5.00"), rating.averageRating());
 	}
 
 	@Test

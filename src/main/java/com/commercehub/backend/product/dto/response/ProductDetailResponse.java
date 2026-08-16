@@ -3,6 +3,7 @@ package com.commercehub.backend.product.dto.response;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -16,6 +17,8 @@ public class ProductDetailResponse {
     Long id;
     Long shopId;
     String shopName;
+    String sellerUsername;
+    String sellerAvatarUrl;
     Long categoryId;
     String categoryName;
     String name;
@@ -27,6 +30,8 @@ public class ProductDetailResponse {
     String status;
     Long soldCount;
     Long failedDisputeCount;
+    BigDecimal averageRating;
+    Long reviewCount;
     String thumbnailUrl;
     OffsetDateTime createdAt;
     Integer stockCount;

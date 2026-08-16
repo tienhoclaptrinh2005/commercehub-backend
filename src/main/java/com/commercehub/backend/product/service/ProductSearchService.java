@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +32,7 @@ public class ProductSearchService {
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
     private final CategoryRepository categoryRepository;
+    private final ProductReviewService productReviewService;
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> searchProducts(ProductFilterRequest request, int page, int size) {
@@ -48,16 +50,31 @@ public class ProductSearchService {
         );
 
 
-        Page<ProductResponse> productPage = productRepository.findAll(spec,pageable).map(product -> {
-                BigDecimal minPrice = (product.getVariants()!=null && !product.getVariants().isEmpty())
-                    ?product.getVariants().stream()
-                        .filter(v -> "ACTIVE".equals(v.getStatus()))
-                        .map(ProductVariant::getPrice)
-                        .min(BigDecimal::compareTo)
-                        .orElse(BigDecimal.ZERO)
-                    :BigDecimal.ZERO;
-            return productMapper.toResponse(product, minPrice);
+        Page<Product> products = productRepository.findAll(spec, pageable);
+        Map<Long, ProductReviewService.RatingSummary> ratings =
+                productReviewService.getRatingSummaries(
+                        products.getContent().stream().map(Product::getId).toList()
+                );
 
+        Page<ProductResponse> productPage = products.map(product -> {
+            BigDecimal minPrice = (product.getVariants() != null && !product.getVariants().isEmpty())
+                    ? product.getVariants().stream()
+                    .filter(v -> "ACTIVE".equals(v.getStatus()))
+                    .map(ProductVariant::getPrice)
+                    .min(BigDecimal::compareTo)
+                    .orElse(BigDecimal.ZERO)
+                    : BigDecimal.ZERO;
+
+            ProductReviewService.RatingSummary rating = ratings.getOrDefault(
+                    product.getId(),
+                    ProductReviewService.RatingSummary.unrated()
+            );
+            return productMapper.toResponse(
+                    product,
+                    minPrice,
+                    rating.averageRating(),
+                    rating.reviewCount()
+            );
         });
 
         return PageResponse.of(productPage);

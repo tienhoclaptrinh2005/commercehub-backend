@@ -16,6 +16,8 @@ public class ProductResponse {
     Long id;
     Long shopId;
     String shopName;
+    String sellerUsername;
+    String sellerAvatarUrl;
     Long categoryId;
     String categoryName;
 
@@ -27,6 +29,8 @@ public class ProductResponse {
     String deliveryType;
     String status;
     Long soldCount;
+    BigDecimal averageRating;
+    Long reviewCount;
     String thumbnailUrl;
     Integer stockCount;
 
