@@ -78,7 +78,8 @@ public class PreOrderService {
             if (targetShop == null) {
                 targetShop = currentShop;
                 if (!"ACTIVE".equals(targetShop.getStatus())
-                        || !"ACTIVE".equals(targetShop.getOwner().getStatus())) {
+                        || !"ACTIVE".equals(targetShop.getOwner().getStatus())
+                        || !targetShop.getOwner().hasRole("SELLER")) {
                     throw new AppException(ErrorCode.SHOP_SUSPENDED);
                 }
             } else if (!targetShop.getId().equals(currentShop.getId())) {

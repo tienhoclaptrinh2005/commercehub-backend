@@ -97,6 +97,12 @@ public class User {
     )
     private Set<Role> roles = new HashSet<>();
 
+    public boolean hasRole(String roleName) {
+        return roleName != null
+                && roles != null
+                && roles.stream().anyMatch(role -> roleName.equals(role.getName()));
+    }
+
     @PrePersist
     protected void onCreate() {
         OffsetDateTime now = OffsetDateTime.now();

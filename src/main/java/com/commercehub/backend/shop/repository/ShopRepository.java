@@ -29,7 +29,10 @@ public interface ShopRepository extends JpaRepository<Shop, Long> {
     Page<Shop> findByStatus(String status, Pageable pageable);
 
     @EntityGraph(attributePaths = {"owner"})
-    @Query("SELECT s FROM Shop s WHERE s.status = 'ACTIVE' AND s.owner.status = 'ACTIVE'")
+    @Query("SELECT s FROM Shop s JOIN s.owner.roles ownerRole " +
+            "WHERE s.status = 'ACTIVE' " +
+            "AND s.owner.status = 'ACTIVE' " +
+            "AND ownerRole.name = 'SELLER'")
     Page<Shop> findAllPublicActive(Pageable pageable);
 
 

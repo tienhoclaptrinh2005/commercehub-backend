@@ -65,20 +65,25 @@ class CommercehubBackendApplicationTests {
 	}
 
 	@Test
-	void higherRolesInheritCommercePermissions() {
-		var adminAuthorities = roleHierarchy.getReachableGrantedAuthorities(
-				List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
-		);
-		assertTrue(adminAuthorities.contains(new SimpleGrantedAuthority("ROLE_SELLER")));
-		assertTrue(adminAuthorities.contains(new SimpleGrantedAuthority("ROLE_BUYER")));
+    void administratorsCanBuyButDoNotInheritSellerPermissions() {
+        var adminAuthorities = roleHierarchy.getReachableGrantedAuthorities(
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+        );
+        assertFalse(adminAuthorities.contains(new SimpleGrantedAuthority("ROLE_SELLER")));
+        assertTrue(adminAuthorities.contains(new SimpleGrantedAuthority("ROLE_BUYER")));
 
-		var superAdminAuthorities = roleHierarchy.getReachableGrantedAuthorities(
-				List.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
-		);
-		assertTrue(superAdminAuthorities.contains(new SimpleGrantedAuthority("ROLE_ADMIN")));
-		assertTrue(superAdminAuthorities.contains(new SimpleGrantedAuthority("ROLE_SELLER")));
-		assertTrue(superAdminAuthorities.contains(new SimpleGrantedAuthority("ROLE_BUYER")));
-	}
+        var superAdminAuthorities = roleHierarchy.getReachableGrantedAuthorities(
+                List.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
+        );
+        assertTrue(superAdminAuthorities.contains(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        assertFalse(superAdminAuthorities.contains(new SimpleGrantedAuthority("ROLE_SELLER")));
+        assertTrue(superAdminAuthorities.contains(new SimpleGrantedAuthority("ROLE_BUYER")));
+
+        var sellerAuthorities = roleHierarchy.getReachableGrantedAuthorities(
+                List.of(new SimpleGrantedAuthority("ROLE_SELLER"))
+        );
+        assertTrue(sellerAuthorities.contains(new SimpleGrantedAuthority("ROLE_BUYER")));
+    }
 
 	@Test
 	void refreshTokenIsNeverSerializedToJson() throws Exception {

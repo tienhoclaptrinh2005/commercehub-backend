@@ -39,6 +39,7 @@ public enum ErrorCode {
     SHOP_NOT_FOUND(404, "Không tìm thấy gian hàng!", HttpStatus.NOT_FOUND),
     SHOP_ALREADY_EXISTS(400, "Tên gian hàng đã tồn tại, vui lòng chọn tên khác!", HttpStatus.BAD_REQUEST),
     SHOP_CREATION_NOT_ALLOWED(403, "Cấp độ tài khoản của bạn chưa đủ điều kiện để mở gian hàng!", HttpStatus.FORBIDDEN),
+    SHOP_CREATION_ROLE_NOT_ALLOWED(403, "Chỉ tài khoản BUYER được phép đăng ký mở gian hàng!", HttpStatus.FORBIDDEN),
     SHOP_LIMIT_REACHED(400, "Bạn đã đạt số lượng gian hàng tối đa cho phép của cấp độ hiện tại!", HttpStatus.BAD_REQUEST),
     INVALID_STATUS(400, "Trạng thái không hợp lệ!", HttpStatus.BAD_REQUEST),
     SHOP_UNAUTHORIZED(403, "Gian hàng của bạn đang bị khóa hoặc chưa được phê duyệt!", HttpStatus.FORBIDDEN),

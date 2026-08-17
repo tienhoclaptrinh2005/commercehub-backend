@@ -41,15 +41,16 @@ public class SecurityConfig {
     }
 
     /**
-     * Một user chỉ lưu một role, quyền cấp cao tự kế thừa quyền cấp thấp.
-     * SUPER_ADMIN > ADMIN > SELLER > BUYER.
+     * Một user chỉ lưu một role.
+     * ADMIN/SUPER_ADMIN vẫn có quyền mua hàng như BUYER nhưng tuyệt đối không
+     * kế thừa SELLER, tránh tài khoản quản trị đồng thời kinh doanh trên sàn.
      */
     @Bean
     public static RoleHierarchy roleHierarchy() {
         RoleHierarchyImpl hierarchy = new RoleHierarchyImpl();
         hierarchy.setHierarchy("""
                 ROLE_SUPER_ADMIN > ROLE_ADMIN
-                ROLE_ADMIN > ROLE_SELLER
+                ROLE_ADMIN > ROLE_BUYER
                 ROLE_SELLER > ROLE_BUYER
                 """);
         return hierarchy;

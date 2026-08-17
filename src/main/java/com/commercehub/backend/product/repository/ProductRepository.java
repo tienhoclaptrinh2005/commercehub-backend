@@ -17,31 +17,34 @@ import java.util.Optional;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpecificationExecutor<Product> {
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "variants", "preOrderConfig"})
-    @Query("SELECT p FROM Product p " +
+    @Query("SELECT p FROM Product p JOIN p.shop.owner.roles ownerRole " +
             "WHERE p.slug = :slug " +
             "AND p.status = 'ACTIVE' " +
             "AND p.shop.status = 'ACTIVE' " +
             "AND p.shop.owner.status = 'ACTIVE' " +
+            "AND ownerRole.name = 'SELLER' " +
             "AND p.category.isActive = true " +
             "AND p.category.parent.isActive = true")
     Optional<Product> findPublicBySlug(@Param("slug") String slug);
 
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "variants", "preOrderConfig"})
-    @Query("SELECT p FROM Product p " +
+    @Query("SELECT p FROM Product p JOIN p.shop.owner.roles ownerRole " +
             "WHERE p.id = :productId " +
             "AND p.status = 'ACTIVE' " +
             "AND p.shop.status = 'ACTIVE' " +
             "AND p.shop.owner.status = 'ACTIVE' " +
+            "AND ownerRole.name = 'SELLER' " +
             "AND p.category.isActive = true " +
             "AND p.category.parent.isActive = true")
     Optional<Product> findPublicById(@Param("productId") Long productId);
 
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category"})
-    @Query("SELECT p FROM Product p " +
+    @Query("SELECT p FROM Product p JOIN p.shop.owner.roles ownerRole " +
             "WHERE p.shop.id = :shopId " +
             "AND p.status = 'ACTIVE' " +
             "AND p.shop.status = 'ACTIVE' " +
             "AND p.shop.owner.status = 'ACTIVE' " +
+            "AND ownerRole.name = 'SELLER' " +
             "AND p.category.isActive = true " +
             "AND p.category.parent.isActive = true " +
             "ORDER BY p.createdAt DESC")
@@ -64,10 +67,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpe
 
 
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category"})
-    @Query("SELECT p FROM Product p " +
+    @Query("SELECT p FROM Product p JOIN p.shop.owner.roles ownerRole " +
             "WHERE p.status = 'ACTIVE' " +
             "AND p.shop.status = 'ACTIVE' " +
             "AND p.shop.owner.status = 'ACTIVE' " +
+            "AND ownerRole.name = 'SELLER' " +
             "AND p.category.isActive = true " +
             "AND p.category.parent.isActive = true")
     Page<Product> findActiveProductsFromActiveShops(Pageable pageable);

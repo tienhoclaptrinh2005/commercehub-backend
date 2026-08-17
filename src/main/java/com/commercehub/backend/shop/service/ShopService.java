@@ -53,7 +53,8 @@ public class ShopService {
         Shop shop = shopRepository.findBySlug(slug)
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
         if (!"ACTIVE".equals(shop.getStatus())
-                || !"ACTIVE".equals(shop.getOwner().getStatus())) {
+                || !"ACTIVE".equals(shop.getOwner().getStatus())
+                || !shop.getOwner().hasRole("SELLER")) {
             throw new AppException(ErrorCode.SHOP_NOT_FOUND);
         }
 
@@ -66,11 +67,16 @@ public class ShopService {
 
     @Transactional
     public ShopResponse createShop(CreateShopRequest request, Long ownerId) {
+        User owner = userRepository.findById(ownerId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        if (owner.getRoles().size() != 1 || !owner.hasRole("BUYER")) {
+            throw new AppException(ErrorCode.SHOP_CREATION_ROLE_NOT_ALLOWED);
+        }
+
         if (shopRepository.existsByName(request.getName())) {
             throw new AppException(ErrorCode.SHOP_ALREADY_EXISTS);
         }
-        User owner = userRepository.findById(ownerId)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (shopRepository.findByOwnerId(ownerId).isPresent()) {
             throw new AppException(ErrorCode.USER_ALREADY_HAS_SHOP);
@@ -172,33 +178,38 @@ public class ShopService {
 
     /**
      * Mỗi user chỉ giữ một role. Khi shop được duyệt, BUYER trở thành SELLER.
-     * ADMIN và SUPER_ADMIN giữ nguyên role vì role hierarchy đã bao gồm quyền SELLER/BUYER.
+     * Shop của SELLER có thể được kích hoạt lại; ADMIN/SUPER_ADMIN bị từ chối.
      */
     private void promoteOwnerForApprovedShop(User owner) {
-        Role highestRole = owner.getRoles().stream()
-                .max(java.util.Comparator.comparingInt(role -> rolePriority(role.getName())))
+        if (owner.getRoles().size() != 1) {
+            throw new AppException(ErrorCode.SYSTEM_CONFIG_ERROR);
+        }
+
+        Role currentRole = owner.getRoles().stream()
+                .findFirst()
                 .orElseThrow(() -> new AppException(ErrorCode.SYSTEM_CONFIG_ERROR));
 
-        if ("BUYER".equals(highestRole.getName())) {
-            highestRole = roleRepository.findByName("SELLER")
+        if ("ADMIN".equals(currentRole.getName())
+                || "SUPER_ADMIN".equals(currentRole.getName())) {
+            throw new AppException(ErrorCode.SHOP_CREATION_ROLE_NOT_ALLOWED);
+        }
+
+        if ("SELLER".equals(currentRole.getName())) {
+            return;
+        }
+
+        if ("BUYER".equals(currentRole.getName())) {
+            Role sellerRole = roleRepository.findByName("SELLER")
                     .orElseThrow(() -> {
                         log.error("CRITICAL ERROR: Không tìm thấy quyền 'SELLER' trong bảng Roles!");
                         return new AppException(ErrorCode.SYSTEM_CONFIG_ERROR);
                     });
+            owner.getRoles().clear();
+            owner.getRoles().add(sellerRole);
+            userRepository.save(owner);
+            return;
         }
 
-        owner.getRoles().clear();
-        owner.getRoles().add(highestRole);
-        userRepository.save(owner);
-    }
-
-    private int rolePriority(String roleName) {
-        return switch (roleName) {
-            case "SUPER_ADMIN" -> 4;
-            case "ADMIN" -> 3;
-            case "SELLER" -> 2;
-            case "BUYER" -> 1;
-            default -> 0;
-        };
+        throw new AppException(ErrorCode.SHOP_CREATION_ROLE_NOT_ALLOWED);
     }
 }

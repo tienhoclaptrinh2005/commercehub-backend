@@ -144,7 +144,8 @@ public class DigitalAssetService {
 
     private void validateShopCanSell(ProductVariant variant) {
         if (!"ACTIVE".equals(variant.getProduct().getShop().getStatus())
-                || !"ACTIVE".equals(variant.getProduct().getShop().getOwner().getStatus())) {
+                || !"ACTIVE".equals(variant.getProduct().getShop().getOwner().getStatus())
+                || !variant.getProduct().getShop().getOwner().hasRole("SELLER")) {
             throw new AppException(ErrorCode.SHOP_UNAUTHORIZED);
         }
     }

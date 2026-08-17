@@ -73,7 +73,8 @@ public class PreOrderConfigService {
 
     private void validateShopCanSell(Product product) {
         if (!"ACTIVE".equals(product.getShop().getStatus())
-                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())) {
+                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())
+                || !product.getShop().getOwner().hasRole("SELLER")) {
             throw new AppException(ErrorCode.SHOP_UNAUTHORIZED);
         }
     }

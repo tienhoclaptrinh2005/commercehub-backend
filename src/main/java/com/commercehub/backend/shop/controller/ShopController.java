@@ -53,12 +53,11 @@ public class ShopController {
     }
 
     /**
-     * Mọi role có quyền BUYER đều có thể gửi hồ sơ mở shop lần đầu.
-     * Shop được tạo ở trạng thái PENDING; chỉ khi admin duyệt ACTIVE thì
-     * BUYER mới được chuyển thành SELLER. ADMIN/SUPER_ADMIN giữ nguyên role.
+     * Chỉ tài khoản có role gốc BUYER được gửi hồ sơ mở shop lần đầu.
+     * SELLER đã có shop; ADMIN/SUPER_ADMIN chỉ quản trị và không được bán hàng.
      */
     @PostMapping
-    @PreAuthorize("hasRole('BUYER')")
+    @PreAuthorize("hasRole('BUYER') and !hasAnyRole('SELLER', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ShopResponse>> createShop(@Valid @RequestBody CreateShopRequest request) {
         Long currentUserId = SecurityUtils.getCurrentUserId();
         if (currentUserId == null) {

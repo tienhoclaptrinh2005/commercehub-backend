@@ -16,11 +16,18 @@ public final class ProductSpecification {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            var shop = root.join("shop");
+            var owner = shop.join("owner");
+            var ownerRole = owner.join("roles");
+            query.distinct(true);
+
             predicates.add(cb.equal(root.get("status"), "ACTIVE"));
 
-            predicates.add(cb.equal(root.get("shop").get("status"), "ACTIVE"));
+            predicates.add(cb.equal(shop.get("status"), "ACTIVE"));
 
-            predicates.add(cb.equal(root.get("shop").get("owner").get("status"), "ACTIVE"));
+            predicates.add(cb.equal(owner.get("status"), "ACTIVE"));
+
+            predicates.add(cb.equal(ownerRole.get("name"), "SELLER"));
 
             predicates.add(cb.isTrue(root.get("category").get("isActive")));
 
@@ -43,7 +50,7 @@ public final class ProductSpecification {
 
 
             if (shopId != null) {
-                predicates.add(cb.equal(root.get("shop").get("id"), shopId));
+                predicates.add(cb.equal(shop.get("id"), shopId));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

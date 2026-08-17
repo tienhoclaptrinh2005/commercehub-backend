@@ -45,7 +45,8 @@ public class ProductService {
                 .orElseThrow(() -> new AppException(ErrorCode.SHOP_NOT_FOUND));
 
         if (!"ACTIVE".equals(shop.getStatus())
-                || !"ACTIVE".equals(shop.getOwner().getStatus())) {
+                || !"ACTIVE".equals(shop.getOwner().getStatus())
+                || !shop.getOwner().hasRole("SELLER")) {
             throw new AppException(ErrorCode.SHOP_UNAUTHORIZED);
         }
 
@@ -264,7 +265,8 @@ public class ProductService {
 
     private void validateShopCanSell(Shop shop) {
         if (!"ACTIVE".equals(shop.getStatus())
-                || !"ACTIVE".equals(shop.getOwner().getStatus())) {
+                || !"ACTIVE".equals(shop.getOwner().getStatus())
+                || !shop.getOwner().hasRole("SELLER")) {
             throw new AppException(ErrorCode.SHOP_UNAUTHORIZED);
         }
     }

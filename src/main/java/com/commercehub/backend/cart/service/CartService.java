@@ -98,7 +98,8 @@ public class CartService {
             throw new AppException(ErrorCode.PRODUCT_NOT_AVAILABLE);
         }
         if (!"ACTIVE".equals(product.getShop().getStatus())
-                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())) {
+                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())
+                || !product.getShop().getOwner().hasRole("SELLER")) {
             throw new AppException(ErrorCode.SHOP_SUSPENDED);
         }
         if (product.getShop().getOwner().getId().equals(userId)) {
@@ -148,7 +149,8 @@ public class CartService {
             throw new AppException(ErrorCode.PRODUCT_NOT_AVAILABLE);
         }
         if (!"ACTIVE".equals(product.getShop().getStatus())
-                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())) {
+                || !"ACTIVE".equals(product.getShop().getOwner().getStatus())
+                || !product.getShop().getOwner().hasRole("SELLER")) {
             throw new AppException(ErrorCode.SHOP_SUSPENDED);
         }
         if ("INSTANT".equals(variant.getProduct().getDeliveryType())
@@ -246,7 +248,8 @@ public class CartService {
         boolean active = "ACTIVE".equals(variant.getStatus())
                 && "ACTIVE".equals(product.getStatus())
                 && "ACTIVE".equals(product.getShop().getStatus())
-                && "ACTIVE".equals(product.getShop().getOwner().getStatus());
+                && "ACTIVE".equals(product.getShop().getOwner().getStatus())
+                && product.getShop().getOwner().hasRole("SELLER");
         boolean inStock = !"INSTANT".equals(product.getDeliveryType())
                 || variant.getStockCount() >= item.getQuantity();
 
