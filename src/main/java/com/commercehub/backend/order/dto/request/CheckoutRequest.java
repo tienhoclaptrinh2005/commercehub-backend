@@ -2,10 +2,12 @@ package com.commercehub.backend.order.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.List;
 
@@ -14,6 +16,7 @@ import java.util.List;
 public class CheckoutRequest {
 
     @NotEmpty(message = "Giỏ hàng không được để trống")
+    @Size(max = 50, message = "Mỗi lần checkout tối đa 50 dòng sản phẩm")
     @Valid
     List<CheckoutItemRequest> items;
 
@@ -24,6 +27,10 @@ public class CheckoutRequest {
      * Khóa idempotency do client sinh (UUID) — gửi lại cùng key sẽ trả về
      * đơn đã tạo thay vì tạo đơn mới và trừ ví lần 2.
      */
-    @Size(max = 100, message = "Idempotency key tối đa 100 ký tự")
+    @NotBlank(message = "Idempotency key không được để trống")
+    @Size(min = 16, max = 100, message = "Idempotency key phải từ 16 đến 100 ký tự")
     String idempotencyKey;
+
+    @JsonIgnore
+    Long checkoutRequestId;
 }

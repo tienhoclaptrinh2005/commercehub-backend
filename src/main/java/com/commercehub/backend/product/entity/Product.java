@@ -86,6 +86,7 @@ public class Product {
     @BatchSize(size = 20)
     List<ProductVariant> variants = new ArrayList<>();
 
-    @OneToOne(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "product", cascade = CascadeType.ALL,
+            orphanRemoval = true, fetch = FetchType.LAZY)
     PreOrderConfig preOrderConfig;
 }

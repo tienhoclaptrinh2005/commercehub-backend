@@ -72,7 +72,7 @@ public class DepositService {
         depositRepository.save(deposit);
 
         // Cộng tiền vào ví User
-        walletService.addBalance(
+        walletService.systemCreditBalance(
                 deposit.getUser().getId(),
                 deposit.getAmount(),
                 "DEPOSIT",

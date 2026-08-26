@@ -39,7 +39,8 @@ public class SellerFeeController {
             @RequestParam(defaultValue = "20") int size
     ) {
         Shop myShop = shopService.getShopByOwnerId(SecurityUtils.getCurrentUserId());
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
+                Sort.by("createdAt").descending());
         return ResponseEntity.ok(ApiResponse.success(ledgerService.getMyShopFees(myShop.getId(), pageable)));
     }
 

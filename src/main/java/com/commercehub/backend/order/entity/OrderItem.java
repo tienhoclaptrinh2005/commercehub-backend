@@ -4,6 +4,7 @@ import com.commercehub.backend.product.entity.ProductVariant;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -69,6 +70,14 @@ public class OrderItem {
 
     @Column(name = "seller_net_amount", precision = 18, scale = 2)
     private BigDecimal sellerNetAmount;
+
+    @Builder.Default
+    @ColumnDefault("'NONE'")
+    @Column(name = "refund_status", nullable = false, length = 20)
+    private String refundStatus = "NONE";
+
+    @Column(name = "refunded_at")
+    private OffsetDateTime refundedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

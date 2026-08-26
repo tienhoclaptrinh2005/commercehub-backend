@@ -52,14 +52,12 @@ public class WalletService {
     }
 
     @Transactional
-    public Wallet holdForSeller(Long sellerId, BigDecimal amount, Long orderId) {
+    public Wallet systemHoldForSeller(Long sellerId, BigDecimal amount, Long orderId) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException(ErrorCode.INVALID_AMOUNT);
         }
         Wallet wallet = walletRepository.findByUserIdWithLock(sellerId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
-
-        assertWalletActive(wallet);
 
         BigDecimal before = wallet.getHoldBalance();
         wallet.setHoldBalance(before.add(amount));
@@ -71,7 +69,7 @@ public class WalletService {
     }
 
     @Transactional
-    public void processHoldRelease(Long sellerId, BigDecimal holdAmount, BigDecimal sellerNet, BigDecimal platformFee, Long refId) {
+    public void systemReleaseHold(Long sellerId, BigDecimal holdAmount, BigDecimal sellerNet, BigDecimal platformFee, Long refId) {
         if (holdAmount == null || holdAmount.compareTo(BigDecimal.ZERO) <= 0 ||
                 sellerNet == null || sellerNet.compareTo(BigDecimal.ZERO) < 0 ||
                 platformFee == null || platformFee.compareTo(BigDecimal.ZERO) < 0) {
@@ -84,8 +82,6 @@ public class WalletService {
 
         Wallet sellerWallet = walletRepository.findByUserIdWithLock(sellerId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
-
-        assertWalletActive(sellerWallet);
 
         BigDecimal holdBefore = sellerWallet.getHoldBalance();
 
@@ -105,7 +101,6 @@ public class WalletService {
         if (platformFee.compareTo(BigDecimal.ZERO) > 0) {
             Wallet platformWallet = walletRepository.findPlatformWalletWithLock()
                     .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
-            assertWalletActive(platformWallet);
             BigDecimal platBefore = platformWallet.getAvailableBalance();
             platformWallet.setAvailableBalance(platBefore.add(platformFee));
             walletRepository.save(platformWallet);
@@ -115,14 +110,12 @@ public class WalletService {
     }
 
     @Transactional
-    public void addBalance(Long userId, BigDecimal amount, String type, Long refId, String refType) {
+    public void systemCreditBalance(Long userId, BigDecimal amount, String type, Long refId, String refType) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException(ErrorCode.INVALID_AMOUNT);
         }
         Wallet wallet = walletRepository.findByUserIdWithLock(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
-
-        assertWalletActive(wallet);
 
         BigDecimal before = wallet.getAvailableBalance();
         wallet.setAvailableBalance(before.add(amount));
@@ -132,15 +125,13 @@ public class WalletService {
     }
 
     @Transactional
-    public void cancelHoldForSeller(Long sellerId, BigDecimal amount, Long refId) {
+    public void systemCancelSellerHold(Long sellerId, BigDecimal amount, Long refId) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException(ErrorCode.INVALID_AMOUNT);
         }
 
         Wallet wallet = walletRepository.findByUserIdWithLock(sellerId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
-        assertWalletActive(wallet);
-
         if (wallet.getHoldBalance().compareTo(amount) < 0) {
             throw new AppException(ErrorCode.INSUFFICIENT_HOLD_BALANCE);
         }

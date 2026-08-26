@@ -76,7 +76,7 @@ public class CartController {
     @PostMapping("/checkout")
     public ResponseEntity<ApiResponse<List<Long>>> checkout(
             @AuthenticationPrincipal CustomUserDetails currentUser,
-            @RequestBody(required = false) @Valid CartCheckoutRequest request) {
+            @RequestBody @Valid CartCheckoutRequest request) {
         List<Long> orderIds = cartService.checkoutCart(currentUser.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Checkout giỏ hàng thành công", orderIds));
     }

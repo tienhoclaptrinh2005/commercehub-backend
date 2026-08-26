@@ -24,10 +24,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
 
     //  Hàm tìm các đơn hàng Shop ĐÃ NHẬN nhưng xử lý quá hạn (quá 24h)
-    List<Order> findByStatusAndProcessingDeadlineAtBefore(String status, OffsetDateTime deadline);
+    @Query("SELECT o.id FROM Order o WHERE o.status = :status AND o.processingDeadlineAt < :deadline ORDER BY o.processingDeadlineAt ASC, o.id ASC")
+    List<Long> findExpiredProcessingIds(@Param("status") String status, @Param("deadline") OffsetDateTime deadline, Pageable pageable);
 
     // Hàm tìm các đơn hàng Shop BỎ QUÊN không thèm duyệt
-    List<Order> findByStatusAndApprovalDeadlineAtBefore(String status, OffsetDateTime deadline);
+    @Query("SELECT o.id FROM Order o WHERE o.status = :status AND o.approvalDeadlineAt < :deadline ORDER BY o.approvalDeadlineAt ASC, o.id ASC")
+    List<Long> findExpiredApprovalIds(@Param("status") String status, @Param("deadline") OffsetDateTime deadline, Pageable pageable);
 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

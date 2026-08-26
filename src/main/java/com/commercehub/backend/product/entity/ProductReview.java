@@ -11,7 +11,13 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "product_reviews")
+@Table(
+        name = "product_reviews",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_product_reviews_product_user",
+                columnNames = {"product_id", "user_id"}
+        )
+)
 @Getter
 @Setter
 @NoArgsConstructor

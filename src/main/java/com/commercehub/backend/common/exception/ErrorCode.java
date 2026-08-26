@@ -100,6 +100,8 @@ public enum ErrorCode {
     UNAUTHORIZED_ACTION(403, "Bạn không có quyền thực hiện hành động này!", HttpStatus.FORBIDDEN),
     ORDER_NOT_PROCESSING(400, "Đơn hàng không ở trạng thái đang xử lý!", HttpStatus.BAD_REQUEST),
     ITEMS_MUST_BE_SAME_SHOP(400, "Tất cả sản phẩm trong đơn hàng phải thuộc cùng một gian hàng!", HttpStatus.BAD_REQUEST),
+    IDEMPOTENCY_KEY_REUSED(409, "Idempotency key đã được dùng với nội dung checkout khác!", HttpStatus.CONFLICT),
+    CHECKOUT_ALREADY_PROCESSING(409, "Checkout với idempotency key này đang được xử lý!", HttpStatus.CONFLICT),
 
     // Hệ thống & Cấu hình
     SYSTEM_CONFIG_ERROR(500, "Lỗi cấu hình hệ thống! Vui lòng liên hệ quản trị viên.", HttpStatus.INTERNAL_SERVER_ERROR),
@@ -125,6 +127,11 @@ public enum ErrorCode {
     HOLD_RELEASE_NOT_WARRANTY(400, "Sản phẩm này không đang trong quá trình bảo hành (WARRANTY_IN_PROGRESS)!", HttpStatus.BAD_REQUEST),
     HOLD_RELEASE_NOT_DISPUTED(400, "Sản phẩm này chưa ở trạng thái tranh chấp (DISPUTED) để Admin phán xử!", HttpStatus.BAD_REQUEST),
 
+
+    DISPUTE_NOT_FOUND(404, "Không tìm thấy tranh chấp!", HttpStatus.NOT_FOUND),
+    DISPUTE_ALREADY_EXISTS(409, "OrderItem này đã có hồ sơ khiếu nại/tranh chấp!", HttpStatus.CONFLICT),
+    DISPUTE_INVALID_STATUS(400, "Trạng thái tranh chấp không hợp lệ để thực hiện thao tác này!", HttpStatus.BAD_REQUEST),
+    DISPUTE_ACCESS_DENIED(403, "Bạn không có quyền truy cập hoặc thao tác tranh chấp này!", HttpStatus.FORBIDDEN),
 
 
 

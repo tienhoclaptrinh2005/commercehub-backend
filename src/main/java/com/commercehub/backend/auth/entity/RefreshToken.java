@@ -35,6 +35,7 @@ public class RefreshToken {
     private OffsetDateTime expiresAt;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean revoked = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)

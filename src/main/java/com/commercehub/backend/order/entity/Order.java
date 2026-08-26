@@ -88,6 +88,9 @@ public class Order {
     @Column(name = "idempotency_key", length = 100)
     private String idempotencyKey;
 
+    @Column(name = "checkout_request_id")
+    private Long checkoutRequestId;
+
     @Version
     @Column(nullable = false)
     private Long version;

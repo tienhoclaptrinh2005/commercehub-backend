@@ -3,6 +3,7 @@ package com.commercehub.backend.order.dto.request;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
@@ -19,5 +20,6 @@ public class CheckoutItemRequest {
     @Max(value = 1000, message = "Số lượng mua tối đa trong một lần là 1000")
     Integer quantity;
 
+    @Size(max = 10000, message = "Thông tin đặt hàng tối đa 10000 ký tự")
     String buyerInputs;
 }

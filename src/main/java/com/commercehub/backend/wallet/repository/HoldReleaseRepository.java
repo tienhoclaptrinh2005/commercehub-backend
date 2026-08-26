@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
@@ -15,33 +16,85 @@ import java.util.Optional;
 @Repository
 public interface HoldReleaseRepository extends JpaRepository<HoldRelease, Long> {
 
-    /** Tìm tất cả HoldRelease HOLDING đã đến hạn để Scheduler xử lý. */
-    @Query("SELECT h FROM HoldRelease h " +
-            "JOIN FETCH h.wallet w " +
-            "JOIN FETCH w.user " +
-            "WHERE h.status = 'HOLDING' AND h.scheduledReleaseAt <= :now")
-    List<HoldRelease> findDueReleases(@Param("now") OffsetDateTime now);
+    /**
+     * Scheduler chỉ lấy những khoản đang HOLDING và đã đến hạn.
+     *
+     * COMPLAINED, WARRANTY_IN_PROGRESS, DISPUTED
+     * sẽ KHÔNG được scheduler xử lý.
+     */
+    @Query("""
+            SELECT h.id
+            FROM HoldRelease h
+            WHERE h.status = 'HOLDING'
+              AND h.scheduledReleaseAt <= :now
+            ORDER BY h.scheduledReleaseAt ASC, h.id ASC
+            """)
+    List<Long> findDueReleaseIds(
+            @Param("now") OffsetDateTime now,
+            Pageable pageable
+    );
 
-    /** Tìm tất cả HoldRelease theo orderId (1 order → nhiều item). */
+
+    /**
+     * Một Order có thể có nhiều OrderItem,
+     * mỗi OrderItem có một HoldRelease.
+     */
     List<HoldRelease> findByOrderId(Long orderId);
 
-    /** Tìm HoldRelease theo orderItemId (không có lock — dùng cho đọc). */
+
+    /**
+     * Chỉ đọc HoldRelease theo OrderItem.
+     * Không dùng lock.
+     */
     Optional<HoldRelease> findByOrderItemId(Long orderItemId);
 
 
-    /** Tìm HoldRelease theo id với Pessimistic Lock (dùng trong HoldReleaseProcessor và adminResolve). */
+    /**
+     * Lock theo HoldRelease ID.
+     *
+     * Dùng trong:
+     * - HoldReleaseProcessor
+     * - Admin resolve dispute
+     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT h FROM HoldRelease h JOIN FETCH h.wallet w JOIN FETCH w.user WHERE h.id = :id")
-    Optional<HoldRelease> findByIdWithLock(@Param("id") Long id);
+    @Query("""
+            SELECT h
+            FROM HoldRelease h
+            JOIN FETCH h.wallet w
+            JOIN FETCH w.user
+            WHERE h.id = :id
+            """)
+    Optional<HoldRelease> findByIdWithLock(
+            @Param("id") Long id
+    );
 
-    /** Tra cứu HoldRelease từ FeeLedger (dùng cho Admin/reporting). */
+
+    /**
+     * Lock theo OrderItem.
+     *
+     * Dùng cho:
+     * - Buyer complain
+     * - Seller start warranty
+     * - Seller complete warranty
+     * - Escalate dispute
+     *
+     * PESSIMISTIC_WRITE giúp tránh race condition
+     * với scheduler nhả tiền.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT h
+            FROM HoldRelease h
+            WHERE h.orderItemId = :orderItemId
+            """)
+    Optional<HoldRelease> findByOrderItemIdWithLock(
+            @Param("orderItemId") Long orderItemId
+    );
+
+
+    /**
+     * Tìm HoldRelease liên kết với Fee Ledger.
+     */
     Optional<HoldRelease> findByFeeLedgerId(Long feeLedgerId);
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT h FROM HoldRelease h WHERE h.orderItemId = :orderItemId")
-    Optional<HoldRelease> findByOrderItemIdWithLock(@Param("orderItemId") Long orderItemId);
-
-
-
 
 }

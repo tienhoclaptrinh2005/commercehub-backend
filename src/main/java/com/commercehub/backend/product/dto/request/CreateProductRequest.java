@@ -24,12 +24,15 @@ public class CreateProductRequest {
     Long categoryId;
 
     @NotBlank(message = "Tên sản phẩm không được để trống!")
+    @Size(max = 255, message = "Tên sản phẩm tối đa 255 ký tự")
     String name;
 
     @NotBlank(message = "Mô tả ngắn sản phẩm không được để trống!")
+    @Size(max = 200, message = "Mô tả ngắn tối đa 200 ký tự")
     String shortDescription;
 
     @NotBlank(message = "Mô tả  sản phẩm không được để trống!")
+    @Size(max = 50000, message = "Mô tả sản phẩm tối đa 50000 ký tự")
     String description;
 
     @Pattern(regexp = "^(ACCOUNT|OTHER)$",
@@ -45,6 +48,7 @@ public class CreateProductRequest {
 
 
     @NotEmpty(message = "Sản phẩm phải có ít nhất 1 gói/biến thể!")
+    @Size(max = 50, message = "Mỗi sản phẩm tối đa 50 biến thể")
     @Valid
     List<CreateVariantRequest> variants;
 

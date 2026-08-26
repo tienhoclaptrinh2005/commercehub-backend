@@ -10,10 +10,17 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    open-in-view: false
+    show-sql: ${JPA_SHOW_SQL:false}
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${JPA_FORMAT_SQL:false}
+
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
 
 google:
   client-id: "1060424015252-neu3kv70tuss4g3md3g74njho7mihpja.apps.googleusercontent.com"
@@ -36,6 +43,13 @@ vnpay:
   tmn-code: ${VNPAY_TMN_CODE:MA_WEBSITE_VNPAY_CAP}
   pay-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
 
+commercehub:
+  jobs:
+    batch-size: ${JOB_BATCH_SIZE:200}
+  dispute:
+    seller-response-hours: ${DISPUTE_SELLER_RESPONSE_HOURS:24}
+    buyer-confirmation-hours: ${DISPUTE_BUYER_CONFIRMATION_HOURS:24}
+    admin-review-hours: ${DISPUTE_ADMIN_REVIEW_HOURS:72}
 
 #  server:
 #    port: ${SERVER_PORT:8080}
@@ -75,4 +89,3 @@ vnpay:
 #    pay-url: ${VNPAY_PAY_URL}
 #
 #
-

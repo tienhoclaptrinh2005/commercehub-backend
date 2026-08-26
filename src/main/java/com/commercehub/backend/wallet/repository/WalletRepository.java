@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 
 @Repository
 public interface WalletRepository extends JpaRepository<Wallet, Long> {
@@ -22,6 +24,10 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM Wallet w WHERE w.isPlatform = true")
     Optional<Wallet> findPlatformWalletWithLock();
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM Wallet w WHERE w.user.id IN :userIds ORDER BY w.id ASC")
+    List<Wallet> findAllByUserIdsWithLock(@Param("userIds") Collection<Long> userIds);
 
     /** Kiểm tra ví platform đã tồn tại chưa (dùng cho seeder lúc khởi động). */
     boolean existsByIsPlatformTrue();

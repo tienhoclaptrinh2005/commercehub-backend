@@ -12,6 +12,9 @@ import com.commercehub.backend.product.repository.AssetDeliveryLogRepository;
 import com.commercehub.backend.product.repository.DigitalAssetRepository;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +50,7 @@ public class DigitalAssetService {
         }
 
         List<String> rawAssets = request.getRawAssets();
-        int addedCount = 0;
+        List<DigitalAsset> assets = new java.util.ArrayList<>();
 
         for (String rawData : rawAssets) {
             if (rawData == null || rawData.trim().isEmpty()) continue;
@@ -61,9 +64,11 @@ public class DigitalAssetService {
                     .status("AVAILABLE")
                     .build();
 
-            digitalAssetRepository.save(asset);
-            addedCount++;
+            assets.add(asset);
         }
+
+        digitalAssetRepository.saveAll(assets);
+        int addedCount = assets.size();
 
         variantRepository.incrementStockCount(variant.getId(), addedCount);
 
@@ -71,7 +76,8 @@ public class DigitalAssetService {
     }
 
     @Transactional(readOnly = true)
-    public List<DigitalAssetResponse> getAssetsByVariant(Long sellerId, Long variantId) {
+    public Page<DigitalAssetResponse> getAssetsByVariant(
+            Long sellerId, Long variantId, int page, int size) {
         ProductVariant variant = variantRepository.findById(variantId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
@@ -80,9 +86,13 @@ public class DigitalAssetService {
         }
         validateShopCanSell(variant);
 
-        return digitalAssetRepository.findByProductVariantIdOrderByCreatedAtDesc(variantId).stream()
-                .map(productMapper::toDigitalAssetResponse)
-                .collect(Collectors.toList());
+        PageRequest pageable = PageRequest.of(
+                Math.max(0, page),
+                Math.min(100, Math.max(1, size)),
+                Sort.by("createdAt").descending()
+        );
+        return digitalAssetRepository.findByProductVariantId(variantId, pageable)
+                .map(productMapper::toDigitalAssetResponse);
     }
 
     @Transactional

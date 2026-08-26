@@ -151,9 +151,19 @@ public class AuthService {
     @Transactional
     public AuthResponse refreshToken(String refreshTokenValue) {
         RefreshToken oldRefreshToken = refreshTokenRepository.findActiveTokenForUpdate(refreshTokenValue)
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_REFRESH_TOKEN));
+                .orElseThrow(() -> {
+                    log.warn("[AUTH][REFRESH_TOKEN_INVALID_OR_REVOKED] Refresh token không tồn tại, không hợp lệ hoặc đã bị thu hồi.");
+                    return new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
+                });
 
         if (oldRefreshToken.getExpiresAt().isBefore(OffsetDateTime.now())) {
+            log.warn(
+                    "[AUTH][REFRESH_TOKEN_EXPIRED] Refresh token id={} của userId={} đã hết hạn lúc {}. "
+                            + "Người dùng phải đăng nhập lại.",
+                    oldRefreshToken.getId(),
+                    oldRefreshToken.getUser().getId(),
+                    oldRefreshToken.getExpiresAt()
+            );
             oldRefreshToken.setRevoked(true);
             refreshTokenRepository.save(oldRefreshToken);
             throw new AppException(ErrorCode.REFRESH_TOKEN_EXPIRED);
@@ -162,6 +172,12 @@ public class AuthService {
         User user = oldRefreshToken.getUser();
 
         if (!"ACTIVE".equals(user.getStatus())) {
+            log.warn(
+                    "[AUTH][REFRESH_TOKEN_ACCOUNT_INACTIVE] Từ chối refresh token id={} vì userId={} có trạng thái {}.",
+                    oldRefreshToken.getId(),
+                    user.getId(),
+                    user.getStatus()
+            );
             oldRefreshToken.setRevoked(true);
             refreshTokenRepository.save(oldRefreshToken);
             throw new AppException(ErrorCode.ACCOUNT_LOCKED);

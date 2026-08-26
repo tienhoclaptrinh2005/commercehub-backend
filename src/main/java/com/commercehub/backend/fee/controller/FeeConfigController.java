@@ -24,7 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/fee-configs")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
 public class FeeConfigController {
 
     private final PlatformFeeConfigService configService;
@@ -87,7 +87,8 @@ public class FeeConfigController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
+                Sort.by("createdAt").descending());
         return ResponseEntity.ok(ApiResponse.success(ledgerService.getAllLedgers(status, pageable)));
     }
 
@@ -111,7 +112,8 @@ public class FeeConfigController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size
     ) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("totalFee").descending());
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
+                Sort.by("totalFee").descending());
         return ResponseEntity.ok(ApiResponse.success(summaryService.getAllSummariesByMonth(year, month, pageable)));
     }
 }

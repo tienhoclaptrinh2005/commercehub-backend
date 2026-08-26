@@ -3,6 +3,7 @@ package com.commercehub.backend.wallet.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.fee.service.PlatformFeeLedgerService;
+import com.commercehub.backend.product.repository.ProductRepository;
 //import com.commercehub.backend.outbox.service.OutboxEventService;
 import com.commercehub.backend.wallet.entity.HoldRelease;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
@@ -23,13 +24,14 @@ public class HoldReleaseProcessor {
     private final WalletService walletService;
     private final HoldReleaseRepository holdReleaseRepository;
     private final PlatformFeeLedgerService platformFeeLedgerService;
+    private final ProductRepository productRepository;
 
     //   private final OutboxEventService outboxEventService;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void processSingle(HoldRelease hrParam) {
+    public void processSingle(Long holdReleaseId) {
 
-        HoldRelease hr = holdReleaseRepository.findByIdWithLock(hrParam.getId())
+        HoldRelease hr = holdReleaseRepository.findByIdWithLock(holdReleaseId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!"HOLDING".equals(hr.getStatus())) {
@@ -37,7 +39,7 @@ public class HoldReleaseProcessor {
             return;
         }
 
-        walletService.processHoldRelease(
+        walletService.systemReleaseHold(
                 hr.getWallet().getUser().getId(),
                 hr.getHoldAmount(),
                 hr.getSellerNetAmount(),
@@ -51,6 +53,11 @@ public class HoldReleaseProcessor {
 
         if (hr.getFeeLedgerId() != null) {
             platformFeeLedgerService.markAsCollected(hr.getFeeLedgerId());
+        }
+
+        if (hr.getOrderItemId() != null
+                && productRepository.incrementSoldCountByOrderItemId(hr.getOrderItemId()) != 1) {
+            log.warn("Không cập nhật được sold_count cho orderItem {}", hr.getOrderItemId());
         }
 
         // 5. Đẩy event sang Outbox để gửi thông báo/email

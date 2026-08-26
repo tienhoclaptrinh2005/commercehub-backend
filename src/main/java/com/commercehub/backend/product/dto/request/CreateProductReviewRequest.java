@@ -22,5 +22,6 @@ public class CreateProductReviewRequest {
     @Size(max = 1000, message = "Nội dung bình luận không được vượt quá 1000 ký tự!")
     String comment;
 
+    @NotNull(message = "Order item dùng để đánh giá không được để trống!")
     Long orderItemId;
 }

@@ -102,7 +102,7 @@ public class WithdrawalService {
         } else if ("REJECT".equalsIgnoreCase(action)) {
             withdrawal.setStatus("REJECTED");
             // Hoàn lại tiền vào ví do bị từ chối rút
-            walletService.addBalance(
+            walletService.systemCreditBalance(
                     withdrawal.getWallet().getUser().getId(),
                     withdrawal.getAmount(),
                     "WITHDRAW_CANCEL",

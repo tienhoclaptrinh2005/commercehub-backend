@@ -36,6 +36,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Checkout INSTANT: giao hàng ngay, tiền buyer bị trừ và hold vào ví seller.
@@ -76,15 +79,36 @@ public class InstantOrderService {
         // Gộp các dòng trùng variant
         Map<Long, CheckoutItemRequest> mergedMap = new LinkedHashMap<>();
         for (CheckoutItemRequest item : request.getItems()) {
-            if (mergedMap.containsKey(item.getProductVariantId())) {
-                CheckoutItemRequest existing = mergedMap.get(item.getProductVariantId());
-                existing.setQuantity(existing.getQuantity() + item.getQuantity());
-            } else {
-                mergedMap.put(item.getProductVariantId(), item);
+            CheckoutItemRequest existing = mergedMap.get(item.getProductVariantId());
+            if (existing == null) {
+                CheckoutItemRequest copy = new CheckoutItemRequest();
+                copy.setProductVariantId(item.getProductVariantId());
+                copy.setQuantity(item.getQuantity());
+                copy.setBuyerInputs(item.getBuyerInputs());
+                mergedMap.put(item.getProductVariantId(), copy);
+                continue;
             }
+            int mergedQuantity;
+            try {
+                mergedQuantity = Math.addExact(existing.getQuantity(), item.getQuantity());
+            } catch (ArithmeticException exception) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            if (mergedQuantity > 1000) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            existing.setQuantity(mergedQuantity);
         }
 
         List<CheckoutItemRequest> consolidatedItems = new ArrayList<>(mergedMap.values());
+        Set<Long> variantIds = consolidatedItems.stream()
+                .map(CheckoutItemRequest::getProductVariantId)
+                .collect(Collectors.toSet());
+        Map<Long, ProductVariant> variantsById = variantRepository.findCheckoutVariants(variantIds).stream()
+                .collect(Collectors.toMap(ProductVariant::getId, Function.identity()));
+        if (variantsById.size() != variantIds.size()) {
+            throw new AppException(ErrorCode.RECORD_NOT_FOUND);
+        }
 
         Shop targetShop = null;
         Long sellerId = null;
@@ -96,8 +120,7 @@ public class InstantOrderService {
 
         // ================= 1. VALIDATE + KHÓA KHO =================
         for (CheckoutItemRequest itemReq : consolidatedItems) {
-            ProductVariant variant = variantRepository.findById(itemReq.getProductVariantId())
-                    .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
+            ProductVariant variant = variantsById.get(itemReq.getProductVariantId());
 
             if (!"INSTANT".equals(variant.getProduct().getDeliveryType())) {
                 throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE_FOR_ASSET);
@@ -151,12 +174,13 @@ public class InstantOrderService {
                 .placedAt(OffsetDateTime.now())
                 .deliveredAt(OffsetDateTime.now())
                 .idempotencyKey(request.getIdempotencyKey())
+                .checkoutRequestId(request.getCheckoutRequestId())
                 .build();
         order = orderRepository.save(order);
 
         // ================= 3. LUÂN CHUYỂN TIỀN =================
         walletService.deductBalance(buyerId, orderTotalAmount, "ORDER_PAYMENT", order.getId(), "ORDER");
-        Wallet sellerWallet = walletService.holdForSeller(sellerId, orderTotalAmount, order.getId());
+        Wallet sellerWallet = walletService.systemHoldForSeller(sellerId, orderTotalAmount, order.getId());
 
         orderStatusService.logStatusChange(order, null, "DELIVERED", buyerId, "Checkout tức thì - giao hàng ngay");
 
@@ -237,8 +261,10 @@ public class InstantOrderService {
                 assetDeliveryService.logDelivery(asset, orderItem.getId(), buyer, "AUTO");
             }
 
-            variant.setStockCount(variant.getStockCount() - itemReq.getQuantity());
-            variantRepository.save(variant);
+            if (variantRepository.decrementStockIfAvailable(
+                    variant.getId(), itemReq.getQuantity()) != 1) {
+                throw new AppException(ErrorCode.OUT_OF_STOCK);
+            }
         }
 
         log.info("Checkout INSTANT thành công - Order ID: {} | Tổng: {}", order.getId(), orderTotalAmount);

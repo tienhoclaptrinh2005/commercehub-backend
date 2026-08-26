@@ -29,7 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.Set;
 import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -58,11 +62,18 @@ public class PreOrderService {
         Shop targetShop = null;
         BigDecimal totalOrderAmount = BigDecimal.ZERO;
         List<ItemProcessContext> processedItems = new ArrayList<>();
+        Set<Long> variantIds = request.getItems().stream()
+                .map(CheckoutItemRequest::getProductVariantId)
+                .collect(Collectors.toSet());
+        Map<Long, ProductVariant> variantsById = variantRepository.findCheckoutVariants(variantIds).stream()
+                .collect(Collectors.toMap(ProductVariant::getId, Function.identity()));
+        if (variantsById.size() != variantIds.size()) {
+            throw new AppException(ErrorCode.RECORD_NOT_FOUND);
+        }
 
         // 1. Lọc và Validate
         for (CheckoutItemRequest itemReq : request.getItems()) {
-            ProductVariant variant = variantRepository.findById(itemReq.getProductVariantId())
-                    .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
+            ProductVariant variant = variantsById.get(itemReq.getProductVariantId());
 
             if (!"PRE_ORDER".equals(variant.getProduct().getDeliveryType())) {
                 throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE_FOR_ASSET);
@@ -113,13 +124,14 @@ public class PreOrderService {
                 .placedAt(OffsetDateTime.now())
                 .approvalDeadlineAt(OffsetDateTime.now().plusHours(48))
                 .idempotencyKey(request.getIdempotencyKey())
+                .checkoutRequestId(request.getCheckoutRequestId())
                 .build();
 
         order = orderRepository.save(order);
 
 
         walletService.deductBalance(buyerId, totalOrderAmount, "ORDER_PAYMENT", order.getId(), "ORDER_PRE");
-        walletService.holdForSeller(sellerId, totalOrderAmount, order.getId());
+        walletService.systemHoldForSeller(sellerId, totalOrderAmount, order.getId());
 
         orderStatusService.logStatusChange(
                 order, null, "WAITING_APPROVAL", buyerId, "Đã thanh toán và đặt hàng thành công, chờ Shop duyệt"

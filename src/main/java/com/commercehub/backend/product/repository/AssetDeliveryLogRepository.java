@@ -12,7 +12,7 @@ public interface AssetDeliveryLogRepository extends JpaRepository<AssetDeliveryL
 
     List<AssetDeliveryLog> findByOrderItemId(Long orderItemId);
 
-    @Query("SELECT l FROM AssetDeliveryLog l WHERE l.orderItemId IN " +
+    @Query("SELECT l FROM AssetDeliveryLog l JOIN FETCH l.asset WHERE l.orderItemId IN " +
             "(SELECT oi.id FROM OrderItem oi WHERE oi.order.id = :orderId) " +
             "ORDER BY l.orderItemId ASC, l.id ASC")
     List<AssetDeliveryLog> findByOrderId(@Param("orderId") Long orderId);

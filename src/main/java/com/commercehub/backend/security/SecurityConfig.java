@@ -47,13 +47,11 @@ public class SecurityConfig {
      */
     @Bean
     public static RoleHierarchy roleHierarchy() {
-        RoleHierarchyImpl hierarchy = new RoleHierarchyImpl();
-        hierarchy.setHierarchy("""
+        return RoleHierarchyImpl.fromHierarchy("""
                 ROLE_SUPER_ADMIN > ROLE_ADMIN
                 ROLE_ADMIN > ROLE_BUYER
                 ROLE_SELLER > ROLE_BUYER
                 """);
-        return hierarchy;
     }
 
     @Bean
@@ -118,6 +116,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/products/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/product-reviews/**").permitAll()
+                        .requestMatchers("/api/v1/admin/**", "/api/admin/**")
+                        .hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/api/v1/seller/**", "/api/seller/**")
+                        .hasRole("SELLER")
                         .anyRequest().authenticated()
                 );
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

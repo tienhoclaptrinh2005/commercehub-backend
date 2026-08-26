@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
 
 @RestController
 @RequestMapping("/api/v1/seller/digital-assets")
@@ -23,12 +24,15 @@ public class DigitalAssetController {
     // 1. Xem danh sách tài khoản trong kho của 1 gói cụ thể
     @GetMapping("/variant/{variantId}")
     @PreAuthorize("hasRole('SELLER')")
-    public ResponseEntity<ApiResponse<List<DigitalAssetResponse>>> getAssetsByVariant(
+    public ResponseEntity<ApiResponse<Page<DigitalAssetResponse>>> getAssetsByVariant(
             @AuthenticationPrincipal CustomUserDetails currentUser,
-            @PathVariable Long variantId) {
+            @PathVariable Long variantId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
         // Gọi Service lấy danh sách (Nhớ check quyền: chỉ chủ shop mới xem được kho của mình)
-        List<DigitalAssetResponse> assets = digitalAssetService.getAssetsByVariant(currentUser.getUser().getId(), variantId);
+        Page<DigitalAssetResponse> assets = digitalAssetService.getAssetsByVariant(
+                currentUser.getUser().getId(), variantId, page, size);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách kho thành công!", assets));
     }

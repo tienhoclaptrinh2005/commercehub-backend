@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -51,8 +52,10 @@ public class ProductReviewService {
             throw new AppException(ErrorCode.CANNOT_REVIEW_OWN_PRODUCT);
         }
 
-        if (!orderItemRepository.existsByOrder_UserIdAndProductVariant_Product_IdAndOrder_Status(
-                userId, request.getProductId(), "DELIVERED")) {
+        if (!orderItemRepository.isReviewableOrderItem(
+                userId,
+                request.getProductId(),
+                request.getOrderItemId())) {
             throw new AppException(ErrorCode.PRODUCT_NOT_PURCHASED);
         }
 
@@ -68,8 +71,12 @@ public class ProductReviewService {
                 .comment(request.getComment())
                 .build();
 
-        ProductReview savedReview = reviewRepository.save(review);
-        return productMapper.toReviewResponse(savedReview);
+        try {
+            ProductReview savedReview = reviewRepository.saveAndFlush(review);
+            return productMapper.toReviewResponse(savedReview);
+        } catch (DataIntegrityViolationException exception) {
+            throw new AppException(ErrorCode.REVIEW_ALREADY_EXISTS);
+        }
     }
 
     @Transactional(readOnly = true)

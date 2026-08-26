@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -89,6 +91,18 @@ public class OrderService {
 
     private OrderDetailResponse buildOrderDetail(Order order) {
         List<OrderItem> orderItems = orderItemRepository.findByOrderId(order.getId());
+        List<Long> preOrderItemIds = orderItems.stream()
+                .filter(item -> "PRE_ORDER".equals(item.getDeliveryType()))
+                .map(OrderItem::getId)
+                .toList();
+        Map<Long, com.commercehub.backend.order.entity.PreOrderItem> preOrderItems =
+                preOrderItemIds.isEmpty()
+                        ? Map.of()
+                        : preOrderItemRepository.findByOrderItemIdIn(preOrderItemIds).stream()
+                                .collect(Collectors.toMap(
+                                        preItem -> preItem.getOrderItem().getId(),
+                                        Function.identity()
+                                ));
 
         var items = orderItems.stream()
                 .map(item -> {
@@ -97,17 +111,19 @@ public class OrderService {
                     // deliveryContent chỉ trả trong chi tiết đơn (buyer sở hữu / shop bán),
                     // không bao giờ xuất hiện trong API danh sách.
                     if ("PRE_ORDER".equals(item.getDeliveryType())) {
-                        preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem ->
-                                itemResponse.setPreOrder(PreOrderItemResponse.builder()
-                                        .status(preItem.getStatus())
-                                        .buyerInputs(preItem.getBuyerInputs())
-                                        .deliveryContentType(preItem.getDeliveryContentType() != null
-                                                ? preItem.getDeliveryContentType().name() : null)
-                                        .deliveryContent(preItem.getDeliveryContent())
-                                        .acceptedAt(preItem.getAcceptedAt())
-                                        .deliveredAt(preItem.getDeliveredAt())
-                                        .completedAt(preItem.getCompletedAt())
-                                        .build()));
+                        var preItem = preOrderItems.get(item.getId());
+                        if (preItem != null) {
+                            itemResponse.setPreOrder(PreOrderItemResponse.builder()
+                                    .status(preItem.getStatus())
+                                    .buyerInputs(preItem.getBuyerInputs())
+                                    .deliveryContentType(preItem.getDeliveryContentType() != null
+                                            ? preItem.getDeliveryContentType().name() : null)
+                                    .deliveryContent(preItem.getDeliveryContent())
+                                    .acceptedAt(preItem.getAcceptedAt())
+                                    .deliveredAt(preItem.getDeliveredAt())
+                                    .completedAt(preItem.getCompletedAt())
+                                    .build());
+                        }
                     }
                     return itemResponse;
                 })

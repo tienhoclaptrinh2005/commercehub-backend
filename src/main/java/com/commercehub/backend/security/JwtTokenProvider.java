@@ -62,15 +62,19 @@ public class JwtTokenProvider {
             Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
             return true;
         } catch (io.jsonwebtoken.security.SignatureException ex) {
-            log.error("Invalid JWT signature: JWT bị giả mạo chữ ký!");
+            log.warn("[AUTH][ACCESS_TOKEN_INVALID_SIGNATURE] Access token JWT có chữ ký không hợp lệ.");
         } catch (io.jsonwebtoken.MalformedJwtException ex) {
-            log.error("Invalid JWT token: Token không đúng định dạng!");
+            log.warn("[AUTH][ACCESS_TOKEN_MALFORMED] Access token JWT không đúng định dạng.");
         } catch (io.jsonwebtoken.ExpiredJwtException ex) {
-            log.error("Expired JWT token: Token đã hết hạn!");
+            log.warn(
+                    "[AUTH][ACCESS_TOKEN_EXPIRED] Access token JWT đã hết hạn lúc {}. "
+                            + "Request cần dùng refresh token để nhận access token mới.",
+                    ex.getClaims().getExpiration()
+            );
         } catch (io.jsonwebtoken.UnsupportedJwtException ex) {
-            log.error("Unsupported JWT token: Token không được hỗ trợ!");
+            log.warn("[AUTH][ACCESS_TOKEN_UNSUPPORTED] Access token JWT sử dụng định dạng hoặc thuật toán không được hỗ trợ.");
         } catch (IllegalArgumentException ex) {
-            log.error("JWT claims string is empty: Chuỗi claims trống!");
+            log.warn("[AUTH][ACCESS_TOKEN_EMPTY] Access token JWT hoặc claims đang trống.");
         }
         return false;
     }
