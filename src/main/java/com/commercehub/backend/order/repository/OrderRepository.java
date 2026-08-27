@@ -20,6 +20,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByUserId(Long userId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"shop"})
+    Page<Order> findByUserIdAndOrderCodeContainingIgnoreCase(
+            Long userId,
+            String orderCode,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"shop"})
     Page<Order> findByShopId(Long shopId, Pageable pageable);
 
 

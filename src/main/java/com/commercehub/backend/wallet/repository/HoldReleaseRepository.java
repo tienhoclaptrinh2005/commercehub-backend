@@ -48,6 +48,8 @@ public interface HoldReleaseRepository extends JpaRepository<HoldRelease, Long> 
      */
     Optional<HoldRelease> findByOrderItemId(Long orderItemId);
 
+    List<HoldRelease> findByOrderItemIdIn(List<Long> orderItemIds);
+
 
     /**
      * Lock theo HoldRelease ID.

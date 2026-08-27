@@ -8,13 +8,18 @@ import com.commercehub.backend.product.service.DigitalAssetService;
 import com.commercehub.backend.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.constraints.Size;
 
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
+@Validated
 public class OrderController {
 
     private final OrderService orderService;
@@ -23,8 +28,14 @@ public class OrderController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<?>> getMyOrders(
-            @AuthenticationPrincipal CustomUserDetails currentUser, Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.success("Success", orderService.getBuyerOrders(currentUser.getId(), pageable)));
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @RequestParam(required = false)
+            @Size(max = 50, message = "Mã đơn hàng tối đa 50 ký tự") String orderCode,
+            @PageableDefault(size = 10, sort = "placedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Success",
+                orderService.getBuyerOrders(currentUser.getId(), orderCode, pageable)
+        ));
     }
 
     @GetMapping("/{id}")

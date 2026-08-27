@@ -33,7 +33,7 @@ public class CartCheckoutRequest {
         @jakarta.validation.constraints.NotNull(message = "Variant không được để trống")
         Long productVariantId;
 
-        @Size(max = 10000, message = "Thông tin đặt hàng tối đa 10000 ký tự")
+        @Size(max = 200, message = "Thông tin đặt hàng tối đa 200 ký tự")
         String buyerInputs;
     }
 }

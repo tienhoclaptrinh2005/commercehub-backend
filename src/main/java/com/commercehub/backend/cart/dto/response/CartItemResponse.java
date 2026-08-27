@@ -25,4 +25,7 @@ public class CartItemResponse {
     private BigDecimal lineTotal;    // unitPrice × quantity
     private Integer stockCount;      // Tồn kho hiện tại (INSTANT)
     private Boolean available;       // false nếu sản phẩm/variant/shop ngừng bán hoặc hết hàng
+    private Integer maxProcessingHours; // Chỉ PRE_ORDER
+    private String orderInstructions;   // Hướng dẫn seller dành cho buyer
+    private String buyerInputFields;    // JSON mô tả dữ liệu seller muốn buyer cung cấp
 }

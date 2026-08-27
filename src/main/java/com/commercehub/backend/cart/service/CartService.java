@@ -16,6 +16,7 @@ import com.commercehub.backend.order.dto.request.CheckoutRequest;
 import com.commercehub.backend.order.service.CheckoutService;
 import com.commercehub.backend.product.entity.Product;
 import com.commercehub.backend.product.entity.ProductVariant;
+import com.commercehub.backend.product.entity.PreOrderConfig;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.UserRepository;
@@ -244,6 +245,9 @@ public class CartService {
     private CartItemResponse toItemResponse(CartItem item) {
         ProductVariant variant = item.getProductVariant();
         Product product = variant.getProduct();
+        PreOrderConfig preOrderConfig = "PRE_ORDER".equals(product.getDeliveryType())
+                ? product.getPreOrderConfig()
+                : null;
 
         boolean active = "ACTIVE".equals(variant.getStatus())
                 && "ACTIVE".equals(product.getStatus())
@@ -272,6 +276,9 @@ public class CartService {
                 .lineTotal(lineTotal)
                 .stockCount(variant.getStockCount())
                 .available(active && inStock)
+                .maxProcessingHours(preOrderConfig != null ? preOrderConfig.getMaxProcessingHours() : null)
+                .orderInstructions(preOrderConfig != null ? preOrderConfig.getOrderInstructions() : null)
+                .buyerInputFields(preOrderConfig != null ? preOrderConfig.getBuyerInputFields() : null)
                 .build();
     }
 }

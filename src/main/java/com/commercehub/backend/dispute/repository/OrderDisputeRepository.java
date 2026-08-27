@@ -22,6 +22,8 @@ public interface OrderDisputeRepository
             Long orderItemId
     );
 
+    List<OrderDispute> findByOrderItemIdIn(List<Long> orderItemIds);
+
     Optional<OrderDispute> findByOrderIdAndOrderItemId(
             Long orderId,
             Long orderItemId

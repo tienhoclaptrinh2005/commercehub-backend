@@ -20,6 +20,6 @@ public class CheckoutItemRequest {
     @Max(value = 1000, message = "Số lượng mua tối đa trong một lần là 1000")
     Integer quantity;
 
-    @Size(max = 10000, message = "Thông tin đặt hàng tối đa 10000 ký tự")
+    @Size(max = 200, message = "Thông tin đặt hàng tối đa 200 ký tự")
     String buyerInputs;
 }

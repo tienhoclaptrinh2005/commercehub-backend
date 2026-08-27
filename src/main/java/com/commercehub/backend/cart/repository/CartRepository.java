@@ -13,11 +13,15 @@ public interface CartRepository extends JpaRepository<Cart, Long> {
 
     Optional<Cart> findByUserId(Long userId);
 
-    /** Lấy giỏ kèm items + variant + product trong 1 query (tránh N+1). */
+    /** Lấy giỏ cùng toàn bộ dữ liệu cần render trong 1 query (tránh N+1). */
     @Query("SELECT DISTINCT c FROM Cart c " +
            "LEFT JOIN FETCH c.items i " +
            "LEFT JOIN FETCH i.productVariant v " +
            "LEFT JOIN FETCH v.product p " +
+           "LEFT JOIN FETCH p.preOrderConfig pc " +
+           "LEFT JOIN FETCH p.shop s " +
+           "LEFT JOIN FETCH s.owner o " +
+           "LEFT JOIN FETCH o.roles " +
            "WHERE c.user.id = :userId")
     Optional<Cart> findByUserIdWithItems(@Param("userId") Long userId);
 }

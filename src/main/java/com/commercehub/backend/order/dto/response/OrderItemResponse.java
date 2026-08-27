@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,4 +23,9 @@ public class OrderItemResponse {
 
     // Chỉ có giá trị với item PRE_ORDER (service tự gắn trong chi tiết đơn)
     private PreOrderItemResponse preOrder;
+
+    // Trạng thái khiếu nại được tính từ HoldRelease thật của từng item.
+    private boolean complaintAllowed;
+    private OffsetDateTime complaintDeadlineAt;
+    private Long disputeId;
 }
