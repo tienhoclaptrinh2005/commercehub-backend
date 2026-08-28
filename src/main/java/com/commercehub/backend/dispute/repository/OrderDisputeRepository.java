@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Repository
 public interface OrderDisputeRepository
@@ -23,6 +24,17 @@ public interface OrderDisputeRepository
     );
 
     List<OrderDispute> findByOrderItemIdIn(List<Long> orderItemIds);
+
+    @Query("""
+            SELECT DISTINCT d.orderId
+            FROM OrderDispute d
+            WHERE d.orderId IN :orderIds
+              AND d.status IN :statuses
+            """)
+    Set<Long> findOrderIdsWithStatuses(
+            @Param("orderIds") List<Long> orderIds,
+            @Param("statuses") Set<String> statuses
+    );
 
     Optional<OrderDispute> findByOrderIdAndOrderItemId(
             Long orderId,

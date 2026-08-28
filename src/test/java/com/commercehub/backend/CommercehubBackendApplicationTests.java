@@ -6,6 +6,7 @@ import com.commercehub.backend.auth.dto.response.AuthResponse;
 import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.product.service.ProductReviewService;
+import com.commercehub.backend.order.repository.OrderRepository;
 import com.commercehub.backend.shop.dto.request.CreateShopRequest;
 import com.commercehub.backend.shop.mapper.ShopMapper;
 import com.commercehub.backend.shop.repository.ShopRepository;
@@ -19,7 +20,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,6 +36,9 @@ class CommercehubBackendApplicationTests {
 
 	@Autowired
 	private ProductRepository productRepository;
+
+	@Autowired
+	private OrderRepository orderRepository;
 
 	@Autowired
 	private ProductMapper productMapper;
@@ -100,6 +106,37 @@ class CommercehubBackendApplicationTests {
 	@Test
 	void productDetailQueryDoesNotFetchMultipleBagCollections() {
 		assertDoesNotThrow(() -> productRepository.findPublicBySlug("__missing-product__"));
+	}
+
+	@Test
+	@Transactional
+	void buyerOrderFiltersAcceptEmptyOptionalCriteria() {
+		Set<String> activeDisputeStatuses = Set.of(
+				"OPEN",
+				"WARRANTY_IN_PROGRESS",
+				"WAITING_BUYER_CONFIRMATION",
+				"PROCESSING"
+		);
+		assertDoesNotThrow(() -> orderRepository.findFirstBuyerOrders(
+				-1L,
+				"",
+				"",
+				OffsetDateTime.parse("1970-01-01T00:00:00+07:00"),
+				OffsetDateTime.parse("9999-12-31T00:00:00+07:00"),
+				activeDisputeStatuses,
+				PageRequest.of(0, 10)
+		));
+		assertDoesNotThrow(() -> orderRepository.findBuyerOrdersBefore(
+				-1L,
+				"ORD-",
+				"DISPUTED",
+				OffsetDateTime.now().minusYears(1),
+				OffsetDateTime.now().plusDays(1),
+				OffsetDateTime.now(),
+				Long.MAX_VALUE,
+				activeDisputeStatuses,
+				PageRequest.of(0, 10)
+		));
 	}
 
 	@Test

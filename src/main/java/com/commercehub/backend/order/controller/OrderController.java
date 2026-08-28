@@ -7,14 +7,17 @@ import com.commercehub.backend.order.service.PreOrderApprovalService;
 import com.commercehub.backend.product.service.DigitalAssetService;
 import com.commercehub.backend.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -31,10 +34,29 @@ public class OrderController {
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @RequestParam(required = false)
             @Size(max = 50, message = "Mã đơn hàng tối đa 50 ký tự") String orderCode,
-            @PageableDefault(size = 10, sort = "placedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime beforePlacedAt,
+            @RequestParam(required = false) Long beforeId,
+            @RequestParam(defaultValue = "10")
+            @Min(value = 1, message = "Số đơn mỗi lần tải tối thiểu là 1")
+            @Max(value = 50, message = "Số đơn mỗi lần tải tối đa là 50") int size) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Success",
-                orderService.getBuyerOrders(currentUser.getId(), orderCode, pageable)
+                orderService.getBuyerOrders(
+                        currentUser.getId(),
+                        orderCode,
+                        status,
+                        fromDate,
+                        toDate,
+                        beforePlacedAt,
+                        beforeId,
+                        size
+                )
         ));
     }
 

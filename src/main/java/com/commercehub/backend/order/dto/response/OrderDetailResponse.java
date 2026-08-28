@@ -22,6 +22,7 @@ public class OrderDetailResponse {
     private String sellerUsername;
     private String deliveryType;
     private String status;
+    private String effectiveStatus;
     private String paymentStatus;
     private String paymentMethod;
     private BigDecimal subtotalAmount;

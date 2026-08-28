@@ -4,6 +4,7 @@ import com.commercehub.backend.order.entity.Order;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -13,16 +14,97 @@ import org.springframework.data.repository.query.Param;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @EntityGraph(attributePaths = {"shop", "shop.owner"})
-    Page<Order> findByUserId(Long userId, Pageable pageable);
+    @Query("""
+            SELECT o
+            FROM Order o
+            WHERE o.user.id = :userId
+              AND (:orderCode = '' OR LOWER(o.orderCode) LIKE CONCAT('%', LOWER(:orderCode), '%'))
+              AND o.placedAt >= :fromDateTime
+              AND o.placedAt < :toDateTimeExclusive
+              AND (
+                    :status = ''
+                    OR (
+                        :status = 'DISPUTED'
+                        AND EXISTS (
+                            SELECT d.id
+                            FROM OrderDispute d
+                            WHERE d.orderId = o.id
+                              AND d.status IN :activeDisputeStatuses
+                        )
+                    )
+                    OR (
+                        :status <> 'DISPUTED'
+                        AND o.status = :status
+                        AND NOT EXISTS (
+                            SELECT d.id
+                            FROM OrderDispute d
+                            WHERE d.orderId = o.id
+                              AND d.status IN :activeDisputeStatuses
+                        )
+                    )
+              )
+            ORDER BY o.placedAt DESC, o.id DESC
+            """)
+    Slice<Order> findFirstBuyerOrders(
+            @Param("userId") Long userId,
+            @Param("orderCode") String orderCode,
+            @Param("status") String status,
+            @Param("fromDateTime") OffsetDateTime fromDateTime,
+            @Param("toDateTimeExclusive") OffsetDateTime toDateTimeExclusive,
+            @Param("activeDisputeStatuses") Set<String> activeDisputeStatuses,
+            Pageable pageable
+    );
 
     @EntityGraph(attributePaths = {"shop", "shop.owner"})
-    Page<Order> findByUserIdAndOrderCodeContainingIgnoreCase(
-            Long userId,
-            String orderCode,
+    @Query("""
+            SELECT o
+            FROM Order o
+            WHERE o.user.id = :userId
+              AND (:orderCode = '' OR LOWER(o.orderCode) LIKE CONCAT('%', LOWER(:orderCode), '%'))
+              AND o.placedAt >= :fromDateTime
+              AND o.placedAt < :toDateTimeExclusive
+              AND (
+                    o.placedAt < :beforePlacedAt
+                    OR (o.placedAt = :beforePlacedAt AND o.id < :beforeId)
+              )
+              AND (
+                    :status = ''
+                    OR (
+                        :status = 'DISPUTED'
+                        AND EXISTS (
+                            SELECT d.id
+                            FROM OrderDispute d
+                            WHERE d.orderId = o.id
+                              AND d.status IN :activeDisputeStatuses
+                        )
+                    )
+                    OR (
+                        :status <> 'DISPUTED'
+                        AND o.status = :status
+                        AND NOT EXISTS (
+                            SELECT d.id
+                            FROM OrderDispute d
+                            WHERE d.orderId = o.id
+                              AND d.status IN :activeDisputeStatuses
+                        )
+                    )
+              )
+            ORDER BY o.placedAt DESC, o.id DESC
+            """)
+    Slice<Order> findBuyerOrdersBefore(
+            @Param("userId") Long userId,
+            @Param("orderCode") String orderCode,
+            @Param("status") String status,
+            @Param("fromDateTime") OffsetDateTime fromDateTime,
+            @Param("toDateTimeExclusive") OffsetDateTime toDateTimeExclusive,
+            @Param("beforePlacedAt") OffsetDateTime beforePlacedAt,
+            @Param("beforeId") Long beforeId,
+            @Param("activeDisputeStatuses") Set<String> activeDisputeStatuses,
             Pageable pageable
     );
 
