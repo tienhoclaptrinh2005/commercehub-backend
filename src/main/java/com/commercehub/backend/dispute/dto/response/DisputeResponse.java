@@ -39,6 +39,8 @@ public class DisputeResponse {
 
     private Long resolverId;
 
+    private String closedReason;
+
     private OffsetDateTime createdAt;
 
     private OffsetDateTime deadlineAt;

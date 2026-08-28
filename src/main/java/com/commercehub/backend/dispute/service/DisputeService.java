@@ -40,6 +40,9 @@ public class DisputeService {
     @Value("${commercehub.dispute.buyer-confirmation-hours:24}")
     private long buyerConfirmationHours;
 
+    @Value("${commercehub.dispute.warranty-processing-hours:24}")
+    private long warrantyProcessingHours;
+
     @Value("${commercehub.dispute.admin-review-hours:72}")
     private long adminReviewHours;
 
@@ -157,6 +160,11 @@ public class DisputeService {
         }
 
         requireStatus(dispute, OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION);
+        requireDeadlineActive(
+                dispute,
+                OffsetDateTime.now(),
+                ErrorCode.DISPUTE_BUYER_CONFIRMATION_DEADLINE_EXPIRED
+        );
 
         /*
          * COMPLAINED / WARRANTY_IN_PROGRESS
@@ -193,6 +201,51 @@ public class DisputeService {
     }
 
     // =========================================================
+    // BUYER WITHDRAW
+    // =========================================================
+
+    /**
+     * Buyer tự hủy khiếu nại khi seller chưa phản hồi hoặc đang bảo hành.
+     * Hồ sơ được đóng vĩnh viễn vì mỗi OrderItem chỉ có một dispute.
+     */
+    @Transactional
+    public DisputeResponse withdrawByBuyer(
+            Long buyerId,
+            Long disputeId
+    ) {
+
+        OrderDispute dispute = disputeRepository
+                .findByIdWithLock(disputeId)
+                .orElseThrow(() -> new AppException(ErrorCode.DISPUTE_NOT_FOUND));
+
+        if (!dispute.getUserId().equals(buyerId)) {
+            throw new AppException(ErrorCode.DISPUTE_ACCESS_DENIED);
+        }
+
+        boolean canWithdraw =
+                OrderDispute.STATUS_OPEN.equals(dispute.getStatus())
+                        || OrderDispute.STATUS_WARRANTY_IN_PROGRESS.equals(dispute.getStatus());
+
+        if (!canWithdraw) {
+            throw new AppException(ErrorCode.DISPUTE_WITHDRAW_NOT_ALLOWED);
+        }
+
+        ErrorCode deadlineError = OrderDispute.STATUS_OPEN.equals(dispute.getStatus())
+                ? ErrorCode.DISPUTE_SELLER_RESPONSE_DEADLINE_EXPIRED
+                : ErrorCode.DISPUTE_WARRANTY_DEADLINE_EXPIRED;
+        requireDeadlineActive(dispute, OffsetDateTime.now(), deadlineError);
+
+        holdReleaseService.withdrawComplaint(dispute.getOrderItemId());
+
+        dispute.setStatus(OrderDispute.STATUS_CLOSED);
+        dispute.setClosedReason(OrderDispute.CLOSED_REASON_BUYER_WITHDREW);
+        dispute.setResolvedAt(OffsetDateTime.now());
+        disputeRepository.save(dispute);
+
+        return disputeMapper.toResponse(dispute);
+    }
+
+    // =========================================================
     // SELLER START WARRANTY
     // =========================================================
 
@@ -214,6 +267,11 @@ public class DisputeService {
                 getByOrderItemWithLock(orderItemId);
 
         requireOpen(dispute);
+        requireDeadlineActive(
+                dispute,
+                OffsetDateTime.now(),
+                ErrorCode.DISPUTE_SELLER_RESPONSE_DEADLINE_EXPIRED
+        );
 
         /*
          * COMPLAINED -> WARRANTY_IN_PROGRESS
@@ -223,6 +281,9 @@ public class DisputeService {
         );
 
         dispute.setStatus(OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
+        dispute.setDeadlineAt(
+                OffsetDateTime.now().plusHours(warrantyProcessingHours)
+        );
 
         applySellerResponse(
                 dispute,
@@ -256,6 +317,11 @@ public class DisputeService {
                 getByOrderItemWithLock(orderItemId);
 
         requireStatus(dispute, OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
+        requireDeadlineActive(
+                dispute,
+                OffsetDateTime.now(),
+                ErrorCode.DISPUTE_WARRANTY_DEADLINE_EXPIRED
+        );
 
         /*
          * Seller chỉ báo đã xử lý; buyer phải xác nhận trước khi T+7 chạy tiếp.
@@ -294,8 +360,14 @@ public class DisputeService {
         }
 
         requireStatus(dispute, OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION);
+        requireDeadlineActive(
+                dispute,
+                OffsetDateTime.now(),
+                ErrorCode.DISPUTE_BUYER_CONFIRMATION_DEADLINE_EXPIRED
+        );
         holdReleaseService.confirmWarrantyResolved(dispute.getOrderItemId());
         dispute.setStatus(OrderDispute.STATUS_CLOSED);
+        dispute.setClosedReason(OrderDispute.CLOSED_REASON_BUYER_ACCEPTED_WARRANTY);
         dispute.setResolvedAt(OffsetDateTime.now());
         disputeRepository.save(dispute);
         return disputeMapper.toResponse(dispute);
@@ -313,6 +385,7 @@ public class DisputeService {
 
         holdReleaseService.confirmWarrantyResolved(dispute.getOrderItemId());
         dispute.setStatus(OrderDispute.STATUS_CLOSED);
+        dispute.setClosedReason(OrderDispute.CLOSED_REASON_BUYER_CONFIRMATION_TIMEOUT);
         dispute.setAdminNote("Hệ thống đóng do buyer không phản hồi đúng hạn");
         dispute.setResolvedAt(now);
         disputeRepository.save(dispute);
@@ -344,6 +417,11 @@ public class DisputeService {
                 OrderDispute.STATUS_OPEN,
                 OrderDispute.STATUS_WARRANTY_IN_PROGRESS
         );
+
+        ErrorCode deadlineError = OrderDispute.STATUS_OPEN.equals(dispute.getStatus())
+                ? ErrorCode.DISPUTE_SELLER_RESPONSE_DEADLINE_EXPIRED
+                : ErrorCode.DISPUTE_WARRANTY_DEADLINE_EXPIRED;
+        requireDeadlineActive(dispute, OffsetDateTime.now(), deadlineError);
 
         /*
          * Seller từ chối bảo hành
@@ -555,6 +633,16 @@ public class DisputeService {
             }
         }
         throw new AppException(ErrorCode.DISPUTE_INVALID_STATUS);
+    }
+
+    private void requireDeadlineActive(
+            OrderDispute dispute,
+            OffsetDateTime now,
+            ErrorCode errorCode
+    ) {
+        if (!dispute.getDeadlineAt().isAfter(now)) {
+            throw new AppException(errorCode);
+        }
     }
 
     private Pageable limitPageable(Pageable pageable) {

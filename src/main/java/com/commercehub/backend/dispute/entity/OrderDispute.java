@@ -29,6 +29,10 @@ public class OrderDispute {
     public static final String STATUS_SELLER_WIN = "SELLER_WIN";
     public static final String STATUS_CLOSED = "CLOSED";
 
+    public static final String CLOSED_REASON_BUYER_WITHDREW = "BUYER_WITHDREW";
+    public static final String CLOSED_REASON_BUYER_ACCEPTED_WARRANTY = "BUYER_ACCEPTED_WARRANTY";
+    public static final String CLOSED_REASON_BUYER_CONFIRMATION_TIMEOUT = "BUYER_CONFIRMATION_TIMEOUT";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
@@ -88,6 +92,9 @@ public class OrderDispute {
 
     @Column(name = "resolver_id")
     Long resolverId;
+
+    @Column(name = "closed_reason", length = 40)
+    String closedReason;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

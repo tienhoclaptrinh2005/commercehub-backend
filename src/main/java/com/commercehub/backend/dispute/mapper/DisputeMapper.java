@@ -31,6 +31,7 @@ public class DisputeMapper {
                 .refundAmount(dispute.getRefundAmount())
                 .adminNote(dispute.getAdminNote())
                 .resolverId(dispute.getResolverId())
+                .closedReason(dispute.getClosedReason())
                 .createdAt(dispute.getCreatedAt())
                 .deadlineAt(dispute.getDeadlineAt())
                 .resolvedAt(dispute.getResolvedAt())

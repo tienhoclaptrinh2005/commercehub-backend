@@ -48,6 +48,7 @@ commercehub:
     batch-size: ${JOB_BATCH_SIZE:200}
   dispute:
     seller-response-hours: ${DISPUTE_SELLER_RESPONSE_HOURS:24}
+    warranty-processing-hours: ${DISPUTE_WARRANTY_PROCESSING_HOURS:24}
     buyer-confirmation-hours: ${DISPUTE_BUYER_CONFIRMATION_HOURS:24}
     admin-review-hours: ${DISPUTE_ADMIN_REVIEW_HOURS:72}
 

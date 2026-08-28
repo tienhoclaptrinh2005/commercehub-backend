@@ -132,6 +132,10 @@ public enum ErrorCode {
     DISPUTE_ALREADY_EXISTS(409, "OrderItem này đã có hồ sơ khiếu nại/tranh chấp!", HttpStatus.CONFLICT),
     DISPUTE_INVALID_STATUS(400, "Trạng thái tranh chấp không hợp lệ để thực hiện thao tác này!", HttpStatus.BAD_REQUEST),
     DISPUTE_ACCESS_DENIED(403, "Bạn không có quyền truy cập hoặc thao tác tranh chấp này!", HttpStatus.FORBIDDEN),
+    DISPUTE_WITHDRAW_NOT_ALLOWED(409, "Chỉ có thể tự hủy khiếu nại đang chờ seller hoặc đang được bảo hành. Mỗi sản phẩm chỉ được khiếu nại một lần!", HttpStatus.CONFLICT),
+    DISPUTE_SELLER_RESPONSE_DEADLINE_EXPIRED(409, "Seller đã hết thời hạn phản hồi. Hệ thống sẽ tự động hoàn tiền cho buyer!", HttpStatus.CONFLICT),
+    DISPUTE_WARRANTY_DEADLINE_EXPIRED(409, "Thời hạn bảo hành đã hết. Hệ thống sẽ tự động hoàn tiền cho buyer!", HttpStatus.CONFLICT),
+    DISPUTE_BUYER_CONFIRMATION_DEADLINE_EXPIRED(409, "Buyer đã hết thời hạn xác nhận. Hệ thống sẽ tự động đóng khiếu nại!", HttpStatus.CONFLICT),
 
 
 

@@ -34,6 +34,7 @@ public class DisputeDeadlineScheduler {
     public void processDeadlines() {
         OffsetDateTime now = OffsetDateTime.now();
         processStatus(OrderDispute.STATUS_OPEN, now);
+        processStatus(OrderDispute.STATUS_WARRANTY_IN_PROGRESS, now);
         processStatus(OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION, now);
     }
 
@@ -53,6 +54,8 @@ public class DisputeDeadlineScheduler {
                 try {
                     if (OrderDispute.STATUS_OPEN.equals(status)) {
                         resolutionService.resolveExpiredOpenForBuyer(id, now);
+                    } else if (OrderDispute.STATUS_WARRANTY_IN_PROGRESS.equals(status)) {
+                        resolutionService.resolveExpiredWarrantyForBuyer(id, now);
                     } else {
                         disputeService.closeExpiredBuyerConfirmation(id, now);
                     }

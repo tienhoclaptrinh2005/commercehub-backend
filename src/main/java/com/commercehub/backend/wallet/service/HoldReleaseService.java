@@ -274,6 +274,39 @@ public class HoldReleaseService {
         holdReleaseRepository.save(hr);
     }
 
+    /**
+     * Buyer tự hủy khiếu nại: khôi phục đồng hồ T+7 còn lại.
+     * Chỉ chấp nhận trước khi seller phản hồi hoặc trong lúc seller bảo hành.
+     */
+    @Transactional
+    public void withdrawComplaint(Long orderItemId) {
+        HoldRelease hr = holdReleaseRepository
+                .findByOrderItemIdWithLock(orderItemId)
+                .orElseThrow(() -> new AppException(ErrorCode.HOLD_RELEASE_NOT_FOUND));
+
+        boolean canWithdraw =
+                STATUS_COMPLAINED.equals(hr.getStatus())
+                        || STATUS_WARRANTY_IN_PROGRESS.equals(hr.getStatus());
+
+        if (!canWithdraw) {
+            throw new AppException(ErrorCode.HOLD_RELEASE_INVALID_STATUS);
+        }
+
+        long remainingSeconds = validateRemainingHoldSeconds(hr);
+        String oldStatus = hr.getStatus();
+        hr.setStatus(STATUS_HOLDING);
+        hr.setScheduledReleaseAt(OffsetDateTime.now().plusSeconds(remainingSeconds));
+        hr.setRemainingHoldSeconds(null);
+        holdReleaseRepository.save(hr);
+
+        log.info(
+                "OrderItem {}: buyer hủy khiếu nại, {} -> HOLDING trong {} giây",
+                orderItemId,
+                oldStatus,
+                remainingSeconds
+        );
+    }
+
     // =========================================================
     // 4. ESCALATE TO DISPUTE
     //

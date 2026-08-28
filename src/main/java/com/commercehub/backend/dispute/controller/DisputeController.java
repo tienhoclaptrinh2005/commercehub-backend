@@ -81,6 +81,17 @@ public class DisputeController {
         );
     }
 
+    /** Buyer tự hủy khiếu nại; hồ sơ này không thể mở lại. */
+    @PostMapping("/disputes/{disputeId}/withdraw")
+    public ResponseEntity<DisputeResponse> withdraw(
+            @PathVariable Long disputeId
+    ) {
+        Long buyerId = SecurityUtils.getCurrentUserId();
+        return ResponseEntity.ok(
+                disputeService.withdrawByBuyer(buyerId, disputeId)
+        );
+    }
+
     @GetMapping("/disputes/{disputeId}")
     public ResponseEntity<DisputeResponse> detail(
             @PathVariable Long disputeId

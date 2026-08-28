@@ -81,6 +81,27 @@ public class DisputeResolutionService {
         );
     }
 
+    /** Seller đã nhận bảo hành nhưng không hoàn tất đúng hạn: tự động hoàn 100% cho buyer. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void resolveExpiredWarrantyForBuyer(Long disputeId, OffsetDateTime now) {
+        OrderDispute dispute = disputeRepository.findByIdWithLock(disputeId)
+                .orElseThrow(() -> new AppException(ErrorCode.DISPUTE_NOT_FOUND));
+
+        if (!OrderDispute.STATUS_WARRANTY_IN_PROGRESS.equals(dispute.getStatus())
+                || dispute.getDeadlineAt().isAfter(now)) {
+            return;
+        }
+
+        holdReleaseService.escalateDispute(dispute.getOrderItemId());
+        disputeRepository.linkFeeLedgerToDispute(dispute.getOrderItemId(), dispute.getId());
+        resolveLocked(
+                dispute,
+                null,
+                OrderDispute.STATUS_BUYER_WIN,
+                "Hệ thống hoàn tiền do seller không hoàn tất bảo hành trong thời hạn"
+        );
+    }
+
     private DisputeResponse resolveLocked(
             OrderDispute dispute,
             Long resolverId,
