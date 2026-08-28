@@ -19,6 +19,7 @@ public class OrderDetailResponse {
     private String orderCode;
     private Long shopId;
     private String shopName;
+    private String sellerUsername;
     private String deliveryType;
     private String status;
     private String paymentStatus;

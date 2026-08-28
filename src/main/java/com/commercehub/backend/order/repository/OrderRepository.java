@@ -16,17 +16,17 @@ import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    @EntityGraph(attributePaths = {"shop"})
+    @EntityGraph(attributePaths = {"shop", "shop.owner"})
     Page<Order> findByUserId(Long userId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"shop"})
+    @EntityGraph(attributePaths = {"shop", "shop.owner"})
     Page<Order> findByUserIdAndOrderCodeContainingIgnoreCase(
             Long userId,
             String orderCode,
             Pageable pageable
     );
 
-    @EntityGraph(attributePaths = {"shop"})
+    @EntityGraph(attributePaths = {"shop", "shop.owner"})
     Page<Order> findByShopId(Long shopId, Pageable pageable);
 
 

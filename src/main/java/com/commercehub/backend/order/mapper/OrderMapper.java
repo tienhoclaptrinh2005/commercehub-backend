@@ -16,10 +16,12 @@ public interface OrderMapper {
 
     @Mapping(target = "shopId", source = "shop.id")
     @Mapping(target = "shopName", source = "shop.name")
+    @Mapping(target = "sellerUsername", source = "shop.owner.username")
     OrderResponse toOrderResponse(Order order);
 
     @Mapping(target = "shopId", source = "shop.id")
     @Mapping(target = "shopName", source = "shop.name")
+    @Mapping(target = "sellerUsername", source = "shop.owner.username")
     OrderDetailResponse toOrderDetailResponse(Order order);
 
     // OrderItem → OrderItemResponse
