@@ -45,6 +45,23 @@ public class WalletTransactionService {
             "FEE", List.of("PLATFORM_FEE"),
             "ADJUSTMENT", List.of("ADMIN_ADJUST")
     );
+    private static final List<String> SELLER_TRANSACTION_TYPES = List.of(
+            "SALE_HOLD",
+            "HOLD_RELEASE",
+            "HOLD_RELEASE_NET",
+            "CANCEL_HOLD",
+            "PLATFORM_FEE",
+            "WITHDRAW_PENDING",
+            "WITHDRAW_DONE",
+            "WITHDRAW_CANCEL",
+            "ADMIN_ADJUST"
+    );
+    private static final Map<String, List<String>> SELLER_CATEGORY_TYPES = Map.of(
+            "SALE", List.of("SALE_HOLD", "HOLD_RELEASE", "HOLD_RELEASE_NET", "CANCEL_HOLD"),
+            "WITHDRAWAL", List.of("WITHDRAW_PENDING", "WITHDRAW_DONE", "WITHDRAW_CANCEL"),
+            "FEE", List.of("PLATFORM_FEE"),
+            "ADJUSTMENT", List.of("ADMIN_ADJUST")
+    );
     private static final Set<String> DIRECT_ORDER_TRANSACTION_TYPES = Set.of(
             "ORDER_PAYMENT", "ORDER_REFUND", "SALE_HOLD"
     );
@@ -63,6 +80,34 @@ public class WalletTransactionService {
             int size,
             String category
     ) {
+        return getTransactions(userId, page, size, category, CATEGORY_TYPES, null);
+    }
+
+    @Transactional(readOnly = true)
+    public SliceResponse<WalletTransactionResponse> getSellerTransactions(
+            Long userId,
+            int page,
+            int size,
+            String category
+    ) {
+        return getTransactions(
+                userId,
+                page,
+                size,
+                category,
+                SELLER_CATEGORY_TYPES,
+                SELLER_TRANSACTION_TYPES
+        );
+    }
+
+    private SliceResponse<WalletTransactionResponse> getTransactions(
+            Long userId,
+            int page,
+            int size,
+            String category,
+            Map<String, List<String>> categoryTypes,
+            List<String> allTransactionTypes
+    ) {
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
 
@@ -70,13 +115,16 @@ public class WalletTransactionService {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
         String normalizedCategory = category == null ? "ALL" : category.trim().toUpperCase();
-        if (!"ALL".equals(normalizedCategory) && !CATEGORY_TYPES.containsKey(normalizedCategory)) {
+        if (!"ALL".equals(normalizedCategory) && !categoryTypes.containsKey(normalizedCategory)) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
+        List<String> transactionTypes = "ALL".equals(normalizedCategory)
+                ? allTransactionTypes
+                : categoryTypes.get(normalizedCategory);
 
         Pageable pageable = PageRequest.of(page - 1, size);
         Slice<WalletTransaction> transactionPage = findTransactions(
-                wallet.getId(), normalizedCategory, pageable);
+                wallet.getId(), transactionTypes, pageable);
 
         TransactionReferences references = loadReferences(transactionPage.getContent());
         Slice<WalletTransactionResponse> responsePage = transactionPage.map(transaction -> {
@@ -95,19 +143,19 @@ public class WalletTransactionService {
         });
         SliceResponse<WalletTransactionResponse> response = SliceResponse.of(responsePage);
         response.setPageNumbers(buildPageNumbers(
-                wallet.getId(), normalizedCategory, page, size, transactionPage));
+                wallet.getId(), transactionTypes, page, size, transactionPage));
         return response;
     }
 
     private Slice<WalletTransaction> findTransactions(
             Long walletId,
-            String category,
+            List<String> transactionTypes,
             Pageable pageable
     ) {
-        return "ALL".equals(category)
+        return transactionTypes == null
                 ? transactionRepository.findByWalletIdOrderByCreatedAtDesc(walletId, pageable)
                 : transactionRepository.findByWalletIdAndTransactionTypeInOrderByCreatedAtDesc(
-                        walletId, CATEGORY_TYPES.get(category), pageable);
+                        walletId, transactionTypes, pageable);
     }
 
     /**
@@ -116,7 +164,7 @@ public class WalletTransactionService {
      */
     private List<Integer> buildPageNumbers(
             Long walletId,
-            String category,
+            List<String> transactionTypes,
             int page,
             int size,
             Slice<WalletTransaction> currentSlice
@@ -131,7 +179,7 @@ public class WalletTransactionService {
             } else {
                 Slice<WalletTransaction> secondPage = findTransactions(
                         walletId,
-                        category,
+                        transactionTypes,
                         PageRequest.of(page, size)
                 );
                 pagesInGroup = secondPage.hasNext() ? 3 : 2;

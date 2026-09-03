@@ -29,6 +29,51 @@ import static org.mockito.Mockito.*;
 class WalletTransactionServiceTest {
 
     @Test
+    void sellerHistoryExcludesBuyerAndDepositTransactions() {
+        WalletTransactionRepository transactionRepository = mock(WalletTransactionRepository.class);
+        WalletRepository walletRepository = mock(WalletRepository.class);
+        WalletMapper walletMapper = mock(WalletMapper.class);
+        OrderRepository orderRepository = mock(OrderRepository.class);
+        OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
+        DepositRepository depositRepository = mock(DepositRepository.class);
+        WalletTransactionService service = new WalletTransactionService(
+                transactionRepository,
+                walletRepository,
+                walletMapper,
+                orderRepository,
+                orderItemRepository,
+                depositRepository
+        );
+
+        Wallet wallet = Wallet.builder().id(4L).build();
+        PageRequest pageable = PageRequest.of(0, 10);
+        List<String> sellerTypes = List.of(
+                "SALE_HOLD",
+                "HOLD_RELEASE",
+                "HOLD_RELEASE_NET",
+                "CANCEL_HOLD",
+                "PLATFORM_FEE",
+                "WITHDRAW_PENDING",
+                "WITHDRAW_DONE",
+                "WITHDRAW_CANCEL",
+                "ADMIN_ADJUST"
+        );
+
+        when(walletRepository.findByUserId(3L)).thenReturn(Optional.of(wallet));
+        when(transactionRepository.findByWalletIdAndTransactionTypeInOrderByCreatedAtDesc(
+                4L, sellerTypes, pageable
+        )).thenReturn(new SliceImpl<>(List.of(), pageable, false));
+
+        SliceResponse<WalletTransactionResponse> result =
+                service.getSellerTransactions(3L, 1, 10, "ALL");
+
+        assertThat(result.getData()).isEmpty();
+        verify(transactionRepository).findByWalletIdAndTransactionTypeInOrderByCreatedAtDesc(
+                4L, sellerTypes, pageable);
+        verify(transactionRepository, never()).findByWalletIdOrderByCreatedAtDesc(anyLong(), any());
+    }
+
+    @Test
     void returnsThreeNavigationPagesWithoutTotalCount() {
         WalletTransactionRepository transactionRepository = mock(WalletTransactionRepository.class);
         WalletRepository walletRepository = mock(WalletRepository.class);
