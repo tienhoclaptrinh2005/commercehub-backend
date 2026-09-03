@@ -1,8 +1,10 @@
 package com.commercehub.backend.wallet.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.wallet.dto.request.DepositRequest;
+import com.commercehub.backend.wallet.dto.response.DepositResponse;
 import com.commercehub.backend.wallet.service.DepositService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,15 @@ public class DepositController {
     // Lấy Secret Key của VNPay từ file cấu hình (application.yml hoặc .env)
     @Value("${vnpay.hash-secret}")
     private String vnpayHashSecret;
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<DepositResponse>>> getDepositHistory(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        PageResponse<DepositResponse> history = depositService.getMyDeposits(currentUser.getId(), page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử nạp tiền thành công", history));
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<String>> createDepositUrl(

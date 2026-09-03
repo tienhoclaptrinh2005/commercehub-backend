@@ -19,6 +19,9 @@ public class WalletTransactionResponse {
     BigDecimal amount;
     BigDecimal balanceBefore;
     BigDecimal balanceAfter;
+    Long referenceId;
+    String referenceType;
+    String referenceCode;
     String description;
     OffsetDateTime createdAt;
 }

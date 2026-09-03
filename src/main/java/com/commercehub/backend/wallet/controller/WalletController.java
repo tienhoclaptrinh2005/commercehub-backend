@@ -1,7 +1,7 @@
 package com.commercehub.backend.wallet.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
-import com.commercehub.backend.common.response.PageResponse;
+import com.commercehub.backend.common.response.SliceResponse;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.wallet.dto.response.WalletResponse;
 import com.commercehub.backend.wallet.dto.response.WalletTransactionResponse;
@@ -35,13 +35,14 @@ public class WalletController {
 
 
     @GetMapping("/transactions")
-    public ResponseEntity<ApiResponse<PageResponse<WalletTransactionResponse>>> getTransactionHistory(
+    public ResponseEntity<ApiResponse<SliceResponse<WalletTransactionResponse>>> getTransactionHistory(
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "ALL") String category) {
 
-        PageResponse<WalletTransactionResponse> transactions =
-                walletTransactionService.getMyTransactions(currentUser.getId(), page, size);
+        SliceResponse<WalletTransactionResponse> transactions =
+                walletTransactionService.getMyTransactions(currentUser.getId(), page, size, category);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy lịch sử giao dịch thành công", transactions));
     }

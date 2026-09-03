@@ -11,7 +11,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -40,6 +42,7 @@ public class OrderCronJobService {
 
     private void processExpired(String status, OffsetDateTime now) {
         int safeBatchSize = Math.min(Math.max(batchSize, 1), 500);
+        Set<Long> failedOrderIds = new HashSet<>();
         for (int batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
             List<Long> ids = "PROCESSING".equals(status)
                     ? orderRepository.findExpiredProcessingIds(status, now, PageRequest.of(0, safeBatchSize))
@@ -48,13 +51,25 @@ public class OrderCronJobService {
                 return;
             }
 
-            for (Long orderId : ids) {
+            // Bản ghi lỗi vẫn còn quá hạn sau rollback và sẽ xuất hiện lại ở trang đầu.
+            // Không thử lại cùng bản ghi 20 lần trong một lượt cron để tránh spam log/DB.
+            List<Long> pendingIds = ids.stream()
+                    .filter(id -> !failedOrderIds.contains(id))
+                    .toList();
+            if (pendingIds.isEmpty()) {
+                log.warn("Order cron {} dừng lượt quét vì {} đơn lỗi đã được thử trong lượt này; sẽ thử lại ở lịch kế tiếp",
+                        status, failedOrderIds.size());
+                return;
+            }
+
+            for (Long orderId : pendingIds) {
                 try {
                     orderCancelProcessor.cancelSingleOrder(
                             orderId,
                             "Hệ thống tự động hủy và hoàn tiền do đơn quá hạn ở trạng thái " + status
                     );
                 } catch (Exception e) {
+                    failedOrderIds.add(orderId);
                     log.error("Lỗi auto-cancel đơn ID {}: {}", orderId, e.getMessage(), e);
                 }
             }

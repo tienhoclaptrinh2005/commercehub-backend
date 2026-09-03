@@ -2,13 +2,17 @@ package com.commercehub.backend.wallet.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.UserRepository;
+import com.commercehub.backend.wallet.dto.response.DepositResponse;
 import com.commercehub.backend.wallet.entity.Deposit;
 import com.commercehub.backend.wallet.entity.Wallet;
 import com.commercehub.backend.wallet.repository.DepositRepository;
 import com.commercehub.backend.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,10 +23,33 @@ import java.time.OffsetDateTime;
 @RequiredArgsConstructor
 public class DepositService {
 
+    private static final int MAX_HISTORY_PAGE_SIZE = 50;
+
     private final DepositRepository depositRepository;
     private final WalletService walletService;
     private final UserRepository userRepository;
     private final WalletRepository walletRepository;
+
+    @Transactional(readOnly = true)
+    public PageResponse<DepositResponse> getMyDeposits(Long userId, int page, int size) {
+        if (page < 1 || size < 1 || size > MAX_HISTORY_PAGE_SIZE) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        Page<DepositResponse> deposits = depositRepository
+                .findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page - 1, size))
+                .map(deposit -> DepositResponse.builder()
+                        .id(deposit.getId())
+                        .amount(deposit.getAmount())
+                        .provider(deposit.getProvider())
+                        .transactionCode(deposit.getTransactionCode())
+                        .status(deposit.getStatus())
+                        .processedAt(deposit.getProcessedAt())
+                        .createdAt(deposit.getCreatedAt())
+                        .build());
+
+        return PageResponse.of(deposits);
+    }
 
     // ==========================================
     // TẠO ĐƠN NẠP TIỀN (PENDING)

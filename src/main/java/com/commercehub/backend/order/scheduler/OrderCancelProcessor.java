@@ -65,7 +65,9 @@ public class OrderCancelProcessor {
 
         // 5. Hoàn tiền: gỡ hold của seller, trả tiền về ví buyer (cùng transaction)
         walletService.systemCancelSellerHold(order.getShop().getOwner().getId(), order.getTotalAmount(), order.getId());
-        walletService.systemCreditBalance(order.getUser().getId(), order.getTotalAmount(), "ORDER_REFUND", order.getId(), reason);
+        // referenceType là loại bản ghi được referenceId trỏ tới, không phải nội dung mô tả.
+        // Truyền `reason` vào đây làm PostgreSQL từ chối vì cột VARCHAR(30).
+        walletService.systemCreditBalance(order.getUser().getId(), order.getTotalAmount(), "ORDER_REFUND", order.getId(), "ORDER");
 
         // Đồng bộ vòng đời pre_order_items khi hệ thống tự hủy
         orderItemRepository.findByOrder(order).forEach(item ->

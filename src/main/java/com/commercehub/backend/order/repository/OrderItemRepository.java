@@ -13,6 +13,7 @@ import java.util.Optional;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     List<OrderItem> findByOrderId(Long orderId);
+    List<OrderItem> findByOrderIdIn(List<Long> orderIds);
     List<OrderItem> findByOrder(Order order);
 
     boolean existsByOrder_UserIdAndProductVariant_Product_IdAndOrder_Status(Long userId, Long productId, String status);
