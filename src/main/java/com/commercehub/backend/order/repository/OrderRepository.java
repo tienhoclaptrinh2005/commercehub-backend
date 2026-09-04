@@ -111,6 +111,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @EntityGraph(attributePaths = {"shop", "shop.owner"})
     Page<Order> findByShopId(Long shopId, Pageable pageable);
 
+    /** Buyer chỉ tra cứu được orderCode thuộc chính tài khoản của mình. */
+    @EntityGraph(attributePaths = {"shop", "shop.owner"})
+    Optional<Order> findByOrderCodeAndUserId(String orderCode, Long userId);
+
+    @Query("SELECT o FROM Order o WHERE o.id IN :orderIds AND o.user.id = :buyerId")
+    List<Order> findCheckoutOrdersForBuyer(
+            @Param("buyerId") Long buyerId,
+            @Param("orderIds") List<Long> orderIds
+    );
+
 
     //  Hàm tìm các đơn hàng Shop ĐÃ NHẬN nhưng xử lý quá hạn (quá 24h)
     @Query("SELECT o.id FROM Order o WHERE o.status = :status AND o.processingDeadlineAt < :deadline ORDER BY o.processingDeadlineAt ASC, o.id ASC")

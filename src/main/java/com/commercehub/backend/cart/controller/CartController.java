@@ -6,6 +6,8 @@ import com.commercehub.backend.cart.dto.request.UpdateCartItemRequest;
 import com.commercehub.backend.cart.dto.response.CartResponse;
 import com.commercehub.backend.cart.service.CartService;
 import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.order.dto.response.CheckoutOrderResponse;
+import com.commercehub.backend.order.service.OrderService;
 import com.commercehub.backend.security.CustomUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ import java.util.List;
 public class CartController {
 
     private final CartService cartService;
+    private final OrderService orderService;
 
     /** GET /api/v1/cart — xem giỏ hàng */
     @GetMapping
@@ -74,10 +77,12 @@ public class CartController {
      * Tự tách đơn theo shop/loại giao hàng, trừ ví, xóa giỏ khi thành công.
      */
     @PostMapping("/checkout")
-    public ResponseEntity<ApiResponse<List<Long>>> checkout(
+    public ResponseEntity<ApiResponse<List<CheckoutOrderResponse>>> checkout(
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @RequestBody @Valid CartCheckoutRequest request) {
         List<Long> orderIds = cartService.checkoutCart(currentUser.getId(), request);
-        return ResponseEntity.ok(ApiResponse.success("Checkout giỏ hàng thành công", orderIds));
+        List<CheckoutOrderResponse> orders =
+                orderService.getBuyerCheckoutOrders(currentUser.getId(), orderIds);
+        return ResponseEntity.ok(ApiResponse.success("Checkout giỏ hàng thành công", orders));
     }
 }

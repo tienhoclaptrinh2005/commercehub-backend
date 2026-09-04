@@ -60,26 +60,32 @@ public class OrderController {
         ));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{orderCode}")
     public ResponseEntity<ApiResponse<?>> getOrderDetail(
-            @AuthenticationPrincipal CustomUserDetails currentUser, @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Success", orderService.getBuyerOrderDetail(currentUser.getId(), id)));
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable @Size(min = 1, max = 50, message = "Mã đơn hàng không hợp lệ") String orderCode) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Success",
+                orderService.getBuyerOrderDetail(currentUser.getId(), orderCode)
+        ));
     }
 
-    @GetMapping("/{id}/assets")
+    @GetMapping("/{orderCode}/assets")
     public ResponseEntity<ApiResponse<?>> getOrderAssets(
-            @AuthenticationPrincipal CustomUserDetails currentUser, @PathVariable Long id) {
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable @Size(min = 1, max = 50, message = "Mã đơn hàng không hợp lệ") String orderCode) {
 
-        Order order = orderService.getBuyerOrderOrThrow(currentUser.getId(), id);
+        Order order = orderService.getBuyerOrderOrThrow(currentUser.getId(), orderCode);
         var assets = digitalAssetService.getDeliveredAssetsByOrderId(order.getId());
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin tài khoản thành công", assets));
     }
 
-    @PostMapping("/{id}/cancel")
+    @PostMapping("/{orderCode}/cancel")
     public ResponseEntity<ApiResponse<?>> cancelOrder(
             @AuthenticationPrincipal CustomUserDetails currentUser,
-            @PathVariable Long id) {
-        preOrderApprovalService.cancelOrderByBuyer(currentUser.getId(), id);
+            @PathVariable @Size(min = 1, max = 50, message = "Mã đơn hàng không hợp lệ") String orderCode) {
+        Order order = orderService.getBuyerOrderOrThrow(currentUser.getId(), orderCode);
+        preOrderApprovalService.cancelOrderByBuyer(currentUser.getId(), order.getId());
         return ResponseEntity.ok(ApiResponse.success("Đã hủy đơn hàng và hoàn tiền thành công.", null));
     }
 }

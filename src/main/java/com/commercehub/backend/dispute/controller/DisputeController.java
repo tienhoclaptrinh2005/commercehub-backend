@@ -5,28 +5,34 @@ import com.commercehub.backend.dispute.dto.request.CreateDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.service.DisputeService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import com.commercehub.backend.order.entity.Order;
+import com.commercehub.backend.order.service.OrderService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
+@Validated
 public class DisputeController {
 
     private final DisputeService disputeService;
+    private final OrderService orderService;
 
     /**
      * Buyer tạo khiếu nại.
      */
     @PostMapping(
-            "/orders/{orderId}/items/{itemId}/complain"
+            "/orders/{orderCode}/items/{itemId}/complain"
     )
     public ResponseEntity<DisputeResponse> complain(
-            @PathVariable Long orderId,
+            @PathVariable @Size(min = 1, max = 50, message = "Mã đơn hàng không hợp lệ") String orderCode,
             @PathVariable Long itemId,
             @Valid
             @RequestBody CreateDisputeRequest request
@@ -35,10 +41,12 @@ public class DisputeController {
         Long buyerId =
                 SecurityUtils.getCurrentUserId();
 
+        Order order = orderService.getBuyerOrderOrThrow(buyerId, orderCode);
+
         DisputeResponse response =
                 disputeService.createComplaint(
                         buyerId,
-                        orderId,
+                        order.getId(),
                         itemId,
                         request
                 );

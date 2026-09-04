@@ -98,6 +98,22 @@ class DisputeServiceTest {
     }
 
     @Test
+    void buyerCannotComplainAboutAnotherBuyersOrderItem() {
+        when(disputeRepository.buyerOwnsOrderItem(41L, 20L, 30L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createComplaint(
+                41L,
+                20L,
+                30L,
+                new CreateDisputeRequest("Lỗi", List.of())
+        )).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ORDER_ACCESS_DENIED));
+
+        verify(disputeRepository, never()).save(any());
+        verifyNoInteractions(holdReleaseService);
+    }
+
+    @Test
     void buyerCanWithdrawWarrantyBeforeDeadline() {
         OrderDispute dispute = dispute(OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
         dispute.setDeadlineAt(OffsetDateTime.now().plusMinutes(1));

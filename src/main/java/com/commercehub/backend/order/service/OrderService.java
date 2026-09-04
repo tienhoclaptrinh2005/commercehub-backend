@@ -3,6 +3,7 @@ package com.commercehub.backend.order.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.dto.response.OrderDetailResponse;
+import com.commercehub.backend.order.dto.response.CheckoutOrderResponse;
 import com.commercehub.backend.order.dto.response.OrderItemResponse;
 import com.commercehub.backend.order.dto.response.OrderResponse;
 import com.commercehub.backend.order.dto.response.PreOrderItemResponse;
@@ -31,6 +32,7 @@ import java.time.OffsetDateTime;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -134,33 +136,41 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public void assertBuyerOwnsOrder(Long buyerId, Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
-        if (!order.getUser().getId().equals(buyerId)) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
+    public List<CheckoutOrderResponse> getBuyerCheckoutOrders(Long buyerId, List<Long> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) {
+            return List.of();
         }
+
+        Map<Long, Order> ownedOrders = orderRepository
+                .findCheckoutOrdersForBuyer(buyerId, orderIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        Order::getId,
+                        Function.identity(),
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ));
+
+        if (ownedOrders.size() != orderIds.stream().distinct().count()) {
+            throw new AppException(ErrorCode.RECORD_NOT_FOUND);
+        }
+
+        return orderIds.stream()
+                .map(ownedOrders::get)
+                .map(order -> new CheckoutOrderResponse(order.getOrderCode()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public Order getBuyerOrderOrThrow(Long buyerId, Long orderId) {
-        Order order = orderRepository.findById(orderId)
+    public Order getBuyerOrderOrThrow(Long buyerId, String orderCode) {
+        String normalizedOrderCode = normalizeOrderCode(orderCode);
+        return orderRepository.findByOrderCodeAndUserId(normalizedOrderCode, buyerId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
-        if (!order.getUser().getId().equals(buyerId)) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
-        return order;
     }
 
     @Transactional(readOnly = true)
-    public OrderDetailResponse getBuyerOrderDetail(Long buyerId, Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
-
-        if (!order.getUser().getId().equals(buyerId)) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
-        return buildOrderDetail(order);
+    public OrderDetailResponse getBuyerOrderDetail(Long buyerId, String orderCode) {
+        return buildOrderDetail(getBuyerOrderOrThrow(buyerId, orderCode));
     }
 
     @Transactional(readOnly = true)
@@ -260,6 +270,13 @@ public class OrderService {
 
     private boolean isActiveDispute(OrderDispute dispute) {
         return dispute != null && ACTIVE_DISPUTE_STATUSES.contains(dispute.getStatus());
+    }
+
+    private String normalizeOrderCode(String orderCode) {
+        if (orderCode == null || orderCode.isBlank() || orderCode.length() > 50) {
+            throw new AppException(ErrorCode.RECORD_NOT_FOUND);
+        }
+        return orderCode.trim();
     }
 
     private Page<OrderResponse> mapWithEffectiveStatus(Page<Order> orders) {
