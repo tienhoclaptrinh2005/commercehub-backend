@@ -25,10 +25,12 @@ public interface ShopMapper {
 
     @Mapping(target = "ownerId", source = "owner.id")
     @Mapping(target = "ownerName", source = "owner.fullName")
+    @Mapping(target = "shopAvatarUrl", source = "owner.avatarUrl")
     ShopResponse toResponse(Shop shop);
 
     @Mapping(target = "ownerId", source = "shop.owner.id")
     @Mapping(target = "ownerName", source = "shop.owner.fullName")
+    @Mapping(target = "shopAvatarUrl", source = "shop.owner.avatarUrl")
     @Mapping(target = "ownerCompletedPurchaseCount", source = "ownerCompletedPurchaseCount")
     @Mapping(target = "successfulSaleCount", source = "successfulSaleCount")
     ShopResponse toResponse(
@@ -43,6 +45,7 @@ public interface ShopMapper {
 
     @Mapping(target = "name", ignore = true)
     @Mapping(target = "slug", ignore = true)
+    @Mapping(target = "shopAvatarUrl", ignore = true)
 
     void updateEntityFromRequest(UpdateShopRequest request, @MappingTarget Shop shop);
 }

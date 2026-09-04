@@ -15,7 +15,7 @@ class ProductMapperTest {
     private final ProductMapper mapper = Mappers.getMapper(ProductMapper.class);
 
     @Test
-    void productSellerAvatarComesFromShopInsteadOfOwnerAccount() {
+    void productSellerAvatarUsesOwnerAccountAvatar() {
         User owner = User.builder()
                 .username("seller_user")
                 .avatarUrl("https://cdn.example.com/user-avatar.png")
@@ -43,6 +43,6 @@ class ProductMapperTest {
         assertThat(response.getShopName()).isEqualTo("Gian hàng chính thức");
         assertThat(response.getSellerUsername()).isEqualTo("seller_user");
         assertThat(response.getSellerAvatarUrl())
-                .isEqualTo("https://cdn.example.com/shop-avatar.png");
+                .isEqualTo("https://cdn.example.com/user-avatar.png");
     }
 }

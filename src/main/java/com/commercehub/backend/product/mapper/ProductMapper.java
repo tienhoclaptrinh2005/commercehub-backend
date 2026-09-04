@@ -41,7 +41,7 @@ public interface ProductMapper {
     @Mapping(target = "shopId", expression = "java(getShopId(product))")
     @Mapping(target = "shopName", expression = "java(getShopName(product))")
     @Mapping(target = "sellerUsername", expression = "java(getSellerUsername(product))")
-    @Mapping(target = "sellerAvatarUrl", expression = "java(getShopAvatarUrl(product))")
+    @Mapping(target = "sellerAvatarUrl", expression = "java(getSellerAvatarUrl(product))")
     @Mapping(target = "categoryId", expression = "java(getCategoryId(product))")
     @Mapping(target = "categoryName", expression = "java(getCategoryName(product))")
     @Mapping(target = "stockCount", expression = "java(calculateTotalStock(product.getVariants()))")
@@ -58,7 +58,7 @@ public interface ProductMapper {
     @Mapping(target = "shopId", expression = "java(getShopId(product))")
     @Mapping(target = "shopName", expression = "java(getShopName(product))")
     @Mapping(target = "sellerUsername", expression = "java(getSellerUsername(product))")
-    @Mapping(target = "sellerAvatarUrl", expression = "java(getShopAvatarUrl(product))")
+    @Mapping(target = "sellerAvatarUrl", expression = "java(getSellerAvatarUrl(product))")
     @Mapping(target = "categoryId", expression = "java(getCategoryId(product))")
     @Mapping(target = "categoryName", expression = "java(getCategoryName(product))")
     @Mapping(target = "stockCount", expression = "java(calculateTotalStock(product.getVariants()))")
@@ -96,9 +96,11 @@ public interface ProductMapper {
                 : null;
     }
 
-    default String getShopAvatarUrl(Product product) {
-        return (product != null && product.getShop() != null)
-                ? product.getShop().getShopAvatarUrl()
+    default String getSellerAvatarUrl(Product product) {
+        return (product != null
+                && product.getShop() != null
+                && product.getShop().getOwner() != null)
+                ? product.getShop().getOwner().getAvatarUrl()
                 : null;
     }
 

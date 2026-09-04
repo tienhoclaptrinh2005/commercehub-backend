@@ -51,7 +51,7 @@ public class UserService {
                 .ifPresent(shop -> {
                     response.setShopId(shop.getId());
                     response.setShopName(shop.getName());
-                    response.setShopAvatarUrl(shop.getShopAvatarUrl());
+                    response.setShopAvatarUrl(user.getAvatarUrl());
                 });
 
         return response;

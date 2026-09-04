@@ -43,6 +43,7 @@ class UserServiceTest {
         User user = User.builder()
                 .id(1L)
                 .username("seller_user")
+                .avatarUrl("https://cdn.example.com/user-avatar.png")
                 .status("ACTIVE")
                 .build();
         Shop shop = Shop.builder()
@@ -65,7 +66,7 @@ class UserServiceTest {
         assertThat(response.getShopId()).isEqualTo(10L);
         assertThat(response.getShopName()).isEqualTo("Gian hàng chính thức");
         assertThat(response.getShopAvatarUrl())
-                .isEqualTo("https://cdn.example.com/shop-avatar.png");
+                .isEqualTo("https://cdn.example.com/user-avatar.png");
     }
 
     @Test

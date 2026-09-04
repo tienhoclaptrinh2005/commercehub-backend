@@ -12,7 +12,6 @@ public class UpdateShopRequest {
     private String name;
 
     private String description;
-    private String shopAvatarUrl;
     private String shopCoverUrl;
 
 }

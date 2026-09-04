@@ -33,6 +33,5 @@ public class CreateShopRequest {
     private boolean acceptedTerms;
 
     private String description;
-    private String shopAvatarUrl;
     private String shopCoverUrl;
 }
