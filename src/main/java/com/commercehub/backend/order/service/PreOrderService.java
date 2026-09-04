@@ -102,7 +102,6 @@ public class PreOrderService {
 
             totalOrderAmount = totalOrderAmount.add(itemSubtotal);
 
-            // ĐÃ SỬA: Lấy dữ liệu thật từ request thay vì gán cứng null
             String buyerInputs = itemReq.getBuyerInputs();
 
             processedItems.add(new ItemProcessContext(variant, itemReq.getQuantity(), itemSubtotal, buyerInputs));

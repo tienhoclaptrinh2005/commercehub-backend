@@ -12,7 +12,12 @@ public final class ProductSpecification {
     private ProductSpecification() {
     }
 
-    public static Specification<Product> filterProducts(String keyword, List<Long> categoryIds, Long shopId) {
+    public static Specification<Product> filterProducts(
+            String keyword,
+            List<Long> categoryIds,
+            Long shopId,
+            String deliveryType
+    ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -51,6 +56,10 @@ public final class ProductSpecification {
 
             if (shopId != null) {
                 predicates.add(cb.equal(shop.get("id"), shopId));
+            }
+
+            if (deliveryType != null && !deliveryType.isBlank()) {
+                predicates.add(cb.equal(root.get("deliveryType"), deliveryType));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

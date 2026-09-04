@@ -6,6 +6,7 @@ import com.commercehub.backend.product.dto.response.ProductDetailResponse;
 import com.commercehub.backend.product.dto.response.ProductResponse;
 import com.commercehub.backend.product.service.ProductSearchService;
 import com.commercehub.backend.product.service.ProductService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -44,7 +45,7 @@ public class ProductController {
 
     @PostMapping("/search")
     public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> searchProducts(
-            @RequestBody ProductFilterRequest request,
+            @Valid @RequestBody ProductFilterRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 

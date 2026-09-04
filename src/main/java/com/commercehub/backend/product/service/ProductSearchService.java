@@ -46,7 +46,8 @@ public class ProductSearchService {
         Specification<Product> spec = ProductSpecification.filterProducts(
                 request.getKeyword(),
                 categoryIds,
-                request.getShopId()
+                request.getShopId(),
+                request.getDeliveryType()
         );
 
 
