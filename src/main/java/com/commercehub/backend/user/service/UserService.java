@@ -3,7 +3,6 @@ package com.commercehub.backend.user.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.service.OrderStatisticsService;
-import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.repository.ShopRepository;
 import com.commercehub.backend.user.dto.response.UserResponse;
 import com.commercehub.backend.user.entity.User;
@@ -49,8 +48,11 @@ public class UserService {
 
         shopRepository.findByOwnerId(user.getId())
                 .filter(shop -> "ACTIVE".equals(shop.getStatus()))
-                .map(Shop::getId)
-                .ifPresent(response::setShopId);
+                .ifPresent(shop -> {
+                    response.setShopId(shop.getId());
+                    response.setShopName(shop.getName());
+                    response.setShopAvatarUrl(shop.getShopAvatarUrl());
+                });
 
         return response;
     }

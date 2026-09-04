@@ -24,4 +24,6 @@ public class UserResponse {
     long successfulSaleCount;
     Set<String> roles;
     Long shopId;
+    String shopName;
+    String shopAvatarUrl;
 }
