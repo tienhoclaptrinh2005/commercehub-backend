@@ -44,6 +44,9 @@ public enum ErrorCode {
     INVALID_STATUS(400, "Trạng thái không hợp lệ!", HttpStatus.BAD_REQUEST),
     SHOP_UNAUTHORIZED(403, "Gian hàng của bạn đang bị khóa hoặc chưa được phê duyệt!", HttpStatus.FORBIDDEN),
     USER_ALREADY_HAS_SHOP(400, "Mỗi tài khoản chỉ được phép mở duy nhất 1 gian hàng!", HttpStatus.BAD_REQUEST),
+    SHOP_STATUS_TRANSITION_INVALID(409, "Không thể chuyển gian hàng giữa hai trạng thái này!", HttpStatus.CONFLICT),
+    SHOP_REVIEW_CONFLICT(409, "Hồ sơ gian hàng vừa được xử lý bởi quản trị viên khác. Vui lòng tải lại!", HttpStatus.CONFLICT),
+    SELLER_IDENTITY_LOCKED(409, "Tên hiển thị, username và tên gian hàng của seller không thể thay đổi!", HttpStatus.CONFLICT),
 
     // product
     PRODUCT_ALREADY_EXISTS(400, "Sản phẩm này đã tồn tại trong gian hàng của bạn!", HttpStatus.BAD_REQUEST),

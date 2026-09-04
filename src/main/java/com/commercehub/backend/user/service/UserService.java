@@ -70,6 +70,10 @@ public class UserService {
         User user = userRepository.findByIdForUsernameUpdate(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        if (user.hasRole("SELLER")) {
+            throw new AppException(ErrorCode.SELLER_IDENTITY_LOCKED);
+        }
+
         // Gửi lại đúng username hiện tại là thao tác không thay đổi và không tiêu thụ lượt đổi.
         if (normalizedUsername.equals(user.getUsername())) {
             return;

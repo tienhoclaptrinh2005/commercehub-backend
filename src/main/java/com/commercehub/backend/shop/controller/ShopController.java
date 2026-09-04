@@ -7,6 +7,7 @@ import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.shop.dto.request.CreateShopRequest;
 import com.commercehub.backend.shop.dto.request.UpdateShopRequest;
 import com.commercehub.backend.shop.dto.response.ShopResponse;
+import com.commercehub.backend.shop.dto.response.ShopApplicationResponse;
 import com.commercehub.backend.shop.service.ShopService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,7 @@ public class ShopController {
 
     @GetMapping("/admin/all")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<Page<ShopResponse>>> getAllShopsForAdmin(
+    public ResponseEntity<ApiResponse<Page<ShopApplicationResponse>>> getAllShopsForAdmin(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.success(shopService.getAllShopsForAdmin(page, size)));
@@ -52,20 +53,27 @@ public class ShopController {
         return ResponseEntity.ok(ApiResponse.success(shopService.getShopBySlug(slug)));
     }
 
+    @GetMapping("/me/application")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<ShopApplicationResponse>> getMyShopApplication() {
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(shopService.getMyShopApplication(currentUserId)));
+    }
+
     /**
      * Chỉ tài khoản có role gốc BUYER được gửi hồ sơ mở shop lần đầu.
      * SELLER đã có shop; ADMIN/SUPER_ADMIN chỉ quản trị và không được bán hàng.
      */
     @PostMapping
     @PreAuthorize("hasRole('BUYER') and !hasAnyRole('SELLER', 'ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<ShopResponse>> createShop(@Valid @RequestBody CreateShopRequest request) {
+    public ResponseEntity<ApiResponse<ShopApplicationResponse>> createShop(@Valid @RequestBody CreateShopRequest request) {
         Long currentUserId = SecurityUtils.getCurrentUserId();
         if (currentUserId == null) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        ShopResponse response = shopService.createShop(request, currentUserId);
+        ShopApplicationResponse response = shopService.createShop(request, currentUserId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Tạo gian hàng thành công!", response));
+                .body(ApiResponse.success("Đã gửi yêu cầu đăng ký bán hàng. Vui lòng chờ quản trị viên duyệt!", response));
     }
 
     @PutMapping("/{id}")

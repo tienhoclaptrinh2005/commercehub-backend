@@ -5,6 +5,7 @@ import com.commercehub.backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
 
@@ -42,6 +43,12 @@ public class Shop  {
     @Column(columnDefinition = "TEXT")
      String description;
 
+    @Column(name = "contact_info", length = 255)
+     String contactInfo;
+
+    @Column(name = "application_reason", length = 500)
+     String applicationReason;
+
     @Column(name = "total_orders", nullable = false)
     @Builder.Default
      Integer totalOrders = 0;
@@ -61,6 +68,12 @@ public class Shop  {
     @Column(name = "rating_avg", nullable = false, precision = 3, scale = 2)
     @Builder.Default
      BigDecimal ratingAvg = BigDecimal.ZERO;
+
+    @Version
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    Long version = 0L;
 
 
     @Column(name = "created_at", nullable = false, updatable = false)

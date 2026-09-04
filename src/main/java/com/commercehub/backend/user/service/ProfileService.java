@@ -37,7 +37,11 @@ public class ProfileService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
-            user.setFullName(request.getFullName().trim());
+            String nextFullName = request.getFullName().trim();
+            if (user.hasRole("SELLER") && !nextFullName.equals(user.getFullName())) {
+                throw new AppException(ErrorCode.SELLER_IDENTITY_LOCKED);
+            }
+            user.setFullName(nextFullName);
         }
 
         if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {

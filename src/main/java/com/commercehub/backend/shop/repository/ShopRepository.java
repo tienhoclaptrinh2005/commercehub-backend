@@ -18,6 +18,7 @@ public interface ShopRepository extends JpaRepository<Shop, Long> {
     @EntityGraph(attributePaths = {"owner"})
     Optional<Shop> findBySlug(String slug);
     boolean existsByName(String name);
+    boolean existsByNameIgnoreCase(String name);
     boolean existsBySlug(String slug);
 
     Optional<Shop> findByOwnerId(Long ownerId);

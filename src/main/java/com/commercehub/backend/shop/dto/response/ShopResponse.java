@@ -20,7 +20,6 @@ public class ShopResponse {
     private String shopAvatarUrl;
     private String shopCoverUrl;
     private String description;
-
     private Integer totalOrders;
     private Integer totalDisputes;
     private BigDecimal disputeRate;

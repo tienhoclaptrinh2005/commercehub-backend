@@ -3,6 +3,7 @@ package com.commercehub.backend.shop.mapper;
 import com.commercehub.backend.shop.dto.request.CreateShopRequest;
 import com.commercehub.backend.shop.dto.request.UpdateShopRequest;
 import com.commercehub.backend.shop.dto.response.ShopResponse;
+import com.commercehub.backend.shop.dto.response.ShopApplicationResponse;
 import com.commercehub.backend.shop.entity.Shop;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -35,6 +36,10 @@ public interface ShopMapper {
             long ownerCompletedPurchaseCount,
             long successfulSaleCount
     );
+
+    @Mapping(target = "ownerId", source = "owner.id")
+    @Mapping(target = "username", source = "owner.username")
+    ShopApplicationResponse toApplicationResponse(Shop shop);
 
     @Mapping(target = "name", ignore = true)
     @Mapping(target = "slug", ignore = true)
