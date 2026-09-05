@@ -73,7 +73,7 @@ public class ShopController {
         }
         ShopApplicationResponse response = shopService.createShop(request, currentUserId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Đã gửi yêu cầu đăng ký bán hàng. Vui lòng chờ quản trị viên duyệt!", response));
+                .body(ApiResponse.success(HttpStatus.CREATED.value(), "Đã gửi yêu cầu đăng ký bán hàng. Vui lòng chờ quản trị viên duyệt!", response));
     }
 
     @PutMapping("/{id}")

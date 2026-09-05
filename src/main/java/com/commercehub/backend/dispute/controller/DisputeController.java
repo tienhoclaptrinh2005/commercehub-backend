@@ -1,5 +1,7 @@
 package com.commercehub.backend.dispute.controller;
 
+import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.dispute.dto.request.CreateDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
@@ -31,7 +33,7 @@ public class DisputeController {
     @PostMapping(
             "/orders/{orderCode}/items/{itemId}/complain"
     )
-    public ResponseEntity<DisputeResponse> complain(
+    public ResponseEntity<ApiResponse<DisputeResponse>> complain(
             @PathVariable @Size(min = 1, max = 50, message = "Mã đơn hàng không hợp lệ") String orderCode,
             @PathVariable Long itemId,
             @Valid
@@ -53,7 +55,11 @@ public class DisputeController {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(response);
+                .body(ApiResponse.success(
+                        HttpStatus.CREATED.value(),
+                        "Tạo khiếu nại thành công!",
+                        response
+                ));
     }
 
     /**
@@ -63,72 +69,74 @@ public class DisputeController {
     @PostMapping(
             "/disputes/{disputeId}/escalate"
     )
-    public ResponseEntity<DisputeResponse> escalate(
+    public ResponseEntity<ApiResponse<DisputeResponse>> escalate(
             @PathVariable Long disputeId
     ) {
 
         Long buyerId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã chuyển khiếu nại đến quản trị viên!",
                 disputeService.escalateByBuyer(
                         buyerId,
                         disputeId
                 )
-        );
+        ));
     }
 
     /** Buyer xác nhận kết quả bảo hành và cho phép đồng hồ T+7 chạy tiếp. */
     @PostMapping("/disputes/{disputeId}/confirm-warranty")
-    public ResponseEntity<DisputeResponse> confirmWarranty(
+    public ResponseEntity<ApiResponse<DisputeResponse>> confirmWarranty(
             @PathVariable Long disputeId
     ) {
         Long buyerId = SecurityUtils.getCurrentUserId();
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã xác nhận kết quả bảo hành!",
                 disputeService.confirmWarrantyByBuyer(buyerId, disputeId)
-        );
+        ));
     }
 
     /** Buyer tự hủy khiếu nại; hồ sơ này không thể mở lại. */
     @PostMapping("/disputes/{disputeId}/withdraw")
-    public ResponseEntity<DisputeResponse> withdraw(
+    public ResponseEntity<ApiResponse<DisputeResponse>> withdraw(
             @PathVariable Long disputeId
     ) {
         Long buyerId = SecurityUtils.getCurrentUserId();
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã rút khiếu nại!",
                 disputeService.withdrawByBuyer(buyerId, disputeId)
-        );
+        ));
     }
 
     @GetMapping("/disputes/{disputeId}")
-    public ResponseEntity<DisputeResponse> detail(
+    public ResponseEntity<ApiResponse<DisputeResponse>> detail(
             @PathVariable Long disputeId
     ) {
 
         Long buyerId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 disputeService.getBuyerDispute(
                         buyerId,
                         disputeId
                 )
-        );
+        ));
     }
 
     @GetMapping("/disputes")
-    public ResponseEntity<Page<DisputeResponse>> list(
+    public ResponseEntity<ApiResponse<PageResponse<DisputeResponse>>> list(
             Pageable pageable
     ) {
 
         Long buyerId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(
-                disputeService.getBuyerDisputes(
+        Page<DisputeResponse> disputes = disputeService.getBuyerDisputes(
                         buyerId,
                         pageable
-                )
-        );
+                );
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(disputes)));
     }
 }

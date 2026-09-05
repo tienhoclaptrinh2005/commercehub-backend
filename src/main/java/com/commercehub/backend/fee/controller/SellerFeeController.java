@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
  * seller không thể truyền shopId của shop khác để đọc trộm dữ liệu.
  */
 @RestController
-@RequestMapping("/api/seller/fees")
+@RequestMapping("/api/v1/seller/fees")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('SELLER')")
 public class SellerFeeController {

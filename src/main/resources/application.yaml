@@ -38,6 +38,15 @@ auth:
     same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
     max-age-seconds: 604800
 
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:true}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:true}
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+
 vnpay:
   hash-secret: ${VNPAY_HASH_SECRET:CHUOI_BI_MAT_CUA_BAN_DO_VNPAY_CAP}
   tmn-code: ${VNPAY_TMN_CODE:MA_WEBSITE_VNPAY_CAP}

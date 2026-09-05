@@ -98,6 +98,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
                                  "/api/v1/auth/refresh-token",
@@ -116,9 +119,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/products/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/product-reviews/**").permitAll()
-                        .requestMatchers("/api/v1/admin/**", "/api/admin/**")
+                        .requestMatchers("/api/v1/admin/**")
                         .hasAnyRole("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers("/api/v1/seller/**", "/api/seller/**")
+                        .requestMatchers("/api/v1/seller/**")
                         .hasRole("SELLER")
                         .anyRequest().authenticated()
                 );

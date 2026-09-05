@@ -33,11 +33,11 @@ public class SellerProductController {
 
         ProductResponse response = productService.createProduct(currentUser.getUser().getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Tạo sản phẩm thành công!", response));
+                .body(ApiResponse.success(HttpStatus.CREATED.value(), "Tạo sản phẩm thành công!", response));
     }
 
 
-    @PostMapping("/products/assets/inventory")
+    @PostMapping("/assets/inventory")
     @PreAuthorize("hasRole('SELLER')")
     public ResponseEntity<ApiResponse<Integer>> uploadAssets(
             @AuthenticationPrincipal CustomUserDetails currentUser,

@@ -1,5 +1,7 @@
 package com.commercehub.backend.dispute.controller;
 
+import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.dispute.dto.request.SellerRespondRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
@@ -24,7 +26,7 @@ public class SellerDisputeController {
      * Seller bắt đầu bảo hành.
      */
     @PostMapping("/orders/{orderId}/items/{itemId}/warranty-start")
-    public ResponseEntity<DisputeResponse> startWarranty(
+    public ResponseEntity<ApiResponse<DisputeResponse>> startWarranty(
             @PathVariable Long orderId,
             @PathVariable Long itemId,
             @Valid
@@ -35,21 +37,22 @@ public class SellerDisputeController {
         Long sellerId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã tiếp nhận bảo hành!",
                 disputeService.startWarranty(
                         sellerId,
                         orderId,
                         itemId,
                         request
                 )
-        );
+        ));
     }
 
     /**
      * Seller hoàn thành bảo hành.
      */
     @PostMapping("/orders/{orderId}/items/{itemId}/warranty-complete")
-    public ResponseEntity<DisputeResponse> completeWarranty(
+    public ResponseEntity<ApiResponse<DisputeResponse>> completeWarranty(
             @PathVariable Long orderId,
             @PathVariable Long itemId,
             @Valid
@@ -60,14 +63,15 @@ public class SellerDisputeController {
         Long sellerId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã gửi kết quả bảo hành đến buyer!",
                 disputeService.completeWarranty(
                         sellerId,
                         orderId,
                         itemId,
                         request
                 )
-        );
+        ));
     }
 
     /**
@@ -75,7 +79,7 @@ public class SellerDisputeController {
      * và đưa lên Admin.
      */
     @PostMapping("/orders/{orderId}/items/{itemId}/dispute")
-    public ResponseEntity<DisputeResponse> escalate(
+    public ResponseEntity<ApiResponse<DisputeResponse>> escalate(
             @PathVariable Long orderId,
             @PathVariable Long itemId,
             @Valid
@@ -86,45 +90,45 @@ public class SellerDisputeController {
         Long sellerId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã chuyển tranh chấp đến quản trị viên!",
                 disputeService.escalateBySeller(
                         sellerId,
                         orderId,
                         itemId,
                         request
                 )
-        );
+        ));
     }
 
     @GetMapping("/disputes")
-    public ResponseEntity<Page<DisputeResponse>> list(
+    public ResponseEntity<ApiResponse<PageResponse<DisputeResponse>>> list(
             Pageable pageable
     ) {
 
         Long sellerId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(
-                disputeService.getSellerDisputes(
+        Page<DisputeResponse> disputes = disputeService.getSellerDisputes(
                         sellerId,
                         pageable
-                )
-        );
+                );
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(disputes)));
     }
 
     @GetMapping("/disputes/{disputeId}")
-    public ResponseEntity<DisputeResponse> detail(
+    public ResponseEntity<ApiResponse<DisputeResponse>> detail(
             @PathVariable Long disputeId
     ) {
 
         Long sellerId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 disputeService.getSellerDispute(
                         sellerId,
                         disputeId
                 )
-        );
+        ));
     }
 }

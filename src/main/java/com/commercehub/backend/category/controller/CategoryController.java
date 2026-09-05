@@ -36,7 +36,7 @@ public class CategoryController {
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(@Valid @RequestBody CreateCategoryRequest request) {
         CategoryResponse response = categoryService.createCategory(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Tạo danh mục thành công!", response));
+                .body(ApiResponse.success(HttpStatus.CREATED.value(), "Tạo danh mục thành công!", response));
     }
 
     @PutMapping("/{id}")

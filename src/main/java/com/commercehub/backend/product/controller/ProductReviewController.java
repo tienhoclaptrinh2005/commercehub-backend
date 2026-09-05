@@ -29,7 +29,7 @@ public class ProductReviewController {
 
         ProductReviewResponse response = reviewService.createReview(currentUser.getUser().getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Cảm ơn bạn đã để lại đánh giá!", response));
+                .body(ApiResponse.success(HttpStatus.CREATED.value(), "Cảm ơn bạn đã để lại đánh giá!", response));
     }
 
     @GetMapping("/product/{productId}")

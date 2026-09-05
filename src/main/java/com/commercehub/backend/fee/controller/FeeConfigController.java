@@ -22,7 +22,7 @@ import java.util.List;
  * để duy trì hệ thống.
  */
 @RestController
-@RequestMapping("/api/admin/fee-configs")
+@RequestMapping("/api/v1/admin/fee-configs")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
 public class FeeConfigController {

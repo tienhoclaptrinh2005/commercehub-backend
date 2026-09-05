@@ -23,7 +23,7 @@ public class CheckoutController {
     private final CheckoutService checkoutService;
     private final OrderService orderService;
 
-    @PostMapping("/checkout")
+    @PostMapping
     public ResponseEntity<ApiResponse<List<CheckoutOrderResponse>>> checkout(
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @RequestBody @Valid CheckoutRequest request) {

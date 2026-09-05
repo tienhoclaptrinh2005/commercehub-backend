@@ -1,5 +1,7 @@
 package com.commercehub.backend.admin.controller;
 
+import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.dispute.dto.request.AdminResolveDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
@@ -21,34 +23,33 @@ public class AdminDisputeController {
     private final DisputeResolutionService disputeResolutionService;
 
     @GetMapping
-    public ResponseEntity<Page<DisputeResponse>> list(
+    public ResponseEntity<ApiResponse<PageResponse<DisputeResponse>>> list(
             @RequestParam(required = false)
             String status,
             Pageable pageable
     ) {
 
-        return ResponseEntity.ok(
-                disputeResolutionService.getAll(
+        Page<DisputeResponse> disputes = disputeResolutionService.getAll(
                         status,
                         pageable
-                )
-        );
+                );
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(disputes)));
     }
 
     @GetMapping("/{disputeId}")
-    public ResponseEntity<DisputeResponse> detail(
+    public ResponseEntity<ApiResponse<DisputeResponse>> detail(
             @PathVariable Long disputeId
     ) {
 
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
                 disputeResolutionService.getById(
                         disputeId
                 )
-        );
+        ));
     }
 
     @PostMapping("/{disputeId}/resolve")
-    public ResponseEntity<DisputeResponse> resolve(
+    public ResponseEntity<ApiResponse<DisputeResponse>> resolve(
             @PathVariable Long disputeId,
             @Valid
             @RequestBody
@@ -58,12 +59,13 @@ public class AdminDisputeController {
         Long adminId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã giải quyết tranh chấp!",
                 disputeResolutionService.resolve(
                         adminId,
                         disputeId,
                         request
                 )
-        );
+        ));
     }
 }
