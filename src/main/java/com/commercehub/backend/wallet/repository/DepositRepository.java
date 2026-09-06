@@ -15,6 +15,8 @@ import java.util.Optional;
 public interface DepositRepository extends JpaRepository<Deposit, Long> {
     Optional<Deposit> findByTransactionCode(String transactionCode);
 
+    boolean existsByProviderTransactionId(String providerTransactionId);
+
     Page<Deposit> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
 

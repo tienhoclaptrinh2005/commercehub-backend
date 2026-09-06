@@ -38,6 +38,10 @@ auth:
     same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
     max-age-seconds: 604800
 
+
+#Local/development: SPRINGDOC_ENABLED=true.
+#CI: giữ true vì có contract test kiểm tra /v3/api-docs.
+#Production: nên đặt SPRINGDOC_ENABLED=false nếu không muốn công khai cấu trúc API.
 springdoc:
   api-docs:
     enabled: ${SPRINGDOC_ENABLED:true}
@@ -47,10 +51,16 @@ springdoc:
     tags-sorter: alpha
     display-request-duration: true
 
-vnpay:
-  hash-secret: ${VNPAY_HASH_SECRET:CHUOI_BI_MAT_CUA_BAN_DO_VNPAY_CAP}
-  tmn-code: ${VNPAY_TMN_CODE:MA_WEBSITE_VNPAY_CAP}
-  pay-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+sepay:
+  environment: ${SEPAY_ENVIRONMENT:sandbox}
+  merchant-id: ${SEPAY_MERCHANT_ID:replace-with-sepay-sandbox-merchant-id}
+  secret-key: ${SEPAY_SECRET_KEY:replace-with-sepay-sandbox-secret-key}
+  ipn-secret: ${SEPAY_IPN_SECRET:replace-with-sepay-sandbox-ipn-secret}
+  checkout-url: ${SEPAY_CHECKOUT_URL:https://pay-sandbox.sepay.vn/v1/checkout/init}
+  # SePay chỉ callback tới URL public. Khi test local, thay ba URL này bằng domain tunnel HTTPS.
+  success-url: ${SEPAY_SUCCESS_URL:http://localhost:3000/wallet/deposit?payment=success}
+  error-url: ${SEPAY_ERROR_URL:http://localhost:3000/wallet/deposit?payment=error}
+  cancel-url: ${SEPAY_CANCEL_URL:http://localhost:3000/wallet/deposit?payment=cancel}
 
 commercehub:
   jobs:
@@ -93,9 +103,14 @@ commercehub:
 #      same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
 #      max-age-seconds: ${AUTH_REFRESH_COOKIE_MAX_AGE:604800}
 #
-#  vnpay:
-#    hash-secret: ${VNPAY_HASH_SECRET}
-#    tmn-code: ${VNPAY_TMN_CODE}
-#    pay-url: ${VNPAY_PAY_URL}
+#  sepay:
+#    environment: ${SEPAY_ENVIRONMENT:production}
+#    merchant-id: ${SEPAY_MERCHANT_ID}
+#    secret-key: ${SEPAY_SECRET_KEY}
+#    ipn-secret: ${SEPAY_IPN_SECRET}
+#    checkout-url: ${SEPAY_CHECKOUT_URL:https://pay.sepay.vn/v1/checkout/init}
+#    success-url: ${SEPAY_SUCCESS_URL}
+#    error-url: ${SEPAY_ERROR_URL}
+#    cancel-url: ${SEPAY_CANCEL_URL}
 #
 #

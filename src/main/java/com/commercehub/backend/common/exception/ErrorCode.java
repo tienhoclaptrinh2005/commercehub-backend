@@ -74,7 +74,10 @@ public enum ErrorCode {
     INVALID_AMOUNT(400,"Số tiền không hợp lệ !" , HttpStatus.BAD_REQUEST),
     INSUFFICIENT_HOLD_BALANCE(400, "Số dư giữ không đủ ", HttpStatus.BAD_REQUEST),
     WALLET_INACTIVE(403, "Ví không hoạt động !", HttpStatus.FORBIDDEN),
-    DEPOSIT_AMOUNT_MISMATCH(400, "Số tiền VNPay báo về không khớp với số tiền của đơn nạp!", HttpStatus.BAD_REQUEST),
+    DEPOSIT_AMOUNT_MISMATCH(400, "Số tiền cổng thanh toán báo về không khớp với số tiền của đơn nạp!", HttpStatus.BAD_REQUEST),
+    INVALID_PAYMENT_NOTIFICATION(400, "Thông báo thanh toán không hợp lệ!", HttpStatus.BAD_REQUEST),
+    PAYMENT_WEBHOOK_UNAUTHORIZED(401, "Webhook thanh toán không được xác thực!", HttpStatus.UNAUTHORIZED),
+    PAYMENT_TRANSACTION_ALREADY_PROCESSED(409, "Giao dịch từ cổng thanh toán đã được xử lý!", HttpStatus.CONFLICT),
 
     //oder
     SHOP_SUSPENDED(403, "Gian hàng hiện đang bị tạm khóa, không thể đặt hàng!", HttpStatus.FORBIDDEN),

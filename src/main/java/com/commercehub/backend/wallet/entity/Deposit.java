@@ -32,10 +32,13 @@ public class Deposit {
     private BigDecimal amount;
 
     @Column(nullable = false, length = 30)
-    private String provider; // VNPAY, MOMO...
+    private String provider; // SEPAY, VNPAY (lịch sử), MOMO...
 
     @Column(name = "transaction_code", length = 100, unique = true)
     private String transactionCode;
+
+    @Column(name = "provider_transaction_id", length = 100)
+    private String providerTransactionId;
 
     @Column(name = "idempotency_key", length = 100, unique = true)
     private String idempotencyKey;

@@ -78,9 +78,12 @@ public class OpenApiConfig {
             if (path.startsWith("/api/v1/product-reviews/")) {
                 return true;
             }
-            return path.equals("/api/v1/wallet/deposit/vnpay-ipn");
+            return false;
         }
 
-        return "POST".equals(method) && path.equals("/api/v1/products/search");
+        return "POST".equals(method) && (
+                path.equals("/api/v1/products/search")
+                        || path.equals("/api/v1/wallet/deposit/sepay-ipn")
+        );
     }
 }

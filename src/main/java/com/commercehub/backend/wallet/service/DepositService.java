@@ -66,7 +66,7 @@ public class DepositService {
                 .user(user)
                 .wallet(wallet)
                 .amount(amount)
-                .provider("VNPAY")
+                .provider("SEPAY")
                 .transactionCode(txCode)
                 .status("PENDING")
                 .build();
@@ -75,16 +75,15 @@ public class DepositService {
     }
 
     // ==========================================
-    // VNPay TRẢ VỀ THÀNH CÔNG
+    // SePay IPN TRẢ VỀ THÀNH CÔNG
     // ==========================================
     @Transactional
-    public void processSuccess(String transactionCode, BigDecimal paidAmount) {
-        // ĐÃ SỬA THÀNH findByTransactionCodeWithLock ĐỂ TRÁNH LỖI NHÂN ĐÔI TIỀN
+    public void processSuccess(String transactionCode, BigDecimal paidAmount, String providerTransactionId) {
         Deposit deposit = depositRepository.findByTransactionCodeWithLock(transactionCode)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
         if (!"PENDING".equals(deposit.getStatus())) {
-            return; // Idempotency check: Tránh cộng tiền 2 lần nếu VNPay bắn IPN nhiều lần
+            return; // Idempotency check: tránh cộng tiền hai lần nếu SePay gửi lại IPN.
         }
 
         // ĐỐI CHIẾU SỐ TIỀN: chỉ cộng ví đúng số tiền user đã đăng ký nạp.
@@ -93,10 +92,17 @@ public class DepositService {
             throw new AppException(ErrorCode.DEPOSIT_AMOUNT_MISMATCH);
         }
 
-        // Cập nhật trạng thái
+        if (providerTransactionId == null || providerTransactionId.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_PAYMENT_NOTIFICATION);
+        }
+        if (depositRepository.existsByProviderTransactionId(providerTransactionId)) {
+            throw new AppException(ErrorCode.PAYMENT_TRANSACTION_ALREADY_PROCESSED);
+        }
+
+        deposit.setProviderTransactionId(providerTransactionId);
         deposit.setStatus("SUCCESS");
         deposit.setProcessedAt(OffsetDateTime.now());
-        depositRepository.save(deposit);
+        depositRepository.saveAndFlush(deposit);
 
         // Cộng tiền vào ví User
         walletService.systemCreditBalance(
@@ -109,11 +115,10 @@ public class DepositService {
     }
 
     // ==========================================
-    // VNPay TRẢ VỀ THẤT BẠI
+    // SePay thông báo giao dịch bị hủy
     // ==========================================
     @Transactional
     public void processFailed(String transactionCode) {
-        // ĐÃ SỬA THÀNH findByTransactionCodeWithLock
         Deposit deposit = depositRepository.findByTransactionCodeWithLock(transactionCode)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 

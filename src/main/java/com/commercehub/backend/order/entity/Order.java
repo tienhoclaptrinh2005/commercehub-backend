@@ -54,7 +54,7 @@ public class Order {
     private String paymentStatus; // UNPAID, PAID, REFUNDED, PARTIAL_REFUND
 
     @Column(name = "payment_method", nullable = false, length = 30)
-    private String paymentMethod; // WALLET, VNPAY, MOMO, ZALOPAY
+    private String paymentMethod; // Đơn mua hàng hiện chỉ thanh toán bằng WALLET.
 
     @Column(name = "subtotal_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal subtotalAmount;
