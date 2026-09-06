@@ -83,7 +83,7 @@ public class OpenApiConfig {
 
         return "POST".equals(method) && (
                 path.equals("/api/v1/products/search")
-                        || path.equals("/api/v1/wallet/deposit/sepay-ipn")
+                        || path.equals("/api/v1/payments/sepay/webhook")
         );
     }
 }

@@ -78,6 +78,10 @@ public enum ErrorCode {
     INVALID_PAYMENT_NOTIFICATION(400, "Thông báo thanh toán không hợp lệ!", HttpStatus.BAD_REQUEST),
     PAYMENT_WEBHOOK_UNAUTHORIZED(401, "Webhook thanh toán không được xác thực!", HttpStatus.UNAUTHORIZED),
     PAYMENT_TRANSACTION_ALREADY_PROCESSED(409, "Giao dịch từ cổng thanh toán đã được xử lý!", HttpStatus.CONFLICT),
+    DEPOSIT_ACTIVE_EXISTS(409, "Bạn đang có một mã QR nạp tiền còn hiệu lực. Vui lòng hoàn tất hoặc chờ mã hết hạn!", HttpStatus.CONFLICT),
+    DEPOSIT_CREATE_TOO_FAST(429, "Bạn thao tác quá nhanh. Vui lòng chờ vài giây rồi thử lại!", HttpStatus.TOO_MANY_REQUESTS),
+    DEPOSIT_RATE_LIMITED(429, "Bạn đã tạo quá nhiều mã QR trong 15 phút. Vui lòng thử lại sau!", HttpStatus.TOO_MANY_REQUESTS),
+    DEPOSIT_DAILY_LIMIT_REACHED(429, "Bạn đã đạt giới hạn tạo mã QR nạp tiền trong ngày!", HttpStatus.TOO_MANY_REQUESTS),
 
     //oder
     SHOP_SUSPENDED(403, "Gian hàng hiện đang bị tạm khóa, không thể đặt hàng!", HttpStatus.FORBIDDEN),

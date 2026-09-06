@@ -111,7 +111,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/verify-email",
                                 "/api/v1/users/levels",
                                 "/error",
-                                "/api/v1/wallet/deposit/sepay-ipn"
+                                "/api/v1/payments/sepay/webhook"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/{username}").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()

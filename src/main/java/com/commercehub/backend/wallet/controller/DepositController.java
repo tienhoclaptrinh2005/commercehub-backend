@@ -4,28 +4,27 @@ import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.wallet.dto.request.DepositRequest;
-import com.commercehub.backend.wallet.dto.request.SePayIpnRequest;
+import com.commercehub.backend.wallet.dto.response.DepositQrResponse;
 import com.commercehub.backend.wallet.dto.response.DepositResponse;
-import com.commercehub.backend.wallet.dto.response.SePayCheckoutResponse;
 import com.commercehub.backend.wallet.service.DepositService;
-import com.commercehub.backend.wallet.service.SePayGatewayService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
-
-@Slf4j
 @RestController
-@RequestMapping("/api/v1/wallet/deposit")
+@RequestMapping("/api/v1/wallet/deposits")
 @RequiredArgsConstructor
 public class DepositController {
 
     private final DepositService depositService;
-    private final SePayGatewayService sePayGatewayService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<DepositResponse>>> getDepositHistory(
@@ -37,30 +36,18 @@ public class DepositController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<SePayCheckoutResponse>> createDepositCheckout(
+    public ResponseEntity<ApiResponse<DepositQrResponse>> createDeposit(
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody DepositRequest request) {
-
-        String txCode = "SEPAY_" + UUID.randomUUID().toString().replace("-", "");
-
-        SePayCheckoutResponse checkout = sePayGatewayService.createCheckout(
-                currentUser.getId(),
-                request.getAmount(),
-                txCode
-        );
-        depositService.createPendingDeposit(currentUser.getId(), request.getAmount(), txCode);
-
-        return ResponseEntity.ok(ApiResponse.success("Tạo phiên thanh toán SePay thành công", checkout));
+        DepositQrResponse deposit = depositService.createDeposit(currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Tạo mã QR nạp tiền thành công", deposit));
     }
 
-    @PostMapping("/sepay-ipn")
-    public ResponseEntity<ApiResponse<Void>> sePayIpnCallback(
-            @RequestHeader(value = "X-Secret-Key", required = false) String secretKey,
-            @Valid @RequestBody SePayIpnRequest request) {
-        sePayGatewayService.processIpn(secretKey, request);
-        log.info("SePay IPN processed - invoice: {}, type: {}",
-                request.getOrder().getOrderInvoiceNumber(),
-                request.getNotificationType());
-        return ResponseEntity.ok(ApiResponse.success("IPN processed", null));
+    @GetMapping("/{transactionCode}")
+    public ResponseEntity<ApiResponse<DepositQrResponse>> getDepositStatus(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable String transactionCode) {
+        DepositQrResponse deposit = depositService.getMyDepositStatus(currentUser.getId(), transactionCode);
+        return ResponseEntity.ok(ApiResponse.success("Lấy trạng thái nạp tiền thành công", deposit));
     }
 }

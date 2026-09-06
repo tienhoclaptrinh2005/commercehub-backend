@@ -38,13 +38,16 @@ class OpenApiContractTest {
         assertTrue(paths.has("/api/v1/seller/products/assets/inventory"));
         assertTrue(paths.has("/api/v1/admin/fee-configs"));
         assertTrue(paths.has("/api/v1/seller/fees"));
-        assertTrue(paths.has("/api/v1/wallet/deposit/sepay-ipn"));
+        assertTrue(paths.has("/api/v1/wallet/deposits"));
+        assertTrue(paths.has("/api/v1/wallet/deposits/{transactionCode}"));
+        assertTrue(paths.has("/api/v1/payments/sepay/webhook"));
 
         assertFalse(paths.has("/api/v1/checkout/checkout"));
         assertFalse(paths.has("/api/v1/seller/products/products/assets/inventory"));
         assertFalse(paths.has("/api/admin/fee-configs"));
         assertFalse(paths.has("/api/seller/fees"));
         assertFalse(paths.has("/api/v1/wallet/deposit/vnpay-ipn"));
+        assertFalse(paths.has("/api/v1/wallet/deposit/sepay-ipn"));
     }
 
     @Test

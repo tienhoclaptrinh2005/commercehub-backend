@@ -44,7 +44,13 @@ public class Deposit {
     private String idempotencyKey;
 
     @Column(nullable = false, length = 30)
-    private String status; // PENDING, SUCCESS, FAILED
+    private String status; // PENDING, SUCCESS, FAILED, EXPIRED, REVIEW_REQUIRED
+
+    @Column(name = "expires_at", nullable = false)
+    private OffsetDateTime expiresAt;
+
+    @Column(name = "paid_at")
+    private OffsetDateTime paidAt;
 
     @Column(name = "processed_at")
     private OffsetDateTime processedAt;

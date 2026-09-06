@@ -12,14 +12,16 @@ import java.time.OffsetDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DepositResponse {
+public class DepositQrResponse {
     private Long id;
-    private BigDecimal amount;
-    private String provider;
     private String transactionCode;
+    private String paymentCode;
+    private BigDecimal amount;
     private String status;
+    private String qrUrl;
+    private String bankCode;
+    private String bankAccountNumber;
+    private String accountName;
     private OffsetDateTime expiresAt;
     private OffsetDateTime paidAt;
-    private OffsetDateTime processedAt;
-    private OffsetDateTime createdAt;
 }

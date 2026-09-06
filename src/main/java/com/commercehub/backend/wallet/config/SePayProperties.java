@@ -12,11 +12,13 @@ import org.springframework.stereotype.Component;
 public class SePayProperties {
 
     private String environment;
-    private String merchantId;
-    private String secretKey;
-    private String ipnSecret;
-    private String checkoutUrl;
-    private String successUrl;
-    private String errorUrl;
-    private String cancelUrl;
+    private String webhookSecret;
+    private String bankCode;
+    private String bankAccountNumber;
+    private String accountName;
+    private String qrBaseUrl;
+    private int depositTtlMinutes = 15;
+    private int createCooldownSeconds = 10;
+    private int maxCreatesPerFifteenMinutes = 5;
+    private int maxCreatesPerDay = 20;
 }
