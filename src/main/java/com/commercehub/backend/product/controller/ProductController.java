@@ -20,6 +20,13 @@ public class ProductController {
     private final ProductSearchService productSearchService;
     private final ProductService productService;
 
+    @GetMapping("/best-selling")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> getBestSellingProducts(
+            @RequestParam(defaultValue = "4") int limit) {
+        List<ProductResponse> responses = productService.getBestSellingProducts(limit);
+        return ResponseEntity.ok(ApiResponse.success("Lấy sản phẩm bán chạy thành công!", responses));
+    }
+
     @GetMapping("/slug/{slug}")
     public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductBySlug(@PathVariable String slug) {
         ProductDetailResponse response = productService.getProductBySlug(slug);

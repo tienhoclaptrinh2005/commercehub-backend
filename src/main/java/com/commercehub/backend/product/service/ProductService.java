@@ -32,6 +32,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProductService {
 
+    private static final int DEFAULT_BEST_SELLING_LIMIT = 4;
+    private static final int MAX_BEST_SELLING_LIMIT = 12;
+
     private final ProductRepository productRepository;
     private final ShopRepository shopRepository;
     private final CategoryRepository categoryRepository;
@@ -209,6 +212,28 @@ public class ProductService {
                         ProductReviewService.RatingSummary.unrated()
                 )
         )));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductResponse> getBestSellingProducts(int limit) {
+        int validLimit = limit <= 0
+                ? DEFAULT_BEST_SELLING_LIMIT
+                : Math.min(limit, MAX_BEST_SELLING_LIMIT);
+
+        List<Product> products = productRepository.findBestSellingActiveProducts(
+                org.springframework.data.domain.PageRequest.of(0, validLimit)
+        );
+        Map<Long, ProductReviewService.RatingSummary> ratings = loadRatingSummaries(products);
+
+        return products.stream()
+                .map(product -> mapToProductResponse(
+                        product,
+                        ratings.getOrDefault(
+                                product.getId(),
+                                ProductReviewService.RatingSummary.unrated()
+                        )
+                ))
+                .toList();
     }
 
     private ProductResponse mapToProductResponse(Product product) {

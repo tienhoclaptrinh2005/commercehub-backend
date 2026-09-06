@@ -77,6 +77,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpe
             "AND p.category.parent.isActive = true")
     Page<Product> findActiveProductsFromActiveShops(Pageable pageable);
 
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "category"})
+    @Query("SELECT p FROM Product p JOIN p.shop.owner.roles ownerRole " +
+            "WHERE p.status = 'ACTIVE' " +
+            "AND p.soldCount > 0 " +
+            "AND p.shop.status = 'ACTIVE' " +
+            "AND p.shop.owner.status = 'ACTIVE' " +
+            "AND ownerRole.name = 'SELLER' " +
+            "AND p.category.isActive = true " +
+            "AND p.category.parent.isActive = true " +
+            "ORDER BY p.soldCount DESC, p.createdAt DESC, p.id DESC")
+    List<Product> findBestSellingActiveProducts(Pageable pageable);
+
     @Modifying
     @Query(value = """
             UPDATE products product
