@@ -1,10 +1,12 @@
 package com.commercehub.backend.product.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.product.dto.request.CreateProductRequest;
 import com.commercehub.backend.product.dto.request.UpdateProductRequest;
 import com.commercehub.backend.product.dto.request.UploadDigitalAssetRequest;
 import com.commercehub.backend.product.dto.response.ProductResponse;
+import com.commercehub.backend.product.dto.response.SellerProductListItemResponse;
 import com.commercehub.backend.product.service.DigitalAssetService;
 import com.commercehub.backend.product.service.ProductService;
 import com.commercehub.backend.security.CustomUserDetails;
@@ -24,6 +26,28 @@ public class SellerProductController {
 
     private final ProductService productService;
     private final DigitalAssetService digitalAssetService;
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<SellerProductListItemResponse>>> getMyProducts(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String deliveryType,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        PageResponse<SellerProductListItemResponse> response = productService.getSellerProducts(
+                currentUser.getId(),
+                keyword,
+                categoryId,
+                deliveryType,
+                status,
+                page,
+                size
+        );
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách sản phẩm của gian hàng thành công!", response));
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('SELLER')")

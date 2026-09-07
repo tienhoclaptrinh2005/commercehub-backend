@@ -3,6 +3,7 @@ package com.commercehub.backend;
 import com.commercehub.backend.product.dto.request.CreateProductRequest;
 import com.commercehub.backend.product.dto.request.CreateVariantRequest;
 import com.commercehub.backend.auth.dto.response.AuthResponse;
+import com.commercehub.backend.dashboard.repository.SellerDashboardRepository;
 import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.product.service.ProductReviewService;
@@ -62,6 +63,9 @@ class CommercehubBackendApplicationTests {
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
+
+	@Autowired
+	private SellerDashboardRepository sellerDashboardRepository;
 
 	@Test
 	void contextLoads() {
@@ -204,6 +208,88 @@ class CommercehubBackendApplicationTests {
 				((BigDecimal) original.get("rating_avg")).stripTrailingZeros(),
 				((BigDecimal) restored.get("rating_avg")).stripTrailingZeros()
 		);
+	}
+
+	@Test
+	@Transactional
+	void sellerDashboardNativeQueriesExecuteAgainstPostgres() {
+		List<Long> shopIds = jdbcTemplate.queryForList(
+				"SELECT DISTINCT shop_id FROM orders ORDER BY shop_id LIMIT 1",
+				Long.class
+		);
+		assumeFalse(shopIds.isEmpty());
+		Long shopId = shopIds.getFirst();
+		OffsetDateTime fromTime = OffsetDateTime.parse("2000-01-01T00:00:00+07:00");
+		OffsetDateTime toTime = OffsetDateTime.now().plusDays(1);
+
+		var revenueRows = assertDoesNotThrow(() -> sellerDashboardRepository.findMonthlyRevenue(
+				shopId,
+				fromTime,
+				toTime
+		));
+		assertFalse(revenueRows.isEmpty());
+		assertTrue(revenueRows.getFirst().getDay() >= 1);
+		assertTrue(revenueRows.getFirst().getOrderCount() >= 1);
+		assertTrue(revenueRows.getFirst().getRevenue().compareTo(BigDecimal.ZERO) >= 0);
+
+		var statusRows = assertDoesNotThrow(() -> sellerDashboardRepository.findMonthlyOrderStatusCounts(
+				shopId,
+				fromTime,
+				toTime
+		));
+		assertFalse(statusRows.isEmpty());
+		assertFalse(statusRows.getFirst().getStatus().isBlank());
+		assertTrue(statusRows.getFirst().getCount() >= 1);
+
+		var recentOrders = assertDoesNotThrow(() -> sellerDashboardRepository.findRecentOrders(shopId));
+		assertFalse(recentOrders.isEmpty());
+		assertTrue(recentOrders.size() <= 5);
+		assertEquals(shopId, jdbcTemplate.queryForObject(
+				"SELECT shop_id FROM orders WHERE id = ?",
+				Long.class,
+				recentOrders.getFirst().getOrderId()
+		));
+		assertFalse(recentOrders.getFirst().getOrderCode().isBlank());
+		assertFalse(recentOrders.getFirst().getProductName().isBlank());
+		assertTrue(recentOrders.getFirst().getItemCount() >= 1);
+		assertTrue(recentOrders.getFirst().getPlacedAt().isBefore(java.time.Instant.now().plusSeconds(60)));
+	}
+
+	@Test
+	@Transactional
+	void sellerProductManagementQueriesAreScopedAndExecutable() {
+		List<Long> sellerIds = jdbcTemplate.queryForList(
+				"""
+				SELECT DISTINCT shop.owner_id
+				FROM shops shop
+				JOIN products product ON product.shop_id = shop.id
+				WHERE product.status <> 'DELETED'
+				ORDER BY shop.owner_id
+				LIMIT 1
+				""",
+				Long.class
+		);
+		assumeFalse(sellerIds.isEmpty());
+		Long sellerId = sellerIds.getFirst();
+
+		var products = assertDoesNotThrow(() -> productRepository.findSellerProducts(
+				sellerId,
+				"",
+				null,
+				null,
+				null,
+				PageRequest.of(0, 10)
+		));
+		assertFalse(products.isEmpty());
+		assertFalse(products.getContent().getFirst().getCategory().getName().isBlank());
+
+		List<Long> productIds = products.getContent().stream().map(product -> product.getId()).toList();
+		var inventory = assertDoesNotThrow(() -> productRepository.findActiveVariantStats(productIds));
+		inventory.forEach(row -> {
+			assertTrue(productIds.contains(row.getProductId()));
+			assertTrue(row.getMinPrice().compareTo(BigDecimal.ZERO) > 0);
+			assertTrue(row.getStockCount() >= 0);
+		});
 	}
 
 	@Test

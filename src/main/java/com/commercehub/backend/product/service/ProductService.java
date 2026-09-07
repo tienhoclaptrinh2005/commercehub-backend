@@ -10,6 +10,7 @@ import com.commercehub.backend.product.dto.request.CreateProductRequest;
 import com.commercehub.backend.product.dto.request.UpdateProductRequest;
 import com.commercehub.backend.product.dto.response.ProductDetailResponse;
 import com.commercehub.backend.product.dto.response.ProductResponse;
+import com.commercehub.backend.product.dto.response.SellerProductListItemResponse;
 import com.commercehub.backend.product.entity.Product;
 import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.mapper.ProductMapper;
@@ -25,6 +26,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.Set;
 import java.util.UUID;
 
@@ -34,6 +37,9 @@ public class ProductService {
 
     private static final int DEFAULT_BEST_SELLING_LIMIT = 4;
     private static final int MAX_BEST_SELLING_LIMIT = 12;
+    private static final int MAX_SELLER_PRODUCT_PAGE_SIZE = 50;
+    private static final int MAX_SELLER_PRODUCT_PAGE = 100;
+    private static final int MAX_SELLER_PRODUCT_KEYWORD_LENGTH = 100;
 
     private final ProductRepository productRepository;
     private final ShopRepository shopRepository;
@@ -236,6 +242,90 @@ public class ProductService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<SellerProductListItemResponse> getSellerProducts(
+            Long sellerId,
+            String keyword,
+            Long categoryId,
+            String deliveryType,
+            String status,
+            int page,
+            int size
+    ) {
+        if (page < 0 || page > MAX_SELLER_PRODUCT_PAGE || size < 1 || size > MAX_SELLER_PRODUCT_PAGE_SIZE) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+        if (categoryId != null && categoryId <= 0) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        String normalizedKeyword = normalizeOptionalText(keyword);
+        if (normalizedKeyword != null && normalizedKeyword.length() > MAX_SELLER_PRODUCT_KEYWORD_LENGTH) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+        if (normalizedKeyword == null) {
+            normalizedKeyword = "";
+        }
+        String normalizedDeliveryType = normalizeFilterValue(
+                deliveryType,
+                Set.of("INSTANT", "PRE_ORDER")
+        );
+        String normalizedStatus = normalizeFilterValue(
+                status,
+                Set.of("ACTIVE", "INACTIVE")
+        );
+
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                page,
+                size,
+                org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Order.desc("createdAt"),
+                        org.springframework.data.domain.Sort.Order.desc("id")
+                )
+        );
+        org.springframework.data.domain.Page<Product> products = productRepository.findSellerProducts(
+                sellerId,
+                normalizedKeyword,
+                categoryId,
+                normalizedDeliveryType,
+                normalizedStatus,
+                pageable
+        );
+
+        List<Long> productIds = products.getContent().stream().map(Product::getId).toList();
+        Map<Long, ProductRepository.SellerProductInventoryStats> inventoryByProduct = productIds.isEmpty()
+                ? Map.of()
+                : productRepository.findActiveVariantStats(productIds).stream()
+                .collect(Collectors.toMap(
+                        ProductRepository.SellerProductInventoryStats::getProductId,
+                        Function.identity()
+                ));
+
+        return PageResponse.of(products.map(product -> {
+            ProductRepository.SellerProductInventoryStats inventory = inventoryByProduct.get(product.getId());
+            return new SellerProductListItemResponse(
+                    product.getId(),
+                    product.getName(),
+                    product.getSlug(),
+                    product.getCategory().getId(),
+                    product.getCategory().getName(),
+                    product.getProductType(),
+                    product.getDeliveryType(),
+                    product.getStatus(),
+                    product.getSoldCount() == null ? 0L : product.getSoldCount(),
+                    product.getThumbnailUrl(),
+                    inventory == null || inventory.getMinPrice() == null
+                            ? BigDecimal.ZERO
+                            : inventory.getMinPrice(),
+                    inventory == null || inventory.getStockCount() == null
+                            ? 0L
+                            : inventory.getStockCount(),
+                    product.getCreatedAt(),
+                    product.getUpdatedAt()
+            );
+        }));
+    }
+
     private ProductResponse mapToProductResponse(Product product) {
         return mapToProductResponse(
                 product,
@@ -269,6 +359,25 @@ public class ProductService {
         return productReviewService.getRatingSummaries(
                 products.stream().map(Product::getId).toList()
         );
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private String normalizeFilterValue(String value, Set<String> allowedValues) {
+        String normalized = normalizeOptionalText(value);
+        if (normalized == null) {
+            return null;
+        }
+        normalized = normalized.toUpperCase(Locale.ROOT);
+        if (!allowedValues.contains(normalized)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+        return normalized;
     }
 
     private Category getSellableCategory(Long categoryId) {

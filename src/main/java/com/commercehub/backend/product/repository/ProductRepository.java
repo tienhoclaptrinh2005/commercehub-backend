@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.math.BigDecimal;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpecificationExecutor<Product> {
@@ -21,6 +22,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpe
         Long getShopId();
         Long getActiveProductCount();
         Long getSoldProductCount();
+    }
+
+    interface SellerProductInventoryStats {
+        Long getProductId();
+        BigDecimal getMinPrice();
+        Long getStockCount();
     }
 
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "variants", "preOrderConfig"})
@@ -63,6 +70,68 @@ public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpe
 
     boolean existsBySlug(String slug);
     long countByShopIdAndStatusNot(Long shopId, String status);
+    long countByShopIdAndStatus(Long shopId, String status);
+
+    @EntityGraph(attributePaths = {"category"})
+    @Query(value = """
+            SELECT product
+            FROM Product product
+            JOIN product.shop shop
+            WHERE shop.owner.id = :sellerId
+              AND product.status <> 'DELETED'
+              AND (
+                    :keyword = ''
+                    OR LOWER(product.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(COALESCE(product.shortDescription, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
+              AND (
+                    :categoryId IS NULL
+                    OR product.category.id = :categoryId
+                    OR product.category.parent.id = :categoryId
+              )
+              AND (:deliveryType IS NULL OR product.deliveryType = :deliveryType)
+              AND (:status IS NULL OR product.status = :status)
+            """,
+            countQuery = """
+            SELECT COUNT(product)
+            FROM Product product
+            JOIN product.shop shop
+            WHERE shop.owner.id = :sellerId
+              AND product.status <> 'DELETED'
+              AND (
+                    :keyword = ''
+                    OR LOWER(product.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(COALESCE(product.shortDescription, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
+              AND (
+                    :categoryId IS NULL
+                    OR product.category.id = :categoryId
+                    OR product.category.parent.id = :categoryId
+              )
+              AND (:deliveryType IS NULL OR product.deliveryType = :deliveryType)
+              AND (:status IS NULL OR product.status = :status)
+            """)
+    Page<Product> findSellerProducts(
+            @Param("sellerId") Long sellerId,
+            @Param("keyword") String keyword,
+            @Param("categoryId") Long categoryId,
+            @Param("deliveryType") String deliveryType,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT variant.product.id AS productId,
+                   MIN(variant.price) AS minPrice,
+                   COALESCE(SUM(variant.stockCount), 0L) AS stockCount
+            FROM ProductVariant variant
+            WHERE variant.product.id IN :productIds
+              AND variant.status = 'ACTIVE'
+            GROUP BY variant.product.id
+            """)
+    List<SellerProductInventoryStats> findActiveVariantStats(
+            @Param("productIds") List<Long> productIds
+    );
 
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "preOrderConfig"})
     Page<Product> findByStatus(String status, Pageable pageable);
