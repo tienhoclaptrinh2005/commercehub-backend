@@ -48,7 +48,7 @@ public class CreateProductRequest {
 
 
     @NotEmpty(message = "Sản phẩm phải có ít nhất 1 gói/biến thể!")
-    @Size(max = 50, message = "Mỗi sản phẩm tối đa 50 biến thể")
+    @Size(max = 5, message = "Mỗi sản phẩm tối đa 5 biến thể")
     @Valid
     List<CreateVariantRequest> variants;
 

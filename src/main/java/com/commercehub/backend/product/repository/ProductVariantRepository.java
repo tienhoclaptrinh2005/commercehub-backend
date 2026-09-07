@@ -13,6 +13,8 @@ import java.util.Collection;
 
 @Repository
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
+    long countByProductId(Long productId);
+
     @EntityGraph(attributePaths = {"product", "product.shop", "product.shop.owner", "product.shop.owner.roles"})
     @Query("SELECT DISTINCT v FROM ProductVariant v WHERE v.id IN :ids")
     List<ProductVariant> findCheckoutVariants(@Param("ids") Collection<Long> ids);

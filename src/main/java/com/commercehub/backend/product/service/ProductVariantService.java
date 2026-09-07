@@ -20,6 +20,8 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class ProductVariantService {
 
+    private static final long MAX_PRODUCT_VARIANTS = 5L;
+
     private final ProductVariantRepository variantRepository;
     private final ProductRepository productRepository;
 
@@ -29,10 +31,14 @@ public class ProductVariantService {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
 
-        Product product = productRepository.findById(request.getProductId())
+        Product product = productRepository.findByIdForVariantUpdate(request.getProductId())
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
 
         validateSellerCanEdit(product, sellerId);
+
+        if (variantRepository.countByProductId(product.getId()) >= MAX_PRODUCT_VARIANTS) {
+            throw new AppException(ErrorCode.PRODUCT_VARIANT_LIMIT_REACHED);
+        }
 
         String normalizedName = request.getName().trim();
         if (variantRepository.existsByNormalizedName(product.getId(), normalizedName)) {

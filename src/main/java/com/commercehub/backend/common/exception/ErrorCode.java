@@ -53,6 +53,7 @@ public enum ErrorCode {
     PRODUCT_NOT_FOUND(404, "Sản phẩm không tồn tại hoặc đã bị xóa!", HttpStatus.NOT_FOUND),
     PRODUCT_LIMIT_REACHED(403, "Gian hàng của bạn đã đạt giới hạn số lượng sản phẩm tối đa cho phép của cấp độ hiện tại!", HttpStatus.FORBIDDEN),
     VARIANT_ALREADY_EXISTS(400, "Tên gói/biến thể đã tồn tại trong sản phẩm này!", HttpStatus.BAD_REQUEST),
+    PRODUCT_VARIANT_LIMIT_REACHED(400, "Mỗi sản phẩm chỉ được tạo tối đa 5 biến thể!", HttpStatus.BAD_REQUEST),
     VARIANT_INVALID_STATUS(400, "Trạng thái biến thể không hợp lệ! Chỉ chấp nhận ACTIVE hoặc INACTIVE.", HttpStatus.BAD_REQUEST),
     PRE_ORDER_CONFIG_NOT_FOUND(404, "Chưa thiết lập cấu hình đặt trước!", HttpStatus.NOT_FOUND),
     RECORD_NOT_FOUND(404 , "Không tìm thấy bản ghi!", HttpStatus.NOT_FOUND),

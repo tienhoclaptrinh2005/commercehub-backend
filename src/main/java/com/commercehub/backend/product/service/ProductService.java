@@ -11,6 +11,7 @@ import com.commercehub.backend.product.dto.request.UpdateProductRequest;
 import com.commercehub.backend.product.dto.response.ProductDetailResponse;
 import com.commercehub.backend.product.dto.response.ProductResponse;
 import com.commercehub.backend.product.dto.response.SellerProductListItemResponse;
+import com.commercehub.backend.product.entity.PreOrderConfig;
 import com.commercehub.backend.product.entity.Product;
 import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.mapper.ProductMapper;
@@ -40,6 +41,7 @@ public class ProductService {
     private static final int MAX_SELLER_PRODUCT_PAGE_SIZE = 50;
     private static final int MAX_SELLER_PRODUCT_PAGE = 100;
     private static final int MAX_SELLER_PRODUCT_KEYWORD_LENGTH = 100;
+    private static final int MAX_PRODUCT_VARIANTS = 5;
 
     private final ProductRepository productRepository;
     private final ShopRepository shopRepository;
@@ -72,9 +74,28 @@ public class ProductService {
 
         Category category = getSellableCategory(request.getCategoryId());
 
+        if (request.getVariants() == null || request.getVariants().isEmpty()) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+        if (request.getVariants().size() > MAX_PRODUCT_VARIANTS) {
+            throw new AppException(ErrorCode.PRODUCT_VARIANT_LIMIT_REACHED);
+        }
+
         Product product = productMapper.toEntity(request);
         product.setShop(shop);
         product.setCategory(category);
+
+        // Mọi sản phẩm đặt hàng luôn có cấu hình mặc định ngay trong cùng
+        // transaction tạo sản phẩm. Nhờ vậy trang mua hàng không rơi vào trạng
+        // thái đã mở bán nhưng lại thiếu thông tin thời gian xử lý.
+        if ("PRE_ORDER".equals(request.getDeliveryType())) {
+            PreOrderConfig preOrderConfig = PreOrderConfig.builder()
+                    .product(product)
+                    .maxProcessingHours(24)
+                    .autoRejectIfUnavailable(false)
+                    .build();
+            product.setPreOrderConfig(preOrderConfig);
+        }
 
         String baseSlug = SlugUtils.toSlug(request.getName());
         String generatedSlug = baseSlug + "-" + UUID.randomUUID().toString().substring(0, 6);
