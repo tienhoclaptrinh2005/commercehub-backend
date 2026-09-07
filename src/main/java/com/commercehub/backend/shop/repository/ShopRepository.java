@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -97,6 +98,45 @@ public interface ShopRepository extends JpaRepository<Shop, Long> {
             @Param("keyword") String keyword,
             @Param("categoryId") Long categoryId,
             Pageable pageable
+    );
+
+    @Modifying
+    @Query(value = """
+            UPDATE shops
+            SET rating_avg = ROUND(
+                        CAST((COALESCE(rating_sum, 0) + :rating) AS NUMERIC)
+                        / (COALESCE(rating_count, 0) + 1),
+                        2
+                    ),
+                rating_sum = COALESCE(rating_sum, 0) + :rating,
+                rating_count = COALESCE(rating_count, 0) + 1,
+                updated_at = NOW()
+            WHERE id = :shopId
+            """, nativeQuery = true)
+    int addVisibleRating(
+            @Param("shopId") Long shopId,
+            @Param("rating") int rating
+    );
+
+    @Modifying
+    @Query(value = """
+            UPDATE shops
+            SET rating_avg = CASE
+                    WHEN COALESCE(rating_count, 0) <= 1 THEN 0
+                    ELSE ROUND(
+                        CAST(GREATEST(COALESCE(rating_sum, 0) - :rating, 0) AS NUMERIC)
+                        / (rating_count - 1),
+                        2
+                    )
+                END,
+                rating_sum = GREATEST(COALESCE(rating_sum, 0) - :rating, 0),
+                rating_count = GREATEST(COALESCE(rating_count, 0) - 1, 0),
+                updated_at = NOW()
+            WHERE id = :shopId
+            """, nativeQuery = true)
+    int removeVisibleRating(
+            @Param("shopId") Long shopId,
+            @Param("rating") int rating
     );
 
 

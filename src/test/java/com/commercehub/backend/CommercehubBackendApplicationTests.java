@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -57,6 +59,9 @@ class CommercehubBackendApplicationTests {
 
 	@Autowired
 	private ObjectMapper objectMapper;
+
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
 
 	@Test
 	void contextLoads() {
@@ -178,6 +183,31 @@ class CommercehubBackendApplicationTests {
 
 	@Test
 	@Transactional
+	void shopRatingCountersAreUpdatedAtomically() {
+		var shops = shopRepository.findAll(PageRequest.of(0, 1));
+		assumeFalse(shops.isEmpty());
+		Long shopId = shops.getContent().getFirst().getId();
+		Map<String, Object> original = loadShopRating(shopId);
+		long originalCount = ((Number) original.get("rating_count")).longValue();
+		long originalSum = ((Number) original.get("rating_sum")).longValue();
+
+		assertEquals(1, shopRepository.addVisibleRating(shopId, 4));
+		Map<String, Object> updated = loadShopRating(shopId);
+		assertEquals(originalCount + 1, ((Number) updated.get("rating_count")).longValue());
+		assertEquals(originalSum + 4, ((Number) updated.get("rating_sum")).longValue());
+
+		assertEquals(1, shopRepository.removeVisibleRating(shopId, 4));
+		Map<String, Object> restored = loadShopRating(shopId);
+		assertEquals(originalCount, ((Number) restored.get("rating_count")).longValue());
+		assertEquals(originalSum, ((Number) restored.get("rating_sum")).longValue());
+		assertEquals(
+				((BigDecimal) original.get("rating_avg")).stripTrailingZeros(),
+				((BigDecimal) restored.get("rating_avg")).stripTrailingZeros()
+		);
+	}
+
+	@Test
+	@Transactional
 	void banningAndUnbanningShopDynamicallyHidesAndRestoresProducts() {
 		var products = productRepository.findActiveProductsFromActiveShops(PageRequest.of(0, 1));
 		assumeFalse(products.isEmpty());
@@ -192,6 +222,13 @@ class CommercehubBackendApplicationTests {
 		shop.setStatus("ACTIVE");
 		shopRepository.saveAndFlush(shop);
 		assertFalse(productRepository.findPublicBySlug(product.getSlug()).isEmpty());
+	}
+
+	private Map<String, Object> loadShopRating(Long shopId) {
+		return jdbcTemplate.queryForMap(
+				"SELECT rating_avg, rating_count, rating_sum FROM shops WHERE id = ?",
+				shopId
+		);
 	}
 
 }

@@ -10,6 +10,7 @@ import com.commercehub.backend.product.entity.ProductReview;
 import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.product.repository.ProductReviewRepository;
+import com.commercehub.backend.shop.repository.ShopRepository;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class ProductReviewService {
     private final UserRepository userRepository;
     private final ProductMapper productMapper;
     private final OrderItemRepository orderItemRepository;
+    private final ShopRepository shopRepository;
 
     @Transactional
     public ProductReviewResponse createReview(Long userId, CreateProductReviewRequest request) {
@@ -71,12 +73,37 @@ public class ProductReviewService {
                 .comment(request.getComment())
                 .build();
 
+        ProductReview savedReview;
         try {
-            ProductReview savedReview = reviewRepository.saveAndFlush(review);
-            return productMapper.toReviewResponse(savedReview);
+            savedReview = reviewRepository.saveAndFlush(review);
         } catch (DataIntegrityViolationException exception) {
             throw new AppException(ErrorCode.REVIEW_ALREADY_EXISTS);
         }
+
+        ensureShopRatingUpdated(
+                shopRepository.addVisibleRating(product.getShop().getId(), request.getRating())
+        );
+        return productMapper.toReviewResponse(savedReview);
+    }
+
+    @Transactional
+    public ProductReviewResponse setReviewVisibility(Long reviewId, boolean visible) {
+        ProductReview review = reviewRepository.findByIdForVisibilityUpdate(reviewId)
+                .orElseThrow(() -> new AppException(ErrorCode.REVIEW_NOT_FOUND));
+
+        boolean currentlyVisible = Boolean.TRUE.equals(review.getIsVisible());
+        if (currentlyVisible == visible) {
+            return productMapper.toReviewResponse(review);
+        }
+
+        review.setIsVisible(visible);
+        ProductReview savedReview = reviewRepository.saveAndFlush(review);
+        Long shopId = review.getProduct().getShop().getId();
+        int updatedRows = visible
+                ? shopRepository.addVisibleRating(shopId, review.getRating())
+                : shopRepository.removeVisibleRating(shopId, review.getRating());
+        ensureShopRatingUpdated(updatedRows);
+        return productMapper.toReviewResponse(savedReview);
     }
 
     @Transactional(readOnly = true)
@@ -129,6 +156,12 @@ public class ProductReviewService {
     public record RatingSummary(BigDecimal averageRating, long reviewCount) {
         public static RatingSummary unrated() {
             return new RatingSummary(DEFAULT_PRODUCT_RATING, 0L);
+        }
+    }
+
+    private void ensureShopRatingUpdated(int updatedRows) {
+        if (updatedRows != 1) {
+            throw new AppException(ErrorCode.SHOP_NOT_FOUND);
         }
     }
 }

@@ -69,6 +69,20 @@ public class Shop  {
     @Builder.Default
      BigDecimal ratingAvg = BigDecimal.ZERO;
 
+    @Column(name = "rating_count", nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+     Long ratingCount = 0L;
+
+    /**
+     * Tổng sao nội bộ để cập nhật rating_avg chính xác và nguyên tử khi một
+     * đánh giá được hiện/ẩn. product_reviews vẫn là nguồn dữ liệu gốc.
+     */
+    @Column(name = "rating_sum", nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+     Long ratingSum = 0L;
+
     @Version
     @Column(nullable = false)
     @ColumnDefault("0")

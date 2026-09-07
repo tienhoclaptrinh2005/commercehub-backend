@@ -351,6 +351,7 @@ public class ShopService {
             );
             default -> Sort.by(
                     Sort.Order.desc("ratingAvg"),
+                    Sort.Order.desc("ratingCount"),
                     Sort.Order.asc("disputeRate"),
                     Sort.Order.asc("totalDisputes"),
                     Sort.Order.desc("createdAt"),

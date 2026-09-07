@@ -25,6 +25,7 @@ public class ShopResponse {
     private Integer totalDisputes;
     private BigDecimal disputeRate;
     private BigDecimal ratingAvg;
+    private Long ratingCount;
     private String status;
 
     // Thống kê gộp cho API danh sách shop; không phát sinh N+1.

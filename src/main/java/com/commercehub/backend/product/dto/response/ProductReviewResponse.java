@@ -18,5 +18,6 @@ public class ProductReviewResponse {
     String reviewerAvatar;
     Integer rating;
     String comment;
+    Boolean isVisible;
     OffsetDateTime createdAt;
 }
