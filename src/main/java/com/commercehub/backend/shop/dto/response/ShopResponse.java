@@ -15,6 +15,7 @@ public class ShopResponse {
     private Long id;
     private Long ownerId;
     private String ownerName;
+    private String ownerUsername;
     private String name;
     private String slug;
     private String shopAvatarUrl;
@@ -25,6 +26,13 @@ public class ShopResponse {
     private BigDecimal disputeRate;
     private BigDecimal ratingAvg;
     private String status;
+
+    // Thống kê gộp cho API danh sách shop; không phát sinh N+1.
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long activeProductCount;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long soldProductCount;
 
     // Chỉ được map ở API chi tiết shop; API danh sách không chạy truy vấn thống kê.
     @JsonInclude(JsonInclude.Include.NON_NULL)

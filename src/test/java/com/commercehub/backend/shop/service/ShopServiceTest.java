@@ -3,8 +3,10 @@ package com.commercehub.backend.shop.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.service.OrderStatisticsService;
+import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.shop.dto.request.CreateShopRequest;
 import com.commercehub.backend.shop.dto.response.ShopApplicationResponse;
+import com.commercehub.backend.shop.dto.response.ShopResponse;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.mapper.ShopMapper;
 import com.commercehub.backend.shop.repository.ShopRepository;
@@ -14,15 +16,22 @@ import com.commercehub.backend.user.repository.RoleRepository;
 import com.commercehub.backend.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -34,6 +43,7 @@ class ShopServiceTest {
     private ShopMapper shopMapper;
     private UserRepository userRepository;
     private RoleRepository roleRepository;
+    private ProductRepository productRepository;
     private ShopService service;
 
     @BeforeEach
@@ -42,13 +52,43 @@ class ShopServiceTest {
         shopMapper = mock(ShopMapper.class);
         userRepository = mock(UserRepository.class);
         roleRepository = mock(RoleRepository.class);
+        productRepository = mock(ProductRepository.class);
         service = new ShopService(
                 shopRepository,
                 shopMapper,
                 userRepository,
                 roleRepository,
-                mock(OrderStatisticsService.class)
+                mock(OrderStatisticsService.class),
+                productRepository
         );
+    }
+
+    @Test
+    void listsPublicShopsWithOneAggregatedStatisticsQuery() {
+        Shop shop = Shop.builder().id(10L).name("VPN Store").build();
+        ShopResponse response = ShopResponse.builder().build();
+        ProductRepository.ShopProductStats stats = mock(ProductRepository.ShopProductStats.class);
+
+        when(shopRepository.findAllPublicActive(eq("vpn"), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(shop), PageRequest.of(0, 8), 1));
+        when(shopMapper.toResponse(shop)).thenReturn(response);
+        when(productRepository.findPublicShopProductStats(List.of(10L)))
+                .thenReturn(List.of(stats));
+        when(stats.getShopId()).thenReturn(10L);
+        when(stats.getActiveProductCount()).thenReturn(4L);
+        when(stats.getSoldProductCount()).thenReturn(25L);
+
+        var result = service.getAllActiveShops(0, 999, "  vpn  ", null, "trusted");
+
+        assertThat(result.getContent()).containsExactly(response);
+        assertThat(response.getActiveProductCount()).isEqualTo(4L);
+        assertThat(response.getSoldProductCount()).isEqualTo(25L);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(shopRepository).findAllPublicActive(eq("vpn"), isNull(), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(8);
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("ratingAvg")).isNotNull();
+        verify(productRepository).findPublicShopProductStats(List.of(10L));
     }
 
     @Test

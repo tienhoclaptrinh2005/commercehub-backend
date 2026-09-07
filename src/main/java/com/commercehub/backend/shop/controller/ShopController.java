@@ -3,6 +3,7 @@ package com.commercehub.backend.shop.controller;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.shop.dto.request.CreateShopRequest;
 import com.commercehub.backend.shop.dto.request.UpdateShopRequest;
@@ -25,10 +26,20 @@ public class ShopController {
     private final ShopService shopService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<ShopResponse>>> getAllActiveShops(
+    public ResponseEntity<ApiResponse<PageResponse<ShopResponse>>> getAllActiveShops(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(ApiResponse.success(shopService.getAllActiveShops(page, size)));
+            @RequestParam(defaultValue = "8") int size,
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "trusted") String sort) {
+        Page<ShopResponse> shops = shopService.getAllActiveShops(
+                page,
+                size,
+                keyword,
+                categoryId,
+                sort
+        );
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(shops)));
     }
 
     @GetMapping("/admin/all")

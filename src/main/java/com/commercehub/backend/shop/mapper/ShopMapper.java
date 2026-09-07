@@ -25,11 +25,13 @@ public interface ShopMapper {
 
     @Mapping(target = "ownerId", source = "owner.id")
     @Mapping(target = "ownerName", source = "owner.fullName")
+    @Mapping(target = "ownerUsername", source = "owner.username")
     @Mapping(target = "shopAvatarUrl", source = "owner.avatarUrl")
     ShopResponse toResponse(Shop shop);
 
     @Mapping(target = "ownerId", source = "shop.owner.id")
     @Mapping(target = "ownerName", source = "shop.owner.fullName")
+    @Mapping(target = "ownerUsername", source = "shop.owner.username")
     @Mapping(target = "shopAvatarUrl", source = "shop.owner.avatarUrl")
     @Mapping(target = "ownerCompletedPurchaseCount", source = "ownerCompletedPurchaseCount")
     @Mapping(target = "successfulSaleCount", source = "successfulSaleCount")

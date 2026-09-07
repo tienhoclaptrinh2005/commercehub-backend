@@ -4,6 +4,7 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.common.util.SlugUtils;
 import com.commercehub.backend.order.service.OrderStatisticsService;
+import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.shop.dto.request.CreateShopRequest;
 import com.commercehub.backend.shop.dto.request.UpdateShopRequest;
 import com.commercehub.backend.shop.dto.response.ShopResponse;
@@ -30,8 +31,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
 import java.time.OffsetDateTime;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -45,14 +49,48 @@ public class ShopService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final OrderStatisticsService orderStatisticsService;
+    private final ProductRepository productRepository;
 
     @Transactional(readOnly = true)
-    public Page<ShopResponse> getAllActiveShops(int page, int size) {
+    public Page<ShopResponse> getAllActiveShops(
+            int page,
+            int size,
+            String keyword,
+            Long categoryId,
+            String sort
+    ) {
         int validPage = Math.max(0, page);
-        int validSize = (size <= 0 || size > 100) ? 20 : size;
-        Pageable pageable = PageRequest.of(validPage, validSize, Sort.by("createdAt").descending());
-        Page<Shop> shopPage = shopRepository.findAllPublicActive(pageable);
-        return shopPage.map(shopMapper::toResponse);
+        int validSize = (size <= 0 || size > 100) ? 8 : size;
+        String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        if (normalizedKeyword.length() > 100) {
+            normalizedKeyword = normalizedKeyword.substring(0, 100);
+        }
+
+        Pageable pageable = PageRequest.of(validPage, validSize, publicShopSort(sort));
+        Page<Shop> shopPage = shopRepository.findAllPublicActive(
+                normalizedKeyword,
+                categoryId,
+                pageable
+        );
+
+        List<Long> shopIds = shopPage.getContent().stream()
+                .map(Shop::getId)
+                .toList();
+        Map<Long, ProductRepository.ShopProductStats> statsByShopId = shopIds.isEmpty()
+                ? Map.of()
+                : productRepository.findPublicShopProductStats(shopIds).stream()
+                        .collect(Collectors.toMap(
+                                ProductRepository.ShopProductStats::getShopId,
+                                Function.identity()
+                        ));
+
+        return shopPage.map(shop -> {
+            ShopResponse response = shopMapper.toResponse(shop);
+            ProductRepository.ShopProductStats stats = statsByShopId.get(shop.getId());
+            response.setActiveProductCount(stats == null ? 0L : stats.getActiveProductCount());
+            response.setSoldProductCount(stats == null ? 0L : stats.getSoldProductCount());
+            return response;
+        });
     }
 
     @Transactional(readOnly = true)
@@ -294,6 +332,30 @@ public class ShopService {
             // REJECTED là trạng thái kết thúc và không được gửi lại.
             case "REJECTED" -> false;
             default -> false;
+        };
+    }
+
+    private Sort publicShopSort(String requestedSort) {
+        String normalizedSort = requestedSort == null
+                ? "trusted"
+                : requestedSort.trim().toLowerCase(Locale.ROOT);
+
+        return switch (normalizedSort) {
+            case "newest" -> Sort.by(
+                    Sort.Order.desc("createdAt"),
+                    Sort.Order.desc("id")
+            );
+            case "name" -> Sort.by(
+                    Sort.Order.asc("name"),
+                    Sort.Order.asc("id")
+            );
+            default -> Sort.by(
+                    Sort.Order.desc("ratingAvg"),
+                    Sort.Order.asc("disputeRate"),
+                    Sort.Order.asc("totalDisputes"),
+                    Sort.Order.desc("createdAt"),
+                    Sort.Order.desc("id")
+            );
         };
     }
 }

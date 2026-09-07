@@ -17,6 +17,12 @@ import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpecificationExecutor<Product> {
+    interface ShopProductStats {
+        Long getShopId();
+        Long getActiveProductCount();
+        Long getSoldProductCount();
+    }
+
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "variants", "preOrderConfig"})
     @Query("SELECT p FROM Product p JOIN p.shop.owner.roles ownerRole " +
             "WHERE p.slug = :slug " +
@@ -88,6 +94,22 @@ public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpe
             "AND p.category.parent.isActive = true " +
             "ORDER BY p.soldCount DESC, p.createdAt DESC, p.id DESC")
     List<Product> findBestSellingActiveProducts(Pageable pageable);
+
+    @Query("""
+            SELECT product.shop.id AS shopId,
+                   COUNT(product.id) AS activeProductCount,
+                   COALESCE(SUM(product.soldCount), 0) AS soldProductCount
+            FROM Product product
+            WHERE product.shop.id IN :shopIds
+              AND product.status = 'ACTIVE'
+              AND product.category.isActive = true
+              AND (
+                    product.category.parent IS NULL
+                    OR product.category.parent.isActive = true
+              )
+            GROUP BY product.shop.id
+            """)
+    List<ShopProductStats> findPublicShopProductStats(@Param("shopIds") List<Long> shopIds);
 
     @Modifying
     @Query(value = """
