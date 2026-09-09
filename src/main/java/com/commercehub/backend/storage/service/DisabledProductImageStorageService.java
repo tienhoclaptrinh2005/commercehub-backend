@@ -22,4 +22,9 @@ public class DisabledProductImageStorageService implements ProductImageStorageSe
     public CompleteProductImageResponse completeUpload(Long sellerId, CompleteProductImageRequest request) {
         throw new AppException(ErrorCode.IMAGE_STORAGE_UNAVAILABLE);
     }
+
+    @Override
+    public void deleteProductImage(Long shopId, String objectKey) {
+        // There is no remote object store to clean when R2 is disabled.
+    }
 }

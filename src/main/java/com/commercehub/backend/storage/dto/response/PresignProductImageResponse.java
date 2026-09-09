@@ -6,6 +6,7 @@ public record PresignProductImageResponse(
         String objectKey,
         String uploadUrl,
         Instant expiresAt,
-        long maxFileSizeBytes
+        long maxFileSizeBytes,
+        String cacheControl
 ) {
 }

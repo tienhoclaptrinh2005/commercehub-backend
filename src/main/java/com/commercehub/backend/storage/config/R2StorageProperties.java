@@ -17,6 +17,11 @@ public class R2StorageProperties {
     private String publicBaseUrl;
     private int presignDurationSeconds = 300;
     private long maxImageSizeBytes = 2_097_152L;
+    private int productImageWidth = 1200;
+    private int productImageHeight = 900;
+    private String imageCacheControl = "public, max-age=31536000, immutable";
     private int createCooldownSeconds = 3;
     private int maxPresignsPerFifteenMinutes = 20;
+    private String rateLimitStore = "memory";
+    private String rateLimitKeyPrefix = "commercehub:r2:presign";
 }

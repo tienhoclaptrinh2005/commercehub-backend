@@ -19,7 +19,9 @@ import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.repository.ShopRepository;
 import com.commercehub.backend.storage.service.MediaUrlService;
+import com.commercehub.backend.storage.event.ProductImageReplacedEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.Set;
@@ -50,6 +53,7 @@ public class ProductService {
     private final ProductMapper productMapper;
     private final ProductReviewService productReviewService;
     private final MediaUrlService mediaUrlService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ProductResponse createProduct(Long userId, CreateProductRequest request) {
@@ -188,6 +192,7 @@ public class ProductService {
     public ProductResponse updateProduct(Long userId, Long productId, UpdateProductRequest request) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+        String previousThumbnail = product.getThumbnailUrl();
 
         if (!product.getShop().getOwner().getId().equals(userId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -232,7 +237,18 @@ public class ProductService {
 
         productMapper.updateProductFromRequest(request, product);
 
-        return mapToProductResponse(productRepository.save(product));
+        Product savedProduct = productRepository.save(product);
+        if (!Objects.equals(previousThumbnail, savedProduct.getThumbnailUrl())
+                && mediaUrlService.isOwnedProductImageReference(
+                        previousThumbnail,
+                        savedProduct.getShop().getId()
+                )) {
+            eventPublisher.publishEvent(new ProductImageReplacedEvent(
+                    savedProduct.getShop().getId(),
+                    previousThumbnail
+            ));
+        }
+        return mapToProductResponse(savedProduct);
     }
 
     @Transactional(readOnly = true)

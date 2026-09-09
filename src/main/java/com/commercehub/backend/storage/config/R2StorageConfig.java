@@ -74,9 +74,9 @@ public class R2StorageConfig {
         requireText(properties.getBucket(), "R2_BUCKET");
         requireText(properties.getPublicBaseUrl(), "MEDIA_PUBLIC_BASE_URL");
 
-        if (properties.getAccessKeyId().trim().length() != 32) {
+        if (!properties.getAccessKeyId().trim().matches("[A-Za-z0-9]{32}")) {
             throw new IllegalStateException(
-                    "R2_ACCESS_KEY_ID phải là Access Key ID 32 ký tự do R2 cấp, không phải API Token"
+                    "R2_ACCESS_KEY_ID phải là Access Key ID 32 ký tự chữ/số do R2 cấp, không phải API Token"
             );
         }
         if (properties.getSecretAccessKey().trim().length() < 32) {
@@ -90,13 +90,22 @@ public class R2StorageConfig {
         if (properties.getPresignDurationSeconds() < 60 || properties.getPresignDurationSeconds() > 900) {
             throw new IllegalStateException("R2_PRESIGN_DURATION_SECONDS phải nằm trong khoảng 60-900 giây");
         }
-        if (properties.getMaxImageSizeBytes() < 1 || properties.getMaxImageSizeBytes() > 10_485_760L) {
-            throw new IllegalStateException("R2_MAX_IMAGE_SIZE_BYTES phải nằm trong khoảng 1 byte đến 10 MB");
+        if (properties.getMaxImageSizeBytes() < 1 || properties.getMaxImageSizeBytes() > 2_097_152L) {
+            throw new IllegalStateException("R2_MAX_IMAGE_SIZE_BYTES không được vượt quá giới hạn cứng 2 MB");
         }
+        if (properties.getProductImageWidth() != 1200 || properties.getProductImageHeight() != 900) {
+            throw new IllegalStateException("Ảnh sản phẩm phải được cấu hình đúng 1200 x 900 px");
+        }
+        requireText(properties.getImageCacheControl(), "R2_IMAGE_CACHE_CONTROL");
         if (properties.getCreateCooldownSeconds() < 0
                 || properties.getMaxPresignsPerFifteenMinutes() < 1) {
             throw new IllegalStateException("Giới hạn tạo presigned URL của R2 không hợp lệ");
         }
+        if (!"memory".equalsIgnoreCase(properties.getRateLimitStore())
+                && !"redis".equalsIgnoreCase(properties.getRateLimitStore())) {
+            throw new IllegalStateException("R2_RATE_LIMIT_STORE chỉ chấp nhận memory hoặc redis");
+        }
+        requireText(properties.getRateLimitKeyPrefix(), "R2_RATE_LIMIT_KEY_PREFIX");
     }
 
     private void requireText(String value, String environmentName) {

@@ -19,6 +19,26 @@ class R2StorageConfigTest {
     }
 
     @Test
+    void rejectsAnAccessKeyContainingSignatureSeparators() {
+        R2StorageProperties properties = validProperties();
+        properties.setAccessKeyId("0123456789abcdef01234/6789abcdef");
+
+        assertThatThrownBy(() -> config.r2S3Client(properties))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("32 ký tự chữ/số");
+    }
+
+    @Test
+    void rejectsAnImageLimitAboveTwoMegabytes() {
+        R2StorageProperties properties = validProperties();
+        properties.setMaxImageSizeBytes(2_097_153L);
+
+        assertThatThrownBy(() -> config.r2S3Client(properties))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("2 MB");
+    }
+
+    @Test
     void rejectsAnEndpointContainingTheBucketPath() {
         R2StorageProperties properties = validProperties();
         properties.setEndpoint(

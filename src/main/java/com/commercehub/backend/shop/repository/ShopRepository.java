@@ -23,6 +23,7 @@ public interface ShopRepository extends JpaRepository<Shop, Long> {
     boolean existsByNameIgnoreCase(String name);
     boolean existsBySlug(String slug);
 
+    @EntityGraph(attributePaths = {"owner", "owner.roles"})
     Optional<Shop> findByOwnerId(Long ownerId);
 
     List<Shop> findAllByOwnerId(Long ownerId);

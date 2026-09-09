@@ -25,6 +25,14 @@ spring:
       pageable:
         default-page-size: 20
         max-page-size: 100
+    redis:
+      # Only contacted when R2_RATE_LIMIT_STORE=redis.
+      url: ${REDIS_URL:redis://localhost:6379}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_COMMAND_TIMEOUT:2s}
+      repositories:
+        # Redis is only used as a shared counter store, not as a Spring Data repository.
+        enabled: false
 
 google:
   client-id: ${GOOGLE_CLIENT_ID:}
@@ -92,8 +100,13 @@ storage:
     public-base-url: ${MEDIA_PUBLIC_BASE_URL:}
     presign-duration-seconds: ${R2_PRESIGN_DURATION_SECONDS:300}
     max-image-size-bytes: ${R2_MAX_IMAGE_SIZE_BYTES:2097152}
+    product-image-width: ${R2_PRODUCT_IMAGE_WIDTH:1200}
+    product-image-height: ${R2_PRODUCT_IMAGE_HEIGHT:900}
+    image-cache-control: ${R2_IMAGE_CACHE_CONTROL:public, max-age=31536000, immutable}
     create-cooldown-seconds: ${R2_UPLOAD_COOLDOWN_SECONDS:3}
     max-presigns-per-fifteen-minutes: ${R2_MAX_PRESIGNS_PER_15_MINUTES:20}
+    rate-limit-store: ${R2_RATE_LIMIT_STORE:memory}
+    rate-limit-key-prefix: ${R2_RATE_LIMIT_KEY_PREFIX:commercehub:r2:presign}
 
 #  server:
 #    port: ${SERVER_PORT:8080}

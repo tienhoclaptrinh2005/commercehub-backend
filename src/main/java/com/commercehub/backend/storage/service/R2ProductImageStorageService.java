@@ -17,8 +17,8 @@ import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -40,10 +40,9 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "storage.r2.enabled", havingValue = "true")
 public class R2ProductImageStorageService implements ProductImageStorageService {
 
+    private static final String PRODUCT_IMAGE_CONTENT_TYPE = "image/webp";
     private static final Map<String, String> EXTENSION_BY_CONTENT_TYPE = Map.of(
-            "image/jpeg", "jpg",
-            "image/png", "png",
-            "image/webp", "webp"
+            PRODUCT_IMAGE_CONTENT_TYPE, "webp"
     );
     private static final DateTimeFormatter OBJECT_DATE_PATH =
             DateTimeFormatter.ofPattern("uuuu/MM").withZone(ZoneOffset.UTC);
@@ -74,6 +73,7 @@ public class R2ProductImageStorageService implements ProductImageStorageService 
                 .bucket(properties.getBucket())
                 .key(objectKey)
                 .contentType(contentType)
+                .cacheControl(properties.getImageCacheControl())
                 .build();
         Duration signatureDuration = Duration.ofSeconds(properties.getPresignDurationSeconds());
         PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(
@@ -87,7 +87,8 @@ public class R2ProductImageStorageService implements ProductImageStorageService 
                 objectKey,
                 presignedRequest.url().toString(),
                 now.plus(signatureDuration),
-                properties.getMaxImageSizeBytes()
+                properties.getMaxImageSizeBytes(),
+                properties.getImageCacheControl()
         );
     }
 
@@ -105,8 +106,9 @@ public class R2ProductImageStorageService implements ProductImageStorageService 
                     .key(objectKey));
             validateFileSize(head.contentLength());
             String contentType = normalizeAndValidateContentType(head.contentType());
-            verifyFileSignature(objectKey, contentType);
+            validateStoredImage(objectKey, contentType, head.contentLength());
         } catch (AppException exception) {
+            deleteQuietly(objectKey, "invalid upload");
             throw exception;
         } catch (S3Exception exception) {
             if (exception.statusCode() == 404) {
@@ -120,6 +122,22 @@ public class R2ProductImageStorageService implements ProductImageStorageService 
         }
 
         return new CompleteProductImageResponse(objectKey, mediaUrlService.toPublicUrl(objectKey));
+    }
+
+    @Override
+    public void deleteProductImage(Long shopId, String objectKey) {
+        String normalized = mediaUrlService.normalizeOwnedProductImageReference(objectKey, shopId);
+        if (normalized == null) {
+            return;
+        }
+        try {
+            s3Client.deleteObject(builder -> builder
+                    .bucket(properties.getBucket())
+                    .key(normalized));
+        } catch (SdkException exception) {
+            log.error("Cannot delete replaced R2 product image {}", normalized, exception);
+            throw new AppException(ErrorCode.IMAGE_STORAGE_UNAVAILABLE);
+        }
     }
 
     private Shop requireActiveShop(Long sellerId) {
@@ -150,47 +168,50 @@ public class R2ProductImageStorageService implements ProductImageStorageService 
         }
     }
 
-    private void verifyFileSignature(String objectKey, String contentType) {
-        ResponseBytes<GetObjectResponse> prefix = s3Client.getObject(
+    private void validateStoredImage(String objectKey, String contentType, long expectedLength) {
+        if (!PRODUCT_IMAGE_CONTENT_TYPE.equals(contentType)) {
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_INVALID_TYPE);
+        }
+
+        ResponseBytes<GetObjectResponse> storedObject = s3Client.getObject(
                 GetObjectRequest.builder()
                         .bucket(properties.getBucket())
                         .key(objectKey)
-                        .range("bytes=0-31")
+                        // Keep the verification read bounded even if the object is
+                        // replaced between HEAD and GET while the signed URL is alive.
+                        .range("bytes=0-" + properties.getMaxImageSizeBytes())
                         .build(),
                 ResponseTransformer.toBytes()
         );
-        byte[] bytes = prefix.asByteArray();
-        boolean valid = switch (contentType) {
-            case "image/jpeg" -> bytes.length >= 3
-                    && unsigned(bytes[0]) == 0xFF
-                    && unsigned(bytes[1]) == 0xD8
-                    && unsigned(bytes[2]) == 0xFF;
-            case "image/png" -> bytes.length >= 8
-                    && unsigned(bytes[0]) == 0x89
-                    && bytes[1] == 'P'
-                    && bytes[2] == 'N'
-                    && bytes[3] == 'G'
-                    && unsigned(bytes[4]) == 0x0D
-                    && unsigned(bytes[5]) == 0x0A
-                    && unsigned(bytes[6]) == 0x1A
-                    && unsigned(bytes[7]) == 0x0A;
-            case "image/webp" -> bytes.length >= 12
-                    && bytes[0] == 'R'
-                    && bytes[1] == 'I'
-                    && bytes[2] == 'F'
-                    && bytes[3] == 'F'
-                    && bytes[8] == 'W'
-                    && bytes[9] == 'E'
-                    && bytes[10] == 'B'
-                    && bytes[11] == 'P';
-            default -> false;
-        };
-        if (!valid) {
+        byte[] bytes = storedObject.asByteArray();
+        if (bytes.length > properties.getMaxImageSizeBytes()) {
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_TOO_LARGE);
+        }
+        if (bytes.length != expectedLength) {
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_REFERENCE_INVALID);
+        }
+        WebpImageInspector.ImageInfo imageInfo;
+        try {
+            imageInfo = WebpImageInspector.inspect(bytes);
+        } catch (IllegalArgumentException exception) {
             throw new AppException(ErrorCode.IMAGE_UPLOAD_INVALID_TYPE);
+        }
+        if (imageInfo.width() != properties.getProductImageWidth()
+                || imageInfo.height() != properties.getProductImageHeight()) {
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_INVALID_DIMENSIONS);
+        }
+        if (imageInfo.containsMetadata() || imageInfo.animated()) {
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_METADATA_NOT_ALLOWED);
         }
     }
 
-    private int unsigned(byte value) {
-        return value & 0xFF;
+    private void deleteQuietly(String objectKey, String reason) {
+        try {
+            s3Client.deleteObject(builder -> builder
+                    .bucket(properties.getBucket())
+                    .key(objectKey));
+        } catch (RuntimeException cleanupError) {
+            log.warn("Cannot clean R2 object {} after {}", objectKey, reason, cleanupError);
+        }
     }
 }

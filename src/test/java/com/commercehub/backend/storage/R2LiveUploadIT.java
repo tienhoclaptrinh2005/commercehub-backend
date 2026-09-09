@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class R2LiveUploadIT {
 
     private static final String LOCAL_ORIGIN = "http://localhost:3000";
+    private static final String CACHE_CONTROL = "public, max-age=31536000, immutable";
     private static final byte[] ONE_PIXEL_PNG = Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
     );
@@ -52,8 +53,8 @@ class R2LiveUploadIT {
         String bucket = required(environment, "R2_BUCKET");
         String publicBaseUrl = required(environment, "MEDIA_PUBLIC_BASE_URL").replaceAll("/+$", "");
         assertThat(accessKeyId)
-                .as("R2_ACCESS_KEY_ID must be the 32-character S3 Access Key ID")
-                .hasSize(32);
+                .as("R2_ACCESS_KEY_ID must be the 32-character alphanumeric S3 Access Key ID")
+                .matches("[A-Za-z0-9]{32}");
         assertThat(secretAccessKey)
                 .as("R2_SECRET_ACCESS_KEY has an invalid length")
                 .hasSizeGreaterThanOrEqualTo(32);
@@ -86,6 +87,7 @@ class R2LiveUploadIT {
                         .bucket(bucket)
                         .key(objectKey)
                         .contentType("image/png")
+                        .cacheControl(CACHE_CONTROL)
                         .build();
                 URI signedPutUrl = presigner.presignPutObject(PutObjectPresignRequest.builder()
                                 .signatureDuration(Duration.ofMinutes(5))
@@ -103,6 +105,7 @@ class R2LiveUploadIT {
                         .timeout(Duration.ofSeconds(30))
                         .header("Origin", LOCAL_ORIGIN)
                         .header("Content-Type", "image/png")
+                        .header("Cache-Control", CACHE_CONTROL)
                         .PUT(HttpRequest.BodyPublishers.ofByteArray(ONE_PIXEL_PNG))
                         .build();
                 HttpResponse<String> uploadResponse = http.send(upload, HttpResponse.BodyHandlers.ofString());
@@ -145,11 +148,19 @@ class R2LiveUploadIT {
                 .timeout(Duration.ofSeconds(30))
                 .header("Origin", LOCAL_ORIGIN)
                 .header("Access-Control-Request-Method", "PUT")
-                .header("Access-Control-Request-Headers", "content-type")
+                .header("Access-Control-Request-Headers", "cache-control,content-type")
                 .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
                 .build();
-        HttpResponse<Void> response = http.send(preflight, HttpResponse.BodyHandlers.discarding());
-        assertThat(response.statusCode()).isBetween(200, 299);
+        HttpResponse<String> response = http.send(preflight, HttpResponse.BodyHandlers.ofString());
+        assertThat(response.statusCode())
+                .withFailMessage(
+                        "R2 CORS preflight returned HTTP %s: %s. Verify the bucket allows origin %s, "
+                                + "method PUT, and headers Content-Type plus Cache-Control.",
+                        response.statusCode(),
+                        sanitizeR2Error(response.body()),
+                        LOCAL_ORIGIN
+                )
+                .isBetween(200, 299);
         assertThat(response.headers().firstValue("Access-Control-Allow-Origin"))
                 .contains(LOCAL_ORIGIN);
     }

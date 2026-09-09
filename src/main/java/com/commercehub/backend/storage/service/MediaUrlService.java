@@ -56,6 +56,14 @@ public class MediaUrlService {
         return normalized;
     }
 
+    public boolean isOwnedProductImageReference(String reference, Long shopId) {
+        try {
+            return normalizeOwnedProductImageReference(reference, shopId) != null;
+        } catch (AppException ignored) {
+            return false;
+        }
+    }
+
     private boolean isAbsoluteHttpUrl(String value) {
         try {
             URI uri = URI.create(value);

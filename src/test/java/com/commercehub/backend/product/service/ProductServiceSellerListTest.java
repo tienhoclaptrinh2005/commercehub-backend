@@ -38,7 +38,8 @@ class ProductServiceSellerListTest {
             mock(CategoryRepository.class),
             mock(ProductMapper.class),
             mock(ProductReviewService.class),
-            new MediaUrlService(new R2StorageProperties())
+            new MediaUrlService(new R2StorageProperties()),
+            mock(org.springframework.context.ApplicationEventPublisher.class)
     );
 
     @Test

@@ -34,7 +34,8 @@ class ProductServiceBestSellingTest {
             categoryRepository,
             productMapper,
             productReviewService,
-            new MediaUrlService(new R2StorageProperties())
+            new MediaUrlService(new R2StorageProperties()),
+            mock(org.springframework.context.ApplicationEventPublisher.class)
     );
 
     @Test
