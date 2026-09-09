@@ -1,11 +1,15 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
+  config:
+    # Local convenience: an ignored .env file is loaded as Java properties.
+    # Real OS/deployment environment variables still take precedence.
+    import: optional:file:.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5678/commercehub_db}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:123}
+    password: ${DB_PASSWORD}
 
   jpa:
     hibernate:
@@ -23,12 +27,12 @@ spring:
         max-page-size: 100
 
 google:
-  client-id: "1060424015252-neu3kv70tuss4g3md3g74njho7mihpja.apps.googleusercontent.com"
+  client-id: ${GOOGLE_CLIENT_ID:}
 
 jwt:
-  secret: ${JWT_SECRET:V29ya2luZ0hhcmRPbkNvbW1lcmNlSHViUHJvamVjdDIwMjZTZWN1cmVLZXlWMzg5NDU=}
-  expiration: 900000 # Access Token 15 phút
-  refreshExpiration: 604800000 # Thời gian sống của Refresh Token7 ngày = 604800000 ms
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_ACCESS_EXPIRATION_MS:900000} # Access Token 15 phút
+  refreshExpiration: ${JWT_REFRESH_EXPIRATION_MS:604800000} # Refresh Token 7 ngày
 
 auth:
   refresh-cookie:
@@ -36,7 +40,7 @@ auth:
     # Localhost chạy HTTP phải để false. Production bắt buộc AUTH_COOKIE_SECURE=true.
     secure: ${AUTH_COOKIE_SECURE:false}
     same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
-    max-age-seconds: 604800
+    max-age-seconds: ${AUTH_REFRESH_COOKIE_MAX_AGE:604800}
 
 
 #Local/development: SPRINGDOC_ENABLED=true.
@@ -53,18 +57,21 @@ springdoc:
 
 sepay:
   environment: ${SEPAY_ENVIRONMENT:test}
-  webhook-secret: ${SEPAY_WEBHOOK_SECRET:replace-with-sepay-webhook-secret}
+  webhook-secret: ${SEPAY_WEBHOOK_SECRET:}
   bank-code: ${SEPAY_BANK_CODE:replace-with-bank-code}
   bank-account-number: ${SEPAY_BANK_ACCOUNT_NUMBER:replace-with-bank-account-number}
   account-name: ${SEPAY_ACCOUNT_NAME:replace-with-account-name}
   qr-base-url: ${SEPAY_QR_BASE_URL:https://vietqr.app/img}
-  deposit-ttl-minutes: 15
-  deposit-expiry-scan-ms: 60000
-  create-cooldown-seconds: 10
-  max-creates-per-fifteen-minutes: 5
-  max-creates-per-day: 20
+  deposit-ttl-minutes: ${SEPAY_DEPOSIT_TTL_MINUTES:15}
+  deposit-expiry-scan-ms: ${SEPAY_DEPOSIT_EXPIRY_SCAN_MS:60000}
+  create-cooldown-seconds: ${SEPAY_CREATE_COOLDOWN_SECONDS:10}
+  max-creates-per-fifteen-minutes: ${SEPAY_MAX_CREATES_PER_15_MINUTES:5}
+  max-creates-per-day: ${SEPAY_MAX_CREATES_PER_DAY:20}
 
 commercehub:
+  cors:
+    # Comma-separated so a domain migration only changes deployment secrets/config.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
   jobs:
     batch-size: ${JOB_BATCH_SIZE:200}
   dispute:
@@ -72,6 +79,21 @@ commercehub:
     warranty-processing-hours: ${DISPUTE_WARRANTY_PROCESSING_HOURS:24}
     buyer-confirmation-hours: ${DISPUTE_BUYER_CONFIRMATION_HOURS:24}
     admin-review-hours: ${DISPUTE_ADMIN_REVIEW_HOURS:72}
+
+storage:
+  r2:
+    # Disabled by default so tests and developers without Cloudflare credentials still boot.
+    enabled: ${R2_ENABLED:false}
+    endpoint: ${R2_ENDPOINT:}
+    access-key-id: ${R2_ACCESS_KEY_ID:}
+    secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+    bucket: ${R2_BUCKET:}
+    # Example: https://images.tienhoclaptrinh.site (no trailing slash required).
+    public-base-url: ${MEDIA_PUBLIC_BASE_URL:}
+    presign-duration-seconds: ${R2_PRESIGN_DURATION_SECONDS:300}
+    max-image-size-bytes: ${R2_MAX_IMAGE_SIZE_BYTES:2097152}
+    create-cooldown-seconds: ${R2_UPLOAD_COOLDOWN_SECONDS:3}
+    max-presigns-per-fifteen-minutes: ${R2_MAX_PRESIGNS_PER_15_MINUTES:20}
 
 #  server:
 #    port: ${SERVER_PORT:8080}

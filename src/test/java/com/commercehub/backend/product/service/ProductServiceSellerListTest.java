@@ -8,6 +8,8 @@ import com.commercehub.backend.product.entity.Product;
 import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.config.R2StorageProperties;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.PageImpl;
@@ -35,7 +37,8 @@ class ProductServiceSellerListTest {
             mock(ShopRepository.class),
             mock(CategoryRepository.class),
             mock(ProductMapper.class),
-            mock(ProductReviewService.class)
+            mock(ProductReviewService.class),
+            new MediaUrlService(new R2StorageProperties())
     );
 
     @Test

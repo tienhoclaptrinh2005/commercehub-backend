@@ -18,6 +18,7 @@ import com.commercehub.backend.product.entity.Product;
 import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.entity.PreOrderConfig;
 import com.commercehub.backend.product.repository.ProductVariantRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class CartService {
     private final ProductVariantRepository variantRepository;
     private final UserRepository userRepository;
     private final CheckoutService checkoutService;
+    private final MediaUrlService mediaUrlService;
 
     // ======================================================
     // XEM GIỎ HÀNG
@@ -266,7 +268,7 @@ public class CartService {
                 .productName(product.getName())
                 .productSlug(product.getSlug())
                 .variantName(variant.getName())
-                .thumbnailUrl(product.getThumbnailUrl())
+                .thumbnailUrl(mediaUrlService.toPublicUrl(product.getThumbnailUrl()))
                 .deliveryType(product.getDeliveryType())
                 .productType(product.getProductType())
                 .shopId(product.getShop().getId())

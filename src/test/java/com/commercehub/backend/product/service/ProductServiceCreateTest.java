@@ -15,6 +15,8 @@ import com.commercehub.backend.shop.repository.ShopRepository;
 import com.commercehub.backend.user.entity.LevelConfig;
 import com.commercehub.backend.user.entity.Role;
 import com.commercehub.backend.user.entity.User;
+import com.commercehub.backend.storage.config.R2StorageProperties;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +47,8 @@ class ProductServiceCreateTest {
             shopRepository,
             categoryRepository,
             productMapper,
-            productReviewService
+            productReviewService,
+            new MediaUrlService(new R2StorageProperties())
     );
 
     private Shop shop;

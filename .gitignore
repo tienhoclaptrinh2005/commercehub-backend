@@ -31,3 +31,41 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Local/deployment secrets. Commit only the safe variable-name template.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Runtime output and local files
+*.log
+/logs/
+/uploads/
+*.tmp
+*.bak
+*.orig
+
+# Private keys and certificate stores
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+/.secrets/
+/secrets/
+/credentials/
+
+# Local Spring overrides can contain credentials
+/src/main/resources/application-local.yml
+/src/main/resources/application-local.yaml
+/src/main/resources/application-local.properties
+/src/main/resources/application-prod.yml
+/src/main/resources/application-prod.yaml
+/src/main/resources/application-prod.properties
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini

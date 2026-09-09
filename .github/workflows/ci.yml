@@ -40,6 +40,13 @@ jobs:
       SPRING_TASK_SCHEDULING_ENABLED: "false"
       JPA_SHOW_SQL: "false"
       JPA_FORMAT_SQL: "false"
+      GOOGLE_CLIENT_ID: ci-client.apps.googleusercontent.com
+      JWT_SECRET: Y29tbWVyY2VodWItY2ktand0LXNlY3JldC1hdC1sZWFzdC0zMi1ieXRlcw==
+      SEPAY_ENVIRONMENT: test
+      SEPAY_WEBHOOK_SECRET: ci-webhook-secret
+      SEPAY_BANK_CODE: MB
+      SEPAY_BANK_ACCOUNT_NUMBER: "0000000000"
+      SEPAY_ACCOUNT_NAME: COMMERCEHUB CI
 
     steps:
       - name: Checkout source

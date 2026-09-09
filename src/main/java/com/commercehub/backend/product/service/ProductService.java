@@ -18,6 +18,7 @@ import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,7 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final ProductMapper productMapper;
     private final ProductReviewService productReviewService;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional
     public ProductResponse createProduct(Long userId, CreateProductRequest request) {
@@ -80,6 +82,11 @@ public class ProductService {
         if (request.getVariants().size() > MAX_PRODUCT_VARIANTS) {
             throw new AppException(ErrorCode.PRODUCT_VARIANT_LIMIT_REACHED);
         }
+
+        request.setThumbnailUrl(mediaUrlService.normalizeOwnedProductImageReference(
+                request.getThumbnailUrl(),
+                shop.getId()
+        ));
 
         Product product = productMapper.toEntity(request);
         product.setShop(shop);
@@ -136,11 +143,13 @@ public class ProductService {
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
         ProductReviewService.RatingSummary rating =
                 productReviewService.getRatingSummary(product.getId());
-        return productMapper.toDetailResponse(
+        ProductDetailResponse response = productMapper.toDetailResponse(
                 product,
                 rating.averageRating(),
                 rating.reviewCount()
         );
+        response.setThumbnailUrl(mediaUrlService.toPublicUrl(product.getThumbnailUrl()));
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -212,6 +221,13 @@ public class ProductService {
         if (request.getCategoryId() != null && (product.getCategory() == null || !request.getCategoryId().equals(product.getCategory().getId()))) {
             Category category = getSellableCategory(request.getCategoryId());
             product.setCategory(category);
+        }
+
+        if (request.getThumbnailUrl() != null) {
+            request.setThumbnailUrl(mediaUrlService.normalizeOwnedProductImageReference(
+                    request.getThumbnailUrl(),
+                    product.getShop().getId()
+            ));
         }
 
         productMapper.updateProductFromRequest(request, product);
@@ -334,7 +350,7 @@ public class ProductService {
                     product.getDeliveryType(),
                     product.getStatus(),
                     product.getSoldCount() == null ? 0L : product.getSoldCount(),
-                    product.getThumbnailUrl(),
+                    mediaUrlService.toPublicUrl(product.getThumbnailUrl()),
                     inventory == null || inventory.getMinPrice() == null
                             ? BigDecimal.ZERO
                             : inventory.getMinPrice(),
@@ -366,12 +382,14 @@ public class ProductService {
                 .orElse(BigDecimal.ZERO)
                 : BigDecimal.ZERO;
 
-        return productMapper.toResponse(
+        ProductResponse response = productMapper.toResponse(
                 product,
                 minPrice,
                 rating.averageRating(),
                 rating.reviewCount()
         );
+        response.setThumbnailUrl(mediaUrlService.toPublicUrl(product.getThumbnailUrl()));
+        return response;
     }
 
     private Map<Long, ProductReviewService.RatingSummary> loadRatingSummaries(
