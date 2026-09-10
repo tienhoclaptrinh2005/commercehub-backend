@@ -4,7 +4,6 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.dashboard.dto.response.SellerDashboardResponse;
 import com.commercehub.backend.dashboard.repository.SellerDashboardRepository;
-import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.service.ShopService;
 import com.commercehub.backend.wallet.entity.Wallet;
@@ -29,7 +28,6 @@ class SellerDashboardServiceTest {
 
     private ShopService shopService;
     private WalletRepository walletRepository;
-    private ProductRepository productRepository;
     private SellerDashboardRepository dashboardRepository;
     private SellerDashboardService service;
 
@@ -37,12 +35,10 @@ class SellerDashboardServiceTest {
     void setUp() {
         shopService = mock(ShopService.class);
         walletRepository = mock(WalletRepository.class);
-        productRepository = mock(ProductRepository.class);
         dashboardRepository = mock(SellerDashboardRepository.class);
         service = new SellerDashboardService(
                 shopService,
                 walletRepository,
-                productRepository,
                 dashboardRepository
         );
     }
@@ -55,13 +51,14 @@ class SellerDashboardServiceTest {
                 mock(SellerDashboardRepository.OrderStatusCountProjection.class);
         SellerDashboardRepository.RecentOrderProjection recent =
                 mock(SellerDashboardRepository.RecentOrderProjection.class);
+        SellerDashboardRepository.PreOrderWorkloadProjection workload =
+                mock(SellerDashboardRepository.PreOrderWorkloadProjection.class);
 
         when(shopService.getShopByOwnerId(9L)).thenReturn(Shop.builder().id(7L).build());
         when(walletRepository.findByUserId(9L)).thenReturn(Optional.of(Wallet.builder()
                 .availableBalance(new BigDecimal("900000"))
                 .holdBalance(new BigDecimal("200000"))
                 .build()));
-        when(productRepository.countByShopIdAndStatus(7L, "ACTIVE")).thenReturn(4L);
         when(dashboardRepository.findMonthlyRevenue(
                 eq(7L), any(OffsetDateTime.class), any(OffsetDateTime.class)
         )).thenReturn(List.of(firstDay, thirdDay));
@@ -80,6 +77,9 @@ class SellerDashboardServiceTest {
         when(recent.getStatus()).thenReturn("DELIVERED");
         when(recent.getPlacedAt()).thenReturn(Instant.parse("2026-09-03T03:30:00Z"));
         when(dashboardRepository.findRecentOrders(7L)).thenReturn(List.of(recent));
+        when(workload.getNewRequestCount()).thenReturn(3L);
+        when(workload.getProcessingCount()).thenReturn(2L);
+        when(dashboardRepository.findCurrentPreOrderWorkload(7L)).thenReturn(workload);
 
         SellerDashboardResponse response = service.getDashboard(9L, "2026-09");
 
@@ -93,7 +93,8 @@ class SellerDashboardServiceTest {
         assertThat(response.revenue()).isEqualByComparingTo("200000");
         assertThat(response.availableBalance()).isEqualByComparingTo("900000");
         assertThat(response.holdBalance()).isEqualByComparingTo("200000");
-        assertThat(response.activeProductCount()).isEqualTo(4L);
+        assertThat(response.newPreOrderRequestCount()).isEqualTo(3L);
+        assertThat(response.processingPreOrderCount()).isEqualTo(2L);
         assertThat(response.recentOrders().getFirst().productSummary())
                 .isEqualTo("Netflix Family +1 mục");
         assertThat(response.recentOrders().getFirst().placedAt())

@@ -42,6 +42,12 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
         Instant getPlacedAt();
     }
 
+    interface PreOrderWorkloadProjection {
+        Long getNewRequestCount();
+
+        Long getProcessingCount();
+    }
+
     /**
      * Tổng hợp ngay tại database để mỗi tháng chỉ trả tối đa 31 dòng.
      * Đơn hoàn một phần được phân bổ giảm giá theo tỷ lệ giá trị item còn lại.
@@ -131,6 +137,26 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
             @Param("fromTime") OffsetDateTime fromTime,
             @Param("toTime") OffsetDateTime toTime
     );
+
+    /**
+     * Hàng đợi công việc hiện tại của seller, không phụ thuộc tháng đang xem.
+     * Một truy vấn tổng hợp thay cho hai câu COUNT riêng biệt.
+     */
+    @Query(value = """
+            SELECT COUNT(*) FILTER (
+                       WHERE o.delivery_type = 'PRE_ORDER'
+                         AND o.status = 'WAITING_APPROVAL'
+                   )::BIGINT AS "newRequestCount",
+                   COUNT(*) FILTER (
+                       WHERE o.delivery_type = 'PRE_ORDER'
+                         AND o.status = 'PROCESSING'
+                   )::BIGINT AS "processingCount"
+            FROM orders o
+            WHERE o.shop_id = :shopId
+              AND o.delivery_type = 'PRE_ORDER'
+              AND o.status IN ('WAITING_APPROVAL', 'PROCESSING')
+            """, nativeQuery = true)
+    PreOrderWorkloadProjection findCurrentPreOrderWorkload(@Param("shopId") Long shopId);
 
     @Query(value = """
             SELECT o.id AS "orderId",

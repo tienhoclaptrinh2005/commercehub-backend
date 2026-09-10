@@ -11,7 +11,8 @@ public record SellerDashboardResponse(
         BigDecimal revenue,
         BigDecimal availableBalance,
         BigDecimal holdBalance,
-        long activeProductCount,
+        long newPreOrderRequestCount,
+        long processingPreOrderCount,
         List<DailyRevenue> dailyRevenue,
         List<OrderStatusCount> orderStatusCounts,
         List<RecentOrder> recentOrders

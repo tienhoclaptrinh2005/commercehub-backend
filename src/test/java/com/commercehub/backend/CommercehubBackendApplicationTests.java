@@ -241,6 +241,11 @@ class CommercehubBackendApplicationTests {
 		assertFalse(statusRows.getFirst().getStatus().isBlank());
 		assertTrue(statusRows.getFirst().getCount() >= 1);
 
+		var workload = assertDoesNotThrow(() ->
+				sellerDashboardRepository.findCurrentPreOrderWorkload(shopId));
+		assertTrue(workload.getNewRequestCount() >= 0);
+		assertTrue(workload.getProcessingCount() >= 0);
+
 		var recentOrders = assertDoesNotThrow(() -> sellerDashboardRepository.findRecentOrders(shopId));
 		assertFalse(recentOrders.isEmpty());
 		assertTrue(recentOrders.size() <= 5);

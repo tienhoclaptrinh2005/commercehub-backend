@@ -4,7 +4,6 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.dashboard.dto.response.SellerDashboardResponse;
 import com.commercehub.backend.dashboard.repository.SellerDashboardRepository;
-import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.service.ShopService;
 import com.commercehub.backend.wallet.entity.Wallet;
@@ -33,7 +32,6 @@ public class SellerDashboardService {
 
     private final ShopService shopService;
     private final WalletRepository walletRepository;
-    private final ProductRepository productRepository;
     private final SellerDashboardRepository dashboardRepository;
 
     @Transactional(readOnly = true)
@@ -92,6 +90,17 @@ public class SellerDashboardService {
                 ))
                 .toList();
 
+        SellerDashboardRepository.PreOrderWorkloadProjection preOrderWorkload =
+                dashboardRepository.findCurrentPreOrderWorkload(shop.getId());
+        long newPreOrderRequestCount = preOrderWorkload == null
+                || preOrderWorkload.getNewRequestCount() == null
+                ? 0L
+                : preOrderWorkload.getNewRequestCount();
+        long processingPreOrderCount = preOrderWorkload == null
+                || preOrderWorkload.getProcessingCount() == null
+                ? 0L
+                : preOrderWorkload.getProcessingCount();
+
         return new SellerDashboardResponse(
                 month.toString(),
                 month.lengthOfMonth(),
@@ -99,7 +108,8 @@ public class SellerDashboardService {
                 revenue,
                 zeroIfNull(wallet.getAvailableBalance()),
                 zeroIfNull(wallet.getHoldBalance()),
-                productRepository.countByShopIdAndStatus(shop.getId(), "ACTIVE"),
+                newPreOrderRequestCount,
+                processingPreOrderCount,
                 dailyRevenue,
                 statusCounts,
                 recentOrders
