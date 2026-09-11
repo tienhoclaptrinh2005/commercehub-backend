@@ -36,6 +36,14 @@ public class DigitalAsset {
     @Column(name = "asset_identifier", length = 500)
     private String assetIdentifier;
 
+    /**
+     * SHA-256 của loại asset + định danh chuẩn hóa. Với ACCOUNT, định danh là
+     * username đứng trước dấu | (không phân biệt hoa/thường); loại khác dùng cả dòng.
+     * Unique index là lớp chống race-condition để một account/key không thể bán hai lần.
+     */
+    @Column(name = "content_hash", length = 64, unique = true)
+    private String contentHash;
+
     @Builder.Default
     @Column(nullable = false, length = 30)
     private String status = "AVAILABLE"; // AVAILABLE, RESERVED, SOLD, DISPUTED, REVOKED

@@ -6,6 +6,7 @@ import com.commercehub.backend.product.dto.request.CreateProductRequest;
 import com.commercehub.backend.product.dto.request.UpdateProductRequest;
 import com.commercehub.backend.product.dto.request.UploadDigitalAssetRequest;
 import com.commercehub.backend.product.dto.response.ProductResponse;
+import com.commercehub.backend.product.dto.response.DigitalAssetImportResponse;
 import com.commercehub.backend.product.dto.response.SellerProductListItemResponse;
 import com.commercehub.backend.product.service.DigitalAssetService;
 import com.commercehub.backend.product.service.ProductService;
@@ -63,13 +64,26 @@ public class SellerProductController {
 
     @PostMapping("/assets/inventory")
     @PreAuthorize("hasRole('SELLER')")
-    public ResponseEntity<ApiResponse<Integer>> uploadAssets(
+    public ResponseEntity<ApiResponse<DigitalAssetImportResponse>> uploadAssets(
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody UploadDigitalAssetRequest request) {
 
-        int addedCount = digitalAssetService.uploadAssets(currentUser.getUser().getId(), request);
+        DigitalAssetImportResponse result = digitalAssetService.uploadAssets(
+                currentUser.getUser().getId(), request);
 
-        return ResponseEntity.ok(ApiResponse.success("Đã nạp thành công " + addedCount + " tài khoản!", addedCount));
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã nạp thành công " + result.addedCount() + " tài khoản!",
+                result
+        ));
+    }
+
+    @GetMapping("/{productId}")
+    public ResponseEntity<ApiResponse<ProductResponse>> getMyProduct(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable Long productId) {
+        ProductResponse response = productService.getSellerProduct(
+                currentUser.getUser().getId(), productId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết sản phẩm thành công!", response));
     }
 
     @DeleteMapping("/{productId}")

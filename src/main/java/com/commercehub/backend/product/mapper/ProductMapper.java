@@ -30,6 +30,7 @@ public interface ProductMapper {
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "slug", ignore = true)
+    @Mapping(target = "variants", ignore = true)
     void updateProductFromRequest(UpdateProductRequest request, @MappingTarget Product product);
 
     @Mapping(target = "productId", source = "product.id")
@@ -49,6 +50,23 @@ public interface ProductMapper {
     @Mapping(target = "averageRating", source = "averageRating")
     @Mapping(target = "reviewCount", source = "reviewCount")
     ProductResponse toResponse(
+            Product product,
+            BigDecimal minPrice,
+            BigDecimal averageRating,
+            Long reviewCount
+    );
+
+    @Mapping(target = "shopId", expression = "java(getShopId(product))")
+    @Mapping(target = "shopName", expression = "java(getShopName(product))")
+    @Mapping(target = "sellerUsername", expression = "java(getSellerUsername(product))")
+    @Mapping(target = "sellerAvatarUrl", expression = "java(getSellerAvatarUrl(product))")
+    @Mapping(target = "categoryId", expression = "java(getCategoryId(product))")
+    @Mapping(target = "categoryName", expression = "java(getCategoryName(product))")
+    @Mapping(target = "stockCount", expression = "java(calculateTotalStock(product.getVariants()))")
+    @Mapping(target = "variants", expression = "java(mapAllVariants(product.getVariants()))")
+    @Mapping(target = "averageRating", source = "averageRating")
+    @Mapping(target = "reviewCount", source = "reviewCount")
+    ProductResponse toSellerResponse(
             Product product,
             BigDecimal minPrice,
             BigDecimal averageRating,
@@ -136,4 +154,18 @@ public interface ProductMapper {
                 .map(this::toVariantResponse)
                 .toList();
     }
+
+    default List<ProductVariantResponse> mapAllVariants(List<ProductVariant> variants) {
+        if (variants == null || variants.isEmpty()) {
+            return List.of();
+        }
+        return variants.stream()
+                .sorted(Comparator.comparing(
+                        ProductVariant::getSortOrder,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ))
+                .map(this::toVariantResponse)
+                .toList();
+    }
+
 }

@@ -60,6 +60,7 @@ public enum ErrorCode {
     CANNOT_DELETE_SOLD_ASSET (400, "Tài khoản đã được bán, không thể xóa khỏi lịch sử!",HttpStatus.BAD_REQUEST),
     INVALID_DELIVERY_TYPE_FOR_ASSET(400, "Bạn chỉ có thể nạp kho cho sản phẩm có hình thức Giao hàng tức thì (INSTANT)!" , HttpStatus.BAD_REQUEST),
     ACCOUNT_IN_TRANSACTION_OR_LOCKED(400,"Tài khoản đang giao dịch hoặc bị khóa, không thể xóa lúc này!",HttpStatus.BAD_REQUEST),
+    ASSET_LINE_INVALID(400, "Mỗi tài khoản/key trong kho phải nằm trên đúng một dòng!", HttpStatus.BAD_REQUEST),
     INVALID_DELIVERY_TYPE_FOR_CONFIG(400, "Sản phẩm không thuộc loại đặt trước (PRE_ORDER) nên không thể cấu hình.", HttpStatus.BAD_REQUEST),
     PRODUCT_NOT_PURCHASED(403, "Bạn chưa mua sản phẩm này hoặc đơn hàng chưa được giao thành công!",HttpStatus.FORBIDDEN),
     IMAGE_STORAGE_UNAVAILABLE(503, "Kho ảnh chưa được cấu hình hoặc đang tạm thời không khả dụng!", HttpStatus.SERVICE_UNAVAILABLE),

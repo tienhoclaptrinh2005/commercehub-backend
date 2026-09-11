@@ -67,17 +67,17 @@ class ProductServiceImageReplacementTest {
         request.setThumbnailUrl("shops/3/products/2026/09/new.webp");
         ProductResponse response = ProductResponse.builder().build();
 
-        when(productRepository.findById(41L)).thenReturn(Optional.of(product));
+        when(productRepository.findSellerOwnedProductById(7L, 41L)).thenReturn(Optional.of(product));
         doAnswer(invocation -> {
             UpdateProductRequest source = invocation.getArgument(0);
             Product target = invocation.getArgument(1);
             target.setThumbnailUrl(source.getThumbnailUrl());
             return null;
         }).when(productMapper).updateProductFromRequest(eq(request), eq(product));
-        when(productRepository.save(product)).thenReturn(product);
+        when(productRepository.saveAndFlush(product)).thenReturn(product);
         when(productReviewService.getRatingSummary(41L))
                 .thenReturn(ProductReviewService.RatingSummary.unrated());
-        when(productMapper.toResponse(
+        when(productMapper.toSellerResponse(
                 eq(product),
                 eq(BigDecimal.ZERO),
                 any(BigDecimal.class),

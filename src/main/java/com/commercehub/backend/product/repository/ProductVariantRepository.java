@@ -38,7 +38,11 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
 
     @Modifying
-    @Query("UPDATE ProductVariant v SET v.stockCount = COALESCE(v.stockCount, 0) + :delta WHERE v.id = :variantId")
+    @Query("UPDATE ProductVariant v " +
+            "SET v.stockCount = CASE " +
+            "WHEN COALESCE(v.stockCount, 0) + :delta < 0 THEN 0 " +
+            "ELSE COALESCE(v.stockCount, 0) + :delta END " +
+            "WHERE v.id = :variantId")
     void incrementStockCount(@Param("variantId") Long variantId, @Param("delta") int delta);
 
     @Modifying(flushAutomatically = true)

@@ -55,6 +55,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpe
             "AND p.category.parent.isActive = true")
     Optional<Product> findPublicById(@Param("productId") Long productId);
 
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "variants", "preOrderConfig"})
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.id = :productId " +
+            "AND p.shop.owner.id = :sellerId " +
+            "AND p.status <> 'DELETED'")
+    Optional<Product> findSellerOwnedProductById(
+            @Param("sellerId") Long sellerId,
+            @Param("productId") Long productId
+    );
+
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "preOrderConfig"})
     @Query("SELECT p FROM Product p JOIN p.shop.owner.roles ownerRole " +
             "WHERE p.shop.id = :shopId " +
@@ -143,6 +153,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> , JpaSpe
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "preOrderConfig"})
     Page<Product> findByStatus(String status, Pageable pageable);
     boolean existsByNameAndShopIdAndStatusNot(String name, Long shopId, String status);
+
+    @Query("SELECT CASE WHEN COUNT(product) > 0 THEN true ELSE false END " +
+            "FROM Product product " +
+            "WHERE product.shop.id = :shopId " +
+            "AND product.id <> :productId " +
+            "AND product.status <> 'DELETED' " +
+            "AND LOWER(TRIM(product.name)) = LOWER(TRIM(:name))")
+    boolean existsSellerProductNameExcludingId(
+            @Param("shopId") Long shopId,
+            @Param("productId") Long productId,
+            @Param("name") String name
+    );
 
     @Override
     @EntityGraph(attributePaths = {"shop", "shop.owner", "category", "preOrderConfig"})

@@ -8,6 +8,7 @@ import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SlugUtils;
 import com.commercehub.backend.product.dto.request.CreateProductRequest;
 import com.commercehub.backend.product.dto.request.UpdateProductRequest;
+import com.commercehub.backend.product.dto.request.UpdateVariantRequest;
 import com.commercehub.backend.product.dto.response.ProductDetailResponse;
 import com.commercehub.backend.product.dto.response.ProductResponse;
 import com.commercehub.backend.product.dto.response.SellerProductListItemResponse;
@@ -22,6 +23,7 @@ import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.storage.event.ProductImageReplacedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -188,15 +190,19 @@ public class ProductService {
     }
 
     // (DÀNH CHO SELLER)
+    @Transactional(readOnly = true)
+    public ProductResponse getSellerProduct(Long userId, Long productId) {
+        Product product = productRepository.findSellerOwnedProductById(userId, productId)
+                .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+        validateShopCanSell(product.getShop());
+        return mapToSellerProductResponse(product);
+    }
+
     @Transactional
     public ProductResponse updateProduct(Long userId, Long productId, UpdateProductRequest request) {
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findSellerOwnedProductById(userId, productId)
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
         String previousThumbnail = product.getThumbnailUrl();
-
-        if (!product.getShop().getOwner().getId().equals(userId)) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
         validateShopCanSell(product.getShop());
 
         if ("DELETED".equals(product.getStatus())) {
@@ -210,17 +216,40 @@ public class ProductService {
             }
         }
 
-        if (request.getName() != null && !request.getName().trim().isEmpty() && !product.getName().equals(request.getName())) {
-            if (productRepository.existsByNameAndShopIdAndStatusNot(request.getName(), product.getShop().getId(), "DELETED")) {
+        if (request.getName() != null) {
+            String normalizedName = request.getName().trim();
+            if (normalizedName.isEmpty()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            request.setName(normalizedName);
+            if (!product.getName().equals(normalizedName)
+                    && productRepository.existsSellerProductNameExcludingId(
+                    product.getShop().getId(), product.getId(), normalizedName)) {
                 throw new AppException(ErrorCode.PRODUCT_ALREADY_EXISTS);
             }
 
-            String baseSlug = SlugUtils.toSlug(request.getName());
-            String generatedSlug = baseSlug + "-" + UUID.randomUUID().toString().substring(0, 6);
-            while (productRepository.existsBySlug(generatedSlug)) {
-                generatedSlug = baseSlug + "-" + UUID.randomUUID().toString().substring(0, 6);
+            if (!product.getName().equals(normalizedName)) {
+                String baseSlug = SlugUtils.toSlug(normalizedName);
+                String generatedSlug = baseSlug + "-" + UUID.randomUUID().toString().substring(0, 6);
+                while (productRepository.existsBySlug(generatedSlug)) {
+                    generatedSlug = baseSlug + "-" + UUID.randomUUID().toString().substring(0, 6);
+                }
+                product.setSlug(generatedSlug);
             }
-            product.setSlug(generatedSlug);
+        }
+        if (request.getShortDescription() != null) {
+            String value = request.getShortDescription().trim();
+            if (value.isEmpty()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            request.setShortDescription(value);
+        }
+        if (request.getDescription() != null) {
+            String value = request.getDescription().trim();
+            if (value.isEmpty()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            request.setDescription(value);
         }
 
         if (request.getCategoryId() != null && (product.getCategory() == null || !request.getCategoryId().equals(product.getCategory().getId()))) {
@@ -236,8 +265,16 @@ public class ProductService {
         }
 
         productMapper.updateProductFromRequest(request, product);
+        if (request.getVariants() != null) {
+            synchronizeVariants(product, request.getVariants());
+        }
 
-        Product savedProduct = productRepository.save(product);
+        Product savedProduct;
+        try {
+            savedProduct = productRepository.saveAndFlush(product);
+        } catch (DataIntegrityViolationException exception) {
+            throw new AppException(ErrorCode.VARIANT_ALREADY_EXISTS);
+        }
         if (!Objects.equals(previousThumbnail, savedProduct.getThumbnailUrl())
                 && mediaUrlService.isOwnedProductImageReference(
                         previousThumbnail,
@@ -248,7 +285,7 @@ public class ProductService {
                     previousThumbnail
             ));
         }
-        return mapToProductResponse(savedProduct);
+        return mapToSellerProductResponse(savedProduct);
     }
 
     @Transactional(readOnly = true)
@@ -406,6 +443,87 @@ public class ProductService {
         );
         response.setThumbnailUrl(mediaUrlService.toPublicUrl(product.getThumbnailUrl()));
         return response;
+    }
+
+    private ProductResponse mapToSellerProductResponse(Product product) {
+        BigDecimal minPrice = product.getVariants().stream()
+                .filter(variant -> "ACTIVE".equals(variant.getStatus()))
+                .map(ProductVariant::getPrice)
+                .min(BigDecimal::compareTo)
+                .orElse(BigDecimal.ZERO);
+        ProductReviewService.RatingSummary rating = productReviewService.getRatingSummary(product.getId());
+        ProductResponse response = productMapper.toSellerResponse(
+                product,
+                minPrice,
+                rating.averageRating(),
+                rating.reviewCount()
+        );
+        response.setThumbnailUrl(mediaUrlService.toPublicUrl(product.getThumbnailUrl()));
+        return response;
+    }
+
+    /**
+     * Đồng bộ tối đa năm biến thể trong cùng transaction với thông tin sản phẩm.
+     * Biến thể đã có lịch sử không bị xóa vật lý; khi seller bỏ khỏi form nó được
+     * chuyển INACTIVE để khóa mua mới nhưng vẫn giữ nguyên FK của đơn cũ.
+     */
+    private void synchronizeVariants(Product product, List<UpdateVariantRequest> requests) {
+        if (requests.isEmpty() || requests.size() > MAX_PRODUCT_VARIANTS) {
+            throw new AppException(ErrorCode.PRODUCT_VARIANT_LIMIT_REACHED);
+        }
+
+        Map<Long, ProductVariant> existingById = product.getVariants().stream()
+                .filter(variant -> variant.getId() != null)
+                .collect(Collectors.toMap(ProductVariant::getId, Function.identity()));
+        long newVariantCount = requests.stream().filter(request -> request.getId() == null).count();
+        if (existingById.size() + newVariantCount > MAX_PRODUCT_VARIANTS) {
+            throw new AppException(ErrorCode.PRODUCT_VARIANT_LIMIT_REACHED);
+        }
+        Set<Long> retainedIds = new HashSet<>();
+        Set<String> normalizedNames = new HashSet<>();
+
+        for (int index = 0; index < requests.size(); index++) {
+            UpdateVariantRequest request = requests.get(index);
+            if (request.getName() == null || request.getName().trim().isEmpty()
+                    || request.getPrice() == null) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            String name = request.getName().trim();
+            if (!normalizedNames.add(name.toLowerCase(Locale.ROOT))) {
+                throw new AppException(ErrorCode.VARIANT_ALREADY_EXISTS);
+            }
+            String status = request.getStatus() == null
+                    ? "ACTIVE"
+                    : request.getStatus().trim().toUpperCase(Locale.ROOT);
+            if (!Set.of("ACTIVE", "INACTIVE").contains(status)) {
+                throw new AppException(ErrorCode.VARIANT_INVALID_STATUS);
+            }
+
+            ProductVariant variant;
+            if (request.getId() == null) {
+                variant = ProductVariant.builder()
+                        .product(product)
+                        .stockCount(0)
+                        .build();
+                product.getVariants().add(variant);
+            } else {
+                variant = existingById.get(request.getId());
+                if (variant == null || !retainedIds.add(request.getId())) {
+                    throw new AppException(ErrorCode.INVALID_REQUEST);
+                }
+            }
+            variant.setName(name);
+            variant.setPrice(request.getPrice());
+            variant.setDurationDays(request.getDurationDays());
+            variant.setSortOrder(request.getSortOrder() == null ? index : request.getSortOrder());
+            variant.setStatus(status);
+        }
+
+        existingById.forEach((id, variant) -> {
+            if (!retainedIds.contains(id)) {
+                variant.setStatus("INACTIVE");
+            }
+        });
     }
 
     private Map<Long, ProductReviewService.RatingSummary> loadRatingSummaries(
