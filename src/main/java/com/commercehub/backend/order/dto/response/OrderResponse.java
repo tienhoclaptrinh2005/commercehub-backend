@@ -18,6 +18,7 @@ public class OrderResponse {
     private Long shopId;
     private String shopName;
     private String sellerUsername;
+    private String buyerUsername;
     private String deliveryType;
     private String status;
     private String effectiveStatus;

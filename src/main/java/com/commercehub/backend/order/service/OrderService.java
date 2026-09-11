@@ -21,9 +21,7 @@ import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +41,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderService {
 
-    private static final int MAX_BUYER_ORDER_PAGE_SIZE = 50;
+    private static final int MAX_ORDER_PAGE_SIZE = 50;
     private static final ZoneOffset BUSINESS_TIMEZONE_OFFSET = ZoneOffset.ofHours(7);
     private static final OffsetDateTime MIN_FILTER_TIME =
             LocalDate.of(1970, 1, 1).atStartOfDay().atOffset(BUSINESS_TIMEZONE_OFFSET);
@@ -68,6 +66,17 @@ public class OrderService {
             "PENDING",
             "APPROVED"
     );
+    private static final Set<String> SELLER_ORDER_FILTER_STATUSES = Set.of(
+            "WAITING_APPROVAL",
+            "PROCESSING",
+            "DELIVERED",
+            "DISPUTED",
+            "REJECTED",
+            "CANCELLED",
+            "CANCELLED_BY_SELLER",
+            "CANCELLED_BY_SYSTEM"
+    );
+    private static final Set<String> ORDER_DELIVERY_TYPES = Set.of("INSTANT", "PRE_ORDER");
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -99,7 +108,7 @@ public class OrderService {
         }
         if ((beforePlacedAt == null) != (beforeId == null)
                 || size < 1
-                || size > MAX_BUYER_ORDER_PAGE_SIZE) {
+                || size > MAX_ORDER_PAGE_SIZE) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
 
@@ -174,18 +183,59 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OrderResponse> getSellerOrders(Long shopId, Pageable pageable) {
-        return mapWithEffectiveStatus(orderRepository.findByShopId(shopId, pageable));
+    public Slice<OrderResponse> getSellerOrders(
+            Long shopId,
+            String search,
+            String deliveryType,
+            String status,
+            LocalDate fromDate,
+            LocalDate toDate,
+            OffsetDateTime beforePlacedAt,
+            Long beforeId,
+            int size
+    ) {
+        String normalizedSearch = search == null ? "" : search.trim();
+        String normalizedDeliveryType = deliveryType == null ? "" : deliveryType.trim().toUpperCase();
+        String normalizedStatus = status == null ? "" : status.trim().toUpperCase();
+        if (!normalizedDeliveryType.isEmpty() && !ORDER_DELIVERY_TYPES.contains(normalizedDeliveryType)) {
+            throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE);
+        }
+        if (!normalizedStatus.isEmpty() && !SELLER_ORDER_FILTER_STATUSES.contains(normalizedStatus)) {
+            throw new AppException(ErrorCode.INVALID_STATUS);
+        }
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+        if ((beforePlacedAt == null) != (beforeId == null)
+                || size < 1
+                || size > MAX_ORDER_PAGE_SIZE) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        OffsetDateTime fromDateTime = fromDate == null
+                ? MIN_FILTER_TIME
+                : fromDate.atStartOfDay().atOffset(BUSINESS_TIMEZONE_OFFSET);
+        OffsetDateTime toDateTimeExclusive = toDate == null
+                ? MAX_FILTER_TIME
+                : toDate.plusDays(1).atStartOfDay().atOffset(BUSINESS_TIMEZONE_OFFSET);
+        PageRequest pageRequest = PageRequest.of(0, size);
+        Slice<Order> orders = beforePlacedAt == null
+                ? orderRepository.findFirstSellerOrders(
+                        shopId, normalizedSearch, normalizedDeliveryType, normalizedStatus,
+                        fromDateTime, toDateTimeExclusive, ACTIVE_DISPUTE_STATUSES, pageRequest
+                )
+                : orderRepository.findSellerOrdersBefore(
+                        shopId, normalizedSearch, normalizedDeliveryType, normalizedStatus,
+                        fromDateTime, toDateTimeExclusive, beforePlacedAt, beforeId,
+                        ACTIVE_DISPUTE_STATUSES, pageRequest
+                );
+        return mapOrdersWithEffectiveStatus(orders);
     }
 
     @Transactional(readOnly = true)
     public OrderDetailResponse getSellerOrderDetail(Long shopId, Long orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdAndShopId(orderId, shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
-
-        if (!order.getShop().getId().equals(shopId)) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
         return buildOrderDetail(order);
     }
 
@@ -279,7 +329,7 @@ public class OrderService {
         return orderCode.trim();
     }
 
-    private Page<OrderResponse> mapWithEffectiveStatus(Page<Order> orders) {
+    private Slice<OrderResponse> mapOrdersWithEffectiveStatus(Slice<Order> orders) {
         List<Long> orderIds = orders.getContent().stream().map(Order::getId).toList();
         Set<Long> disputedOrderIds = orderIds.isEmpty()
                 ? Set.of()
@@ -299,17 +349,6 @@ public class OrderService {
      * tập kết quả. Spring Data chỉ lấy thêm một bản ghi để xác định còn trang sau.
      */
     private Slice<OrderResponse> mapBuyerOrdersWithEffectiveStatus(Slice<Order> orders) {
-        List<Long> orderIds = orders.getContent().stream().map(Order::getId).toList();
-        Set<Long> disputedOrderIds = orderIds.isEmpty()
-                ? Set.of()
-                : orderDisputeRepository.findOrderIdsWithStatuses(orderIds, ACTIVE_DISPUTE_STATUSES);
-
-        return orders.map(order -> {
-            OrderResponse response = orderMapper.toOrderResponse(order);
-            if (disputedOrderIds.contains(order.getId())) {
-                response.setEffectiveStatus("DISPUTED");
-            }
-            return response;
-        });
+        return mapOrdersWithEffectiveStatus(orders);
     }
 }

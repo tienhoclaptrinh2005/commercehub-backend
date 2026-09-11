@@ -108,12 +108,115 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             Pageable pageable
     );
 
-    @EntityGraph(attributePaths = {"shop", "shop.owner"})
-    Page<Order> findByShopId(Long shopId, Pageable pageable);
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "user"})
+    @Query("""
+            SELECT o
+            FROM Order o
+            WHERE o.shop.id = :shopId
+              AND (
+                    :search = ''
+                    OR LOWER(o.orderCode) LIKE CONCAT('%', LOWER(:search), '%')
+                    OR LOWER(o.user.username) LIKE CONCAT('%', LOWER(:search), '%')
+              )
+              AND (:deliveryType = '' OR o.deliveryType = :deliveryType)
+              AND o.placedAt >= :fromDateTime
+              AND o.placedAt < :toDateTimeExclusive
+              AND (
+                    :status = ''
+                    OR (
+                        :status = 'DISPUTED'
+                        AND EXISTS (
+                            SELECT d.id
+                            FROM OrderDispute d
+                            WHERE d.orderId = o.id
+                              AND d.status IN :activeDisputeStatuses
+                        )
+                    )
+                    OR (
+                        :status <> 'DISPUTED'
+                        AND o.status = :status
+                        AND NOT EXISTS (
+                            SELECT d.id
+                            FROM OrderDispute d
+                            WHERE d.orderId = o.id
+                              AND d.status IN :activeDisputeStatuses
+                        )
+                    )
+              )
+            ORDER BY o.placedAt DESC, o.id DESC
+            """)
+    Slice<Order> findFirstSellerOrders(
+            @Param("shopId") Long shopId,
+            @Param("search") String search,
+            @Param("deliveryType") String deliveryType,
+            @Param("status") String status,
+            @Param("fromDateTime") OffsetDateTime fromDateTime,
+            @Param("toDateTimeExclusive") OffsetDateTime toDateTimeExclusive,
+            @Param("activeDisputeStatuses") Set<String> activeDisputeStatuses,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "user"})
+    @Query("""
+            SELECT o
+            FROM Order o
+            WHERE o.shop.id = :shopId
+              AND (
+                    :search = ''
+                    OR LOWER(o.orderCode) LIKE CONCAT('%', LOWER(:search), '%')
+                    OR LOWER(o.user.username) LIKE CONCAT('%', LOWER(:search), '%')
+              )
+              AND (:deliveryType = '' OR o.deliveryType = :deliveryType)
+              AND o.placedAt >= :fromDateTime
+              AND o.placedAt < :toDateTimeExclusive
+              AND (
+                    o.placedAt < :beforePlacedAt
+                    OR (o.placedAt = :beforePlacedAt AND o.id < :beforeId)
+              )
+              AND (
+                    :status = ''
+                    OR (
+                        :status = 'DISPUTED'
+                        AND EXISTS (
+                            SELECT d.id
+                            FROM OrderDispute d
+                            WHERE d.orderId = o.id
+                              AND d.status IN :activeDisputeStatuses
+                        )
+                    )
+                    OR (
+                        :status <> 'DISPUTED'
+                        AND o.status = :status
+                        AND NOT EXISTS (
+                            SELECT d.id
+                            FROM OrderDispute d
+                            WHERE d.orderId = o.id
+                              AND d.status IN :activeDisputeStatuses
+                        )
+                    )
+              )
+            ORDER BY o.placedAt DESC, o.id DESC
+            """)
+    Slice<Order> findSellerOrdersBefore(
+            @Param("shopId") Long shopId,
+            @Param("search") String search,
+            @Param("deliveryType") String deliveryType,
+            @Param("status") String status,
+            @Param("fromDateTime") OffsetDateTime fromDateTime,
+            @Param("toDateTimeExclusive") OffsetDateTime toDateTimeExclusive,
+            @Param("beforePlacedAt") OffsetDateTime beforePlacedAt,
+            @Param("beforeId") Long beforeId,
+            @Param("activeDisputeStatuses") Set<String> activeDisputeStatuses,
+            Pageable pageable
+    );
 
     /** Buyer chỉ tra cứu được orderCode thuộc chính tài khoản của mình. */
     @EntityGraph(attributePaths = {"shop", "shop.owner"})
     Optional<Order> findByOrderCodeAndUserId(String orderCode, Long userId);
+
+    /** Seller chỉ tra cứu được ID đơn thuộc chính gian hàng, tránh lộ dữ liệu qua ID tuần tự. */
+    @EntityGraph(attributePaths = {"shop", "shop.owner", "user"})
+    Optional<Order> findByIdAndShopId(Long id, Long shopId);
 
     @Query("SELECT o FROM Order o WHERE o.id IN :orderIds AND o.user.id = :buyerId")
     List<Order> findCheckoutOrdersForBuyer(

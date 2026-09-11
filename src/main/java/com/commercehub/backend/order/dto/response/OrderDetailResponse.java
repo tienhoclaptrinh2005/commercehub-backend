@@ -20,6 +20,7 @@ public class OrderDetailResponse {
     private Long shopId;
     private String shopName;
     private String sellerUsername;
+    private String buyerUsername;
     private String deliveryType;
     private String status;
     private String effectiveStatus;
@@ -29,6 +30,9 @@ public class OrderDetailResponse {
     private BigDecimal voucherDiscount;
     private BigDecimal totalAmount;
     private OffsetDateTime placedAt;
+    private OffsetDateTime approvalDeadlineAt;
+    private OffsetDateTime processingDeadlineAt;
+    private String rejectionReason;
     private OffsetDateTime deliveredAt;
 
     // Danh sách sản phẩm trong đơn

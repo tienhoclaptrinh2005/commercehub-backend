@@ -73,4 +73,16 @@ class OrderServiceOwnershipTest {
                 .isInstanceOfSatisfying(AppException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECORD_NOT_FOUND));
     }
+
+    @Test
+    void sellerOrderLookupCombinesOrderIdAndCurrentShop() {
+        when(orderRepository.findByIdAndShopId(41L, 9L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getSellerOrderDetail(9L, 41L))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECORD_NOT_FOUND));
+
+        verify(orderRepository).findByIdAndShopId(41L, 9L);
+        verify(orderRepository, never()).findById(anyLong());
+    }
 }
