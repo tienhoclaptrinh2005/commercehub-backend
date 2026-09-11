@@ -12,6 +12,7 @@ import com.commercehub.backend.product.entity.ProductVariant;
 import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.product.repository.ProductSpecification;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +34,7 @@ public class ProductSearchService {
     private final ProductMapper productMapper;
     private final CategoryRepository categoryRepository;
     private final ProductReviewService productReviewService;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> searchProducts(ProductFilterRequest request, int page, int size) {
@@ -70,12 +72,14 @@ public class ProductSearchService {
                     product.getId(),
                     ProductReviewService.RatingSummary.unrated()
             );
-            return productMapper.toResponse(
+            ProductResponse response = productMapper.toResponse(
                     product,
                     minPrice,
                     rating.averageRating(),
                     rating.reviewCount()
             );
+            response.setThumbnailUrl(mediaUrlService.toPublicUrl(product.getThumbnailUrl()));
+            return response;
         });
 
         return PageResponse.of(productPage);
