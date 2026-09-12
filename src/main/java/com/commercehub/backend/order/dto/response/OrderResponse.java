@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -19,6 +20,7 @@ public class OrderResponse {
     private String shopName;
     private String sellerUsername;
     private String buyerUsername;
+    private List<String> variantNames;
     private String deliveryType;
     private String status;
     private String effectiveStatus;

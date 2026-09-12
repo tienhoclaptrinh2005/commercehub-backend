@@ -246,15 +246,36 @@ class CommercehubBackendApplicationTests {
 		assertTrue(workload.getNewRequestCount() >= 0);
 		assertTrue(workload.getProcessingCount() >= 0);
 
+		Long sellerId = jdbcTemplate.queryForObject(
+				"SELECT owner_id FROM shops WHERE id = ?",
+				Long.class,
+				shopId
+		);
 		var notifications = assertDoesNotThrow(() ->
 				sellerDashboardRepository.findSellerNotificationCounts(
 						shopId,
+						sellerId,
 						OffsetDateTime.now().minusHours(24)
 				));
 		assertTrue(notifications.getRecentInstantOrderCount() >= 0);
 		assertTrue(notifications.getNewPreOrderRequestCount() >= 0);
 		assertTrue(notifications.getProcessingPreOrderCount() >= 0);
 		assertTrue(notifications.getActiveDisputeCount() >= 0);
+
+		assertDoesNotThrow(() -> {
+			sellerDashboardRepository.markSellerNotificationCategoryRead(sellerId, "INSTANT_ORDERS");
+			sellerDashboardRepository.markSellerNotificationCategoryRead(sellerId, "PRE_ORDERS");
+			sellerDashboardRepository.markSellerNotificationCategoryRead(sellerId, "DISPUTES");
+		});
+		var notificationsAfterRead = sellerDashboardRepository.findSellerNotificationCounts(
+				shopId,
+				sellerId,
+				OffsetDateTime.now().minusHours(24)
+		);
+		assertEquals(0L, notificationsAfterRead.getRecentInstantOrderCount());
+		assertEquals(0L, notificationsAfterRead.getNewPreOrderRequestCount());
+		assertEquals(0L, notificationsAfterRead.getProcessingPreOrderCount());
+		assertEquals(0L, notificationsAfterRead.getActiveDisputeCount());
 
 		var recentOrders = assertDoesNotThrow(() -> sellerDashboardRepository.findRecentOrders(shopId));
 		assertFalse(recentOrders.isEmpty());

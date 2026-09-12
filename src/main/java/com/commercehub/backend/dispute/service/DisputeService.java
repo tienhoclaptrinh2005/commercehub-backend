@@ -131,7 +131,8 @@ public class DisputeService {
         dispute =
                 disputeRepository.save(dispute);
 
-        return disputeMapper.toResponse(dispute);
+        OrderDispute detailedDispute = disputeRepository.findById(dispute.getId()).orElse(dispute);
+        return disputeMapper.toResponse(detailedDispute);
     }
 
     // =========================================================

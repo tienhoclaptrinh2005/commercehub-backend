@@ -44,6 +44,7 @@ public interface OrderDisputeRepository
     // LOCK
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
     @Query("""
             SELECT d
             FROM OrderDispute d
@@ -54,6 +55,7 @@ public interface OrderDisputeRepository
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
     @Query("""
             SELECT d
             FROM OrderDispute d
@@ -185,24 +187,32 @@ public interface OrderDisputeRepository
 
     // LIST
 
+    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
     Page<OrderDispute> findByUserIdOrderByCreatedAtDesc(
             Long userId,
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
     Page<OrderDispute> findByShopIdOrderByCreatedAtDesc(
             Long shopId,
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
     Page<OrderDispute> findByStatusOrderByCreatedAtDesc(
             String status,
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
     Page<OrderDispute> findAllByOrderByCreatedAtDesc(
             Pageable pageable
     );
+
+    @Override
+    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
+    Optional<OrderDispute> findById(Long id);
 
     @Query("""
             SELECT d.id

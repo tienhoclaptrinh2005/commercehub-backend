@@ -338,9 +338,26 @@ public class OrderService {
         Set<Long> disputedOrderIds = orderIds.isEmpty()
                 ? Set.of()
                 : orderDisputeRepository.findOrderIdsWithStatuses(orderIds, ACTIVE_DISPUTE_STATUSES);
+        Map<Long, List<String>> variantNamesByOrder = orderIds.isEmpty()
+                ? Map.of()
+                : orderItemRepository.findByOrderIdIn(orderIds).stream()
+                        .collect(Collectors.groupingBy(
+                                item -> item.getOrder().getId(),
+                                LinkedHashMap::new,
+                                Collectors.mapping(
+                                        item -> item.getVariantName() == null || item.getVariantName().isBlank()
+                                                ? "Mặc định"
+                                                : item.getVariantName(),
+                                        Collectors.collectingAndThen(
+                                                Collectors.toCollection(java.util.LinkedHashSet::new),
+                                                List::copyOf
+                                        )
+                                )
+                        ));
 
         return orders.map(order -> {
             OrderResponse response = orderMapper.toOrderResponse(order);
+            response.setVariantNames(variantNamesByOrder.getOrDefault(order.getId(), List.of()));
             if (disputedOrderIds.contains(order.getId())) {
                 response.setEffectiveStatus("DISPUTED");
             }

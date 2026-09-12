@@ -22,6 +22,7 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +31,11 @@ public class SellerDashboardService {
     private static final ZoneId BUSINESS_TIMEZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final ZoneOffset BUSINESS_OFFSET = ZoneOffset.ofHours(7);
     private static final YearMonth EARLIEST_ALLOWED_MONTH = YearMonth.of(2000, 1);
+    private static final Set<String> NOTIFICATION_CATEGORIES = Set.of(
+            "INSTANT_ORDERS",
+            "PRE_ORDERS",
+            "DISPUTES"
+    );
 
     private final ShopService shopService;
     private final WalletRepository walletRepository;
@@ -123,6 +129,7 @@ public class SellerDashboardService {
         SellerDashboardRepository.SellerNotificationProjection counts =
                 dashboardRepository.findSellerNotificationCounts(
                         shop.getId(),
+                        sellerId,
                         OffsetDateTime.now(BUSINESS_TIMEZONE).minusHours(24)
                 );
 
@@ -132,6 +139,18 @@ public class SellerDashboardService {
                 projectionCount(counts == null ? null : counts.getProcessingPreOrderCount()),
                 projectionCount(counts == null ? null : counts.getActiveDisputeCount())
         );
+    }
+
+    @Transactional
+    public SellerNotificationResponse markNotificationsRead(Long sellerId, String category) {
+        String normalizedCategory = category == null ? "" : category.trim().toUpperCase();
+        if (!NOTIFICATION_CATEGORIES.contains(normalizedCategory)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        shopService.getShopByOwnerId(sellerId);
+        dashboardRepository.markSellerNotificationCategoryRead(sellerId, normalizedCategory);
+        return getNotifications(sellerId);
     }
 
     private YearMonth parseMonth(String requestedMonth) {

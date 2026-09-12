@@ -7,6 +7,9 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
+import com.commercehub.backend.order.entity.Order;
+import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.shop.entity.Shop;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -53,6 +56,18 @@ public class OrderDispute {
 
     @Column(name = "shop_id", nullable = false)
     Long shopId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", insertable = false, updatable = false)
+    Order order;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_item_id", insertable = false, updatable = false)
+    OrderItem orderItem;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shop_id", insertable = false, updatable = false)
+    Shop shop;
 
 
     @Column(name = "reason", nullable = false, columnDefinition = "TEXT")

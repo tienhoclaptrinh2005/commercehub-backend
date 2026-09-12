@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 class SellerDashboardServiceTest {
 
@@ -124,7 +125,7 @@ class SellerDashboardServiceTest {
         when(counts.getNewPreOrderRequestCount()).thenReturn(12L);
         when(counts.getProcessingPreOrderCount()).thenReturn(3L);
         when(counts.getActiveDisputeCount()).thenReturn(2L);
-        when(dashboardRepository.findSellerNotificationCounts(eq(7L), any(OffsetDateTime.class)))
+        when(dashboardRepository.findSellerNotificationCounts(eq(7L), eq(9L), any(OffsetDateTime.class)))
                 .thenReturn(counts);
 
         SellerNotificationResponse response = service.getNotifications(9L);
@@ -133,6 +134,20 @@ class SellerDashboardServiceTest {
         assertThat(response.newPreOrderRequestCount()).isEqualTo(12L);
         assertThat(response.processingPreOrderCount()).isEqualTo(3L);
         assertThat(response.activeDisputeCount()).isEqualTo(2L);
+    }
+
+    @Test
+    void markingOneNotificationCategoryPersistsReadTimeAndReturnsFreshCounts() {
+        SellerDashboardRepository.SellerNotificationProjection counts =
+                mock(SellerDashboardRepository.SellerNotificationProjection.class);
+        when(shopService.getShopByOwnerId(9L)).thenReturn(Shop.builder().id(7L).build());
+        when(dashboardRepository.findSellerNotificationCounts(eq(7L), eq(9L), any(OffsetDateTime.class)))
+                .thenReturn(counts);
+
+        SellerNotificationResponse response = service.markNotificationsRead(9L, "pre_orders");
+
+        verify(dashboardRepository).markSellerNotificationCategoryRead(9L, "PRE_ORDERS");
+        assertThat(response.newPreOrderRequestCount()).isZero();
     }
 
     private SellerDashboardRepository.DailyRevenueProjection dailyRow(

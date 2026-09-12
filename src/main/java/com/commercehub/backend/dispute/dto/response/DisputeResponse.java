@@ -23,6 +23,14 @@ public class DisputeResponse {
 
     private Long shopId;
 
+    private String orderCode;
+
+    private String shopName;
+
+    private String productName;
+
+    private String variantName;
+
     private String reason;
 
     private List<String> evidenceUrls;

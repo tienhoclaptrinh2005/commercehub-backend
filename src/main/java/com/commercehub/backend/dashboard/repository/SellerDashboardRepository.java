@@ -2,6 +2,7 @@ package com.commercehub.backend.dashboard.repository;
 
 import com.commercehub.backend.order.entity.Order;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
@@ -177,6 +178,14 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
             SELECT COUNT(*) FILTER (
                        WHERE o.delivery_type = 'INSTANT'
                          AND o.placed_at >= :recentSince
+                         AND o.placed_at > COALESCE(
+                             (
+                                 SELECT reads.instant_orders_read_at
+                                 FROM seller_notification_reads reads
+                                 WHERE reads.seller_id = :sellerId
+                             ),
+                             TIMESTAMPTZ 'epoch'
+                         )
                          AND o.payment_status IN ('PAID', 'PARTIAL_REFUND')
                          AND o.status NOT IN (
                              'REJECTED', 'REFUNDED', 'CANCELLED',
@@ -186,10 +195,26 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
                    COUNT(*) FILTER (
                        WHERE o.delivery_type = 'PRE_ORDER'
                          AND o.status = 'WAITING_APPROVAL'
+                         AND o.placed_at > COALESCE(
+                             (
+                                 SELECT reads.pre_orders_read_at
+                                 FROM seller_notification_reads reads
+                                 WHERE reads.seller_id = :sellerId
+                             ),
+                             TIMESTAMPTZ 'epoch'
+                         )
                    )::BIGINT AS "newPreOrderRequestCount",
                    COUNT(*) FILTER (
                        WHERE o.delivery_type = 'PRE_ORDER'
                          AND o.status = 'PROCESSING'
+                         AND o.placed_at > COALESCE(
+                             (
+                                 SELECT reads.pre_orders_read_at
+                                 FROM seller_notification_reads reads
+                                 WHERE reads.seller_id = :sellerId
+                             ),
+                             TIMESTAMPTZ 'epoch'
+                         )
                    )::BIGINT AS "processingPreOrderCount",
                    (
                        SELECT COUNT(*)::BIGINT
@@ -199,13 +224,59 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
                              'OPEN', 'WARRANTY_IN_PROGRESS',
                              'WAITING_BUYER_CONFIRMATION', 'PROCESSING'
                          )
+                         AND dispute.created_at > COALESCE(
+                             (
+                                 SELECT reads.disputes_read_at
+                                 FROM seller_notification_reads reads
+                                 WHERE reads.seller_id = :sellerId
+                             ),
+                             TIMESTAMPTZ 'epoch'
+                         )
                    ) AS "activeDisputeCount"
             FROM orders o
             WHERE o.shop_id = :shopId
             """, nativeQuery = true)
     SellerNotificationProjection findSellerNotificationCounts(
             @Param("shopId") Long shopId,
+            @Param("sellerId") Long sellerId,
             @Param("recentSince") OffsetDateTime recentSince
+    );
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO seller_notification_reads (
+                seller_id,
+                instant_orders_read_at,
+                pre_orders_read_at,
+                disputes_read_at,
+                created_at,
+                updated_at
+            ) VALUES (
+                :sellerId,
+                CASE WHEN :category = 'INSTANT_ORDERS' THEN NOW() ELSE TIMESTAMPTZ 'epoch' END,
+                CASE WHEN :category = 'PRE_ORDERS' THEN NOW() ELSE TIMESTAMPTZ 'epoch' END,
+                CASE WHEN :category = 'DISPUTES' THEN NOW() ELSE TIMESTAMPTZ 'epoch' END,
+                NOW(),
+                NOW()
+            )
+            ON CONFLICT (seller_id) DO UPDATE SET
+                instant_orders_read_at = CASE
+                    WHEN :category = 'INSTANT_ORDERS' THEN NOW()
+                    ELSE seller_notification_reads.instant_orders_read_at
+                END,
+                pre_orders_read_at = CASE
+                    WHEN :category = 'PRE_ORDERS' THEN NOW()
+                    ELSE seller_notification_reads.pre_orders_read_at
+                END,
+                disputes_read_at = CASE
+                    WHEN :category = 'DISPUTES' THEN NOW()
+                    ELSE seller_notification_reads.disputes_read_at
+                END,
+                updated_at = NOW()
+            """, nativeQuery = true)
+    void markSellerNotificationCategoryRead(
+            @Param("sellerId") Long sellerId,
+            @Param("category") String category
     );
 
     @Query(value = """
