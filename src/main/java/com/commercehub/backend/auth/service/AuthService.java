@@ -9,6 +9,7 @@ import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.security.JwtTokenProvider;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.entity.LevelConfig;
 import com.commercehub.backend.user.entity.Role;
 import com.commercehub.backend.user.entity.User;
@@ -58,6 +59,7 @@ public class AuthService {
     private final LevelConfigRepository levelConfigRepository;
     private final WalletRepository walletRepository;
     private final ShopRepository shopRepository;
+    private final MediaUrlService mediaUrlService;
 
     @Value("${google.client-id:xxxxxxxx.googleusercontent.com}")
     private String googleClientId;
@@ -279,7 +281,7 @@ public class AuthService {
                 user = User.builder()
                         .email(email)
                         .fullName(name != null ? name : "Người dùng Google")
-                        .avatarUrl(pictureUrl)
+                        .avatarUrl(GoogleAvatarPolicy.keepStoredOrUseGoogle(null, pictureUrl))
                         .username(generateUniqueUsername(email))
                         .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
                         .roles(new java.util.HashSet<>(java.util.List.of(buyerRole)))
@@ -309,6 +311,13 @@ public class AuthService {
                 if (!"ACTIVE".equals(user.getStatus())) {
                     throw new AppException(ErrorCode.ACCOUNT_LOCKED);
                 }
+                // Ảnh Google chỉ khởi tạo giá trị còn thiếu. Sau khi người dùng
+                // đã tải avatar riêng lên R2, lần Google login sau không được
+                // ghi đè object key đang lưu trong database.
+                user.setAvatarUrl(GoogleAvatarPolicy.keepStoredOrUseGoogle(
+                        user.getAvatarUrl(),
+                        pictureUrl
+                ));
             }
 
             Authentication authentication = createAuthentication(user);
@@ -374,9 +383,11 @@ public class AuthService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
+                .avatarUrl(mediaUrlService.toPublicUrl(user.getAvatarUrl()))
                 .roles(roles)
                 .shopId(shop == null ? null : shop.getId())
                 .shopStatus(shop == null ? null : shop.getStatus())
                 .build();
     }
+
 }

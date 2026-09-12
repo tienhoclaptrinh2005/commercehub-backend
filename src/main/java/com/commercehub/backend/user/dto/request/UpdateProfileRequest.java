@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.validator.constraints.URL;
 
 @Getter
 @Setter
@@ -18,7 +17,4 @@ public class UpdateProfileRequest {
     String fullName;
     @Pattern(regexp = "^(0[3|5|7|8|9])+([0-9]{8})$", message = "Số điện thoại không đúng định dạng!")
     String phone;
-    @URL(message = "Đường dẫn ảnh đại diện phải là m ột URL hợp lệ!")
-    String avatarUrl;
-
 }

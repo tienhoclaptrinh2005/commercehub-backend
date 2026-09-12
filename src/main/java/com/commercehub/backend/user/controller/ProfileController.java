@@ -4,7 +4,6 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.security.CustomUserDetails;
-import com.commercehub.backend.user.dto.request.UpdateAvatarRequest;
 import com.commercehub.backend.user.dto.request.UpdateProfileRequest;
 import com.commercehub.backend.user.dto.response.ProfileResponse;
 import com.commercehub.backend.user.service.ProfileService;
@@ -44,13 +43,4 @@ public class ProfileController {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật hồ sơ thành công !" , response));
 
     }
-
-
-    @PatchMapping("/avatar")
-    public ResponseEntity<ApiResponse<ProfileResponse>> updateAvatar(@Valid @RequestBody UpdateAvatarRequest request, @AuthenticationPrincipal CustomUserDetails currentUser) {
-        String email = currentUser.getUsername();
-        ProfileResponse response = profileService.updateAvatar(email, request);
-        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công !", response));
-    }
-
 }

@@ -12,6 +12,7 @@ import com.commercehub.backend.shop.dto.response.ShopApplicationResponse;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.mapper.ShopMapper;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.entity.Role;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.RoleRepository;
@@ -50,6 +51,7 @@ public class ShopService {
     private final RoleRepository roleRepository;
     private final OrderStatisticsService orderStatisticsService;
     private final ProductRepository productRepository;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional(readOnly = true)
     public Page<ShopResponse> getAllActiveShops(
@@ -86,6 +88,7 @@ public class ShopService {
 
         return shopPage.map(shop -> {
             ShopResponse response = shopMapper.toResponse(shop);
+            resolveMediaUrls(response);
             ProductRepository.ShopProductStats stats = statsByShopId.get(shop.getId());
             response.setActiveProductCount(stats == null ? 0L : stats.getActiveProductCount());
             response.setSoldProductCount(stats == null ? 0L : stats.getSoldProductCount());
@@ -107,7 +110,13 @@ public class ShopService {
                 .countCompletedPurchases(shop.getOwner().getId());
         long successfulSaleCount = orderStatisticsService.countSuccessfulSales(shop.getId());
 
-        return shopMapper.toResponse(shop, ownerCompletedPurchaseCount, successfulSaleCount);
+        ShopResponse response = shopMapper.toResponse(
+                shop,
+                ownerCompletedPurchaseCount,
+                successfulSaleCount
+        );
+        resolveMediaUrls(response);
+        return response;
     }
 
     @Transactional
@@ -187,7 +196,9 @@ public class ShopService {
 
         shopMapper.updateEntityFromRequest(request, shop);
 
-        return shopMapper.toResponse(shopRepository.save(shop));
+        ShopResponse response = shopMapper.toResponse(shopRepository.save(shop));
+        resolveMediaUrls(response);
+        return response;
     }
 
     @Cacheable(value = "shopByOwner", key = "#ownerId")
@@ -246,6 +257,11 @@ public class ShopService {
      * Mỗi user chỉ giữ một role. Khi shop được duyệt, BUYER trở thành SELLER.
      * Shop của SELLER có thể được kích hoạt lại; ADMIN/SUPER_ADMIN bị từ chối.
      */
+    private void resolveMediaUrls(ShopResponse response) {
+        response.setShopAvatarUrl(mediaUrlService.toPublicUrl(response.getShopAvatarUrl()));
+        response.setShopCoverUrl(mediaUrlService.toPublicUrl(response.getShopCoverUrl()));
+    }
+
     private void promoteOwnerForApprovedShop(User owner, String approvedShopName) {
         if (owner.getRoles().size() != 1) {
             throw new AppException(ErrorCode.SYSTEM_CONFIG_ERROR);

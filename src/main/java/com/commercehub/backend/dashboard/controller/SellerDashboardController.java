@@ -2,6 +2,7 @@ package com.commercehub.backend.dashboard.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.dashboard.dto.response.SellerDashboardResponse;
+import com.commercehub.backend.dashboard.dto.response.SellerNotificationResponse;
 import com.commercehub.backend.dashboard.service.SellerDashboardService;
 import com.commercehub.backend.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -28,5 +29,13 @@ public class SellerDashboardController {
     ) {
         SellerDashboardResponse response = dashboardService.getDashboard(currentUser.getId(), month);
         return ResponseEntity.ok(ApiResponse.success("Lấy tổng quan bán hàng thành công", response));
+    }
+
+    @GetMapping("/notifications")
+    public ResponseEntity<ApiResponse<SellerNotificationResponse>> getNotifications(
+            @AuthenticationPrincipal CustomUserDetails currentUser
+    ) {
+        SellerNotificationResponse response = dashboardService.getNotifications(currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông báo bán hàng thành công", response));
     }
 }

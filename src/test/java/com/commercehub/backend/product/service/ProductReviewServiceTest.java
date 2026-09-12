@@ -10,6 +10,7 @@ import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.product.repository.ProductReviewRepository;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +49,8 @@ class ProductReviewServiceTest {
                 userRepository,
                 productMapper,
                 orderItemRepository,
-                shopRepository
+                shopRepository,
+                mock(MediaUrlService.class)
         );
     }
 

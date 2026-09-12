@@ -79,6 +79,7 @@ public class ProductSearchService {
                     rating.reviewCount()
             );
             response.setThumbnailUrl(mediaUrlService.toPublicUrl(product.getThumbnailUrl()));
+            response.setSellerAvatarUrl(mediaUrlService.toPublicUrl(response.getSellerAvatarUrl()));
             return response;
         });
 

@@ -26,6 +26,7 @@ public class AuthResponse {
     String username;
     String email;
     String fullName;
+    String avatarUrl;
     Set<String> roles;
     Long shopId;
     String shopStatus;

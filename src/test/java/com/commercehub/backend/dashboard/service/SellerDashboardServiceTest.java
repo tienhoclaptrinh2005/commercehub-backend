@@ -3,6 +3,7 @@ package com.commercehub.backend.dashboard.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.dashboard.dto.response.SellerDashboardResponse;
+import com.commercehub.backend.dashboard.dto.response.SellerNotificationResponse;
 import com.commercehub.backend.dashboard.repository.SellerDashboardRepository;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.service.ShopService;
@@ -112,6 +113,19 @@ class SellerDashboardServiceTest {
                 .isInstanceOf(AppException.class)
                 .extracting(exception -> ((AppException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    void notificationCountUsesCurrentWaitingPreOrders() {
+        SellerDashboardRepository.PreOrderWorkloadProjection workload =
+                mock(SellerDashboardRepository.PreOrderWorkloadProjection.class);
+        when(shopService.getShopByOwnerId(9L)).thenReturn(Shop.builder().id(7L).build());
+        when(workload.getNewRequestCount()).thenReturn(12L);
+        when(dashboardRepository.findCurrentPreOrderWorkload(7L)).thenReturn(workload);
+
+        SellerNotificationResponse response = service.getNotifications(9L);
+
+        assertThat(response.newPreOrderRequestCount()).isEqualTo(12L);
     }
 
     private SellerDashboardRepository.DailyRevenueProjection dailyRow(

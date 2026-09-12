@@ -3,6 +3,7 @@ package com.commercehub.backend.user.service;
 import com.commercehub.backend.order.service.OrderStatisticsService;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.dto.response.UserResponse;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.mapper.UserMapper;
@@ -22,6 +23,7 @@ class UserServiceTest {
     private UserMapper userMapper;
     private OrderStatisticsService orderStatisticsService;
     private ShopRepository shopRepository;
+    private MediaUrlService mediaUrlService;
     private UserService userService;
 
     @BeforeEach
@@ -30,11 +32,15 @@ class UserServiceTest {
         userMapper = mock(UserMapper.class);
         orderStatisticsService = mock(OrderStatisticsService.class);
         shopRepository = mock(ShopRepository.class);
+        mediaUrlService = mock(MediaUrlService.class);
+        when(mediaUrlService.toPublicUrl(org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         userService = new UserService(
                 userRepository,
                 userMapper,
                 orderStatisticsService,
-                shopRepository
+                shopRepository,
+                mediaUrlService
         );
     }
 

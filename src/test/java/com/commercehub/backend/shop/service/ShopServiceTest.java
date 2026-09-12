@@ -10,6 +10,7 @@ import com.commercehub.backend.shop.dto.response.ShopResponse;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.mapper.ShopMapper;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.entity.Role;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.RoleRepository;
@@ -44,6 +45,7 @@ class ShopServiceTest {
     private UserRepository userRepository;
     private RoleRepository roleRepository;
     private ProductRepository productRepository;
+    private MediaUrlService mediaUrlService;
     private ShopService service;
 
     @BeforeEach
@@ -53,13 +55,15 @@ class ShopServiceTest {
         userRepository = mock(UserRepository.class);
         roleRepository = mock(RoleRepository.class);
         productRepository = mock(ProductRepository.class);
+        mediaUrlService = mock(MediaUrlService.class);
         service = new ShopService(
                 shopRepository,
                 shopMapper,
                 userRepository,
                 roleRepository,
                 mock(OrderStatisticsService.class),
-                productRepository
+                productRepository,
+                mediaUrlService
         );
     }
 

@@ -4,6 +4,7 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.service.OrderStatisticsService;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.dto.response.UserResponse;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.mapper.UserMapper;
@@ -27,6 +28,7 @@ public class UserService {
     private final UserMapper userMapper;
     private final OrderStatisticsService orderStatisticsService;
     private final ShopRepository shopRepository;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional(readOnly = true)
     public UserResponse getUserByUsername(String username) {
@@ -45,13 +47,14 @@ public class UserService {
                 completedPurchaseCount,
                 successfulSaleCount
         );
+        response.setAvatarUrl(mediaUrlService.toPublicUrl(user.getAvatarUrl()));
 
         shopRepository.findByOwnerId(user.getId())
                 .filter(shop -> "ACTIVE".equals(shop.getStatus()))
                 .ifPresent(shop -> {
                     response.setShopId(shop.getId());
                     response.setShopName(shop.getName());
-                    response.setShopAvatarUrl(user.getAvatarUrl());
+                    response.setShopAvatarUrl(mediaUrlService.toPublicUrl(user.getAvatarUrl()));
                 });
 
         return response;

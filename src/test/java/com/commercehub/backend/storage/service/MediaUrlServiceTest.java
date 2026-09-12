@@ -55,4 +55,20 @@ class MediaUrlServiceTest {
         )).isInstanceOfSatisfying(AppException.class, exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.IMAGE_UPLOAD_REFERENCE_INVALID));
     }
+
+    @Test
+    void onlyAllowsUserToApplyAnAvatarFromTheirOwnPrefix() {
+        MediaUrlService service = new MediaUrlService(new R2StorageProperties());
+
+        assertThat(service.normalizeOwnedAvatarImageReference(
+                "users/7/avatars/2026/09/avatar.webp",
+                7L
+        )).isEqualTo("users/7/avatars/2026/09/avatar.webp");
+
+        assertThatThrownBy(() -> service.normalizeOwnedAvatarImageReference(
+                "users/8/avatars/2026/09/avatar.webp",
+                7L
+        )).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.IMAGE_UPLOAD_ACCESS_DENIED));
+    }
 }

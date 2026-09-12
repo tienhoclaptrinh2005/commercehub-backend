@@ -11,6 +11,7 @@ import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.product.repository.ProductReviewRepository;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class ProductReviewService {
     private final ProductMapper productMapper;
     private final OrderItemRepository orderItemRepository;
     private final ShopRepository shopRepository;
+    private final MediaUrlService mediaUrlService;
 
     @Transactional
     public ProductReviewResponse createReview(Long userId, CreateProductReviewRequest request) {
@@ -83,7 +85,7 @@ public class ProductReviewService {
         ensureShopRatingUpdated(
                 shopRepository.addVisibleRating(product.getShop().getId(), request.getRating())
         );
-        return productMapper.toReviewResponse(savedReview);
+        return resolveReviewerAvatar(productMapper.toReviewResponse(savedReview));
     }
 
     @Transactional
@@ -93,7 +95,7 @@ public class ProductReviewService {
 
         boolean currentlyVisible = Boolean.TRUE.equals(review.getIsVisible());
         if (currentlyVisible == visible) {
-            return productMapper.toReviewResponse(review);
+            return resolveReviewerAvatar(productMapper.toReviewResponse(review));
         }
 
         review.setIsVisible(visible);
@@ -103,7 +105,7 @@ public class ProductReviewService {
                 ? shopRepository.addVisibleRating(shopId, review.getRating())
                 : shopRepository.removeVisibleRating(shopId, review.getRating());
         ensureShopRatingUpdated(updatedRows);
-        return productMapper.toReviewResponse(savedReview);
+        return resolveReviewerAvatar(productMapper.toReviewResponse(savedReview));
     }
 
     @Transactional(readOnly = true)
@@ -117,7 +119,8 @@ public class ProductReviewService {
         Pageable pageable = PageRequest.of(validPage, validSize, Sort.by("createdAt").descending());
 
         return reviewRepository.findByProductIdAndIsVisibleTrue(productId, pageable)
-                .map(productMapper::toReviewResponse);
+                .map(productMapper::toReviewResponse)
+                .map(this::resolveReviewerAvatar);
     }
 
     @Transactional(readOnly = true)
@@ -163,5 +166,10 @@ public class ProductReviewService {
         if (updatedRows != 1) {
             throw new AppException(ErrorCode.SHOP_NOT_FOUND);
         }
+    }
+
+    private ProductReviewResponse resolveReviewerAvatar(ProductReviewResponse response) {
+        response.setReviewerAvatar(mediaUrlService.toPublicUrl(response.getReviewerAvatar()));
+        return response;
     }
 }

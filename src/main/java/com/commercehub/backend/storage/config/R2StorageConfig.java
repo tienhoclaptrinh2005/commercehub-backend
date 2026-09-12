@@ -96,6 +96,13 @@ public class R2StorageConfig {
         if (properties.getProductImageWidth() != 1200 || properties.getProductImageHeight() != 900) {
             throw new IllegalStateException("Ảnh sản phẩm phải được cấu hình đúng 1200 x 900 px");
         }
+        if (properties.getAvatarMaxImageSizeBytes() < 1
+                || properties.getAvatarMaxImageSizeBytes() > 1_048_576L) {
+            throw new IllegalStateException("R2_AVATAR_MAX_IMAGE_SIZE_BYTES không được vượt quá giới hạn cứng 1 MB");
+        }
+        if (properties.getAvatarImageWidth() != 512 || properties.getAvatarImageHeight() != 512) {
+            throw new IllegalStateException("Ảnh đại diện phải được cấu hình đúng 512 x 512 px");
+        }
         requireText(properties.getImageCacheControl(), "R2_IMAGE_CACHE_CONTROL");
         if (properties.getCreateCooldownSeconds() < 0
                 || properties.getMaxPresignsPerFifteenMinutes() < 1) {

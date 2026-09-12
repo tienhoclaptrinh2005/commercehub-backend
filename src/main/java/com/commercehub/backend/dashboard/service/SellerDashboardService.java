@@ -3,6 +3,7 @@ package com.commercehub.backend.dashboard.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.dashboard.dto.response.SellerDashboardResponse;
+import com.commercehub.backend.dashboard.dto.response.SellerNotificationResponse;
 import com.commercehub.backend.dashboard.repository.SellerDashboardRepository;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.service.ShopService;
@@ -114,6 +115,17 @@ public class SellerDashboardService {
                 statusCounts,
                 recentOrders
         );
+    }
+
+    @Transactional(readOnly = true)
+    public SellerNotificationResponse getNotifications(Long sellerId) {
+        Shop shop = shopService.getShopByOwnerId(sellerId);
+        SellerDashboardRepository.PreOrderWorkloadProjection workload =
+                dashboardRepository.findCurrentPreOrderWorkload(shop.getId());
+        long newRequestCount = workload == null || workload.getNewRequestCount() == null
+                ? 0L
+                : workload.getNewRequestCount();
+        return new SellerNotificationResponse(newRequestCount);
     }
 
     private YearMonth parseMonth(String requestedMonth) {

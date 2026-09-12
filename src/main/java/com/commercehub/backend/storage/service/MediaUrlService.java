@@ -64,6 +64,31 @@ public class MediaUrlService {
         }
     }
 
+    public String normalizeOwnedAvatarImageReference(String reference, Long userId) {
+        if (reference == null || reference.isBlank()) {
+            return null;
+        }
+
+        String normalized = stripLeadingSlash(reference.trim());
+        if (isAbsoluteHttpUrl(normalized) || !SAFE_OBJECT_KEY.matcher(normalized).matches()) {
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_REFERENCE_INVALID);
+        }
+
+        String requiredPrefix = "users/" + userId + "/avatars/";
+        if (!normalized.startsWith(requiredPrefix)) {
+            throw new AppException(ErrorCode.IMAGE_UPLOAD_ACCESS_DENIED);
+        }
+        return normalized;
+    }
+
+    public boolean isOwnedAvatarImageReference(String reference, Long userId) {
+        try {
+            return normalizeOwnedAvatarImageReference(reference, userId) != null;
+        } catch (AppException ignored) {
+            return false;
+        }
+    }
+
     private boolean isAbsoluteHttpUrl(String value) {
         try {
             URI uri = URI.create(value);

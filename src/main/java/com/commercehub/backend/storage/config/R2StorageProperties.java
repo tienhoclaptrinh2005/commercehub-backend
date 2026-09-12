@@ -19,6 +19,9 @@ public class R2StorageProperties {
     private long maxImageSizeBytes = 2_097_152L;
     private int productImageWidth = 1200;
     private int productImageHeight = 900;
+    private long avatarMaxImageSizeBytes = 1_048_576L;
+    private int avatarImageWidth = 512;
+    private int avatarImageHeight = 512;
     private String imageCacheControl = "public, max-age=31536000, immutable";
     private int createCooldownSeconds = 3;
     private int maxPresignsPerFifteenMinutes = 20;

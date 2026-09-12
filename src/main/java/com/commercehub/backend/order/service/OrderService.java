@@ -234,9 +234,13 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public OrderDetailResponse getSellerOrderDetail(Long shopId, Long orderId) {
-        Order order = orderRepository.findByIdAndShopId(orderId, shopId)
+        return buildOrderDetail(getSellerOrderOrThrow(shopId, orderId));
+    }
+
+    @Transactional(readOnly = true)
+    public Order getSellerOrderOrThrow(Long shopId, Long orderId) {
+        return orderRepository.findByIdAndShopId(orderId, shopId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
-        return buildOrderDetail(order);
     }
 
 

@@ -1,9 +1,13 @@
 package com.commercehub.backend.order.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.exception.AppException;
+import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.dto.request.DeliverPreOrderRequest;
+import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.service.OrderService;
 import com.commercehub.backend.order.service.PreOrderApprovalService;
+import com.commercehub.backend.product.service.DigitalAssetService;
 import com.commercehub.backend.security.CustomUserDetails;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.service.ShopService;
@@ -32,6 +36,7 @@ public class SellerOrderController {
     private final OrderService orderService;
     private final ShopService shopService;
     private final PreOrderApprovalService preOrderApprovalService;
+    private final DigitalAssetService digitalAssetService;
 
     private Shop getCurrentSellerShop(Long userId) {
         return shopService.getShopByOwnerId(userId);
@@ -75,6 +80,24 @@ public class SellerOrderController {
         Shop shop = getCurrentSellerShop(currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success("Success", orderService.getSellerOrderDetail(shop.getId(), id)));
     }
+
+    // Chỉ trả nội dung tài khoản đã giao cho đúng shop sở hữu đơn INSTANT.
+    @GetMapping("/{id}/assets")
+    public ResponseEntity<ApiResponse<?>> getSellerOrderAssets(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PathVariable @Min(value = 1, message = "ID đơn hàng không hợp lệ") Long id) {
+
+        Shop shop = getCurrentSellerShop(currentUser.getId());
+        Order order = orderService.getSellerOrderOrThrow(shop.getId(), id);
+        if (!"INSTANT".equals(order.getDeliveryType())) {
+            throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE_FOR_ASSET);
+        }
+        return ResponseEntity.ok(ApiResponse.success(
+                "Lấy thông tin tài khoản đã giao thành công",
+                digitalAssetService.getDeliveredAssetsByOrderId(order.getId())
+        ));
+    }
+
     //  PRE_ORDER
     // POST /api/v1/seller/orders/{id}/accept
     @PostMapping("/{id}/accept")

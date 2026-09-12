@@ -102,6 +102,9 @@ storage:
     max-image-size-bytes: ${R2_MAX_IMAGE_SIZE_BYTES:2097152}
     product-image-width: ${R2_PRODUCT_IMAGE_WIDTH:1200}
     product-image-height: ${R2_PRODUCT_IMAGE_HEIGHT:900}
+    avatar-max-image-size-bytes: ${R2_AVATAR_MAX_IMAGE_SIZE_BYTES:1048576}
+    avatar-image-width: ${R2_AVATAR_IMAGE_WIDTH:512}
+    avatar-image-height: ${R2_AVATAR_IMAGE_HEIGHT:512}
     image-cache-control: ${R2_IMAGE_CACHE_CONTROL:public, max-age=31536000, immutable}
     create-cooldown-seconds: ${R2_UPLOAD_COOLDOWN_SECONDS:3}
     max-presigns-per-fifteen-minutes: ${R2_MAX_PRESIGNS_PER_15_MINUTES:20}
