@@ -116,16 +116,23 @@ class SellerDashboardServiceTest {
     }
 
     @Test
-    void notificationCountUsesCurrentWaitingPreOrders() {
-        SellerDashboardRepository.PreOrderWorkloadProjection workload =
-                mock(SellerDashboardRepository.PreOrderWorkloadProjection.class);
+    void notificationCountsUseRealCurrentSellerWorkload() {
+        SellerDashboardRepository.SellerNotificationProjection counts =
+                mock(SellerDashboardRepository.SellerNotificationProjection.class);
         when(shopService.getShopByOwnerId(9L)).thenReturn(Shop.builder().id(7L).build());
-        when(workload.getNewRequestCount()).thenReturn(12L);
-        when(dashboardRepository.findCurrentPreOrderWorkload(7L)).thenReturn(workload);
+        when(counts.getRecentInstantOrderCount()).thenReturn(4L);
+        when(counts.getNewPreOrderRequestCount()).thenReturn(12L);
+        when(counts.getProcessingPreOrderCount()).thenReturn(3L);
+        when(counts.getActiveDisputeCount()).thenReturn(2L);
+        when(dashboardRepository.findSellerNotificationCounts(eq(7L), any(OffsetDateTime.class)))
+                .thenReturn(counts);
 
         SellerNotificationResponse response = service.getNotifications(9L);
 
+        assertThat(response.recentInstantOrderCount()).isEqualTo(4L);
         assertThat(response.newPreOrderRequestCount()).isEqualTo(12L);
+        assertThat(response.processingPreOrderCount()).isEqualTo(3L);
+        assertThat(response.activeDisputeCount()).isEqualTo(2L);
     }
 
     private SellerDashboardRepository.DailyRevenueProjection dailyRow(

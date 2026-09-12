@@ -48,6 +48,16 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
         Long getProcessingCount();
     }
 
+    interface SellerNotificationProjection {
+        Long getRecentInstantOrderCount();
+
+        Long getNewPreOrderRequestCount();
+
+        Long getProcessingPreOrderCount();
+
+        Long getActiveDisputeCount();
+    }
+
     /**
      * Tổng hợp ngay tại database để mỗi tháng chỉ trả tối đa 31 dòng.
      * Đơn hoàn một phần được phân bổ giảm giá theo tỷ lệ giá trị item còn lại.
@@ -157,6 +167,46 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
               AND o.status IN ('WAITING_APPROVAL', 'PROCESSING')
             """, nativeQuery = true)
     PreOrderWorkloadProjection findCurrentPreOrderWorkload(@Param("shopId") Long shopId);
+
+    /**
+     * Badge công việc của seller. Đơn giao ngay chỉ tính trong cửa sổ gần đây để
+     * badge không tăng vĩnh viễn; đơn đặt hàng và khiếu nại chỉ tính trạng thái
+     * còn cần seller theo dõi/xử lý.
+     */
+    @Query(value = """
+            SELECT COUNT(*) FILTER (
+                       WHERE o.delivery_type = 'INSTANT'
+                         AND o.placed_at >= :recentSince
+                         AND o.payment_status IN ('PAID', 'PARTIAL_REFUND')
+                         AND o.status NOT IN (
+                             'REJECTED', 'REFUNDED', 'CANCELLED',
+                             'CANCELLED_BY_SELLER', 'CANCELLED_BY_SYSTEM'
+                         )
+                   )::BIGINT AS "recentInstantOrderCount",
+                   COUNT(*) FILTER (
+                       WHERE o.delivery_type = 'PRE_ORDER'
+                         AND o.status = 'WAITING_APPROVAL'
+                   )::BIGINT AS "newPreOrderRequestCount",
+                   COUNT(*) FILTER (
+                       WHERE o.delivery_type = 'PRE_ORDER'
+                         AND o.status = 'PROCESSING'
+                   )::BIGINT AS "processingPreOrderCount",
+                   (
+                       SELECT COUNT(*)::BIGINT
+                       FROM order_disputes dispute
+                       WHERE dispute.shop_id = :shopId
+                         AND dispute.status IN (
+                             'OPEN', 'WARRANTY_IN_PROGRESS',
+                             'WAITING_BUYER_CONFIRMATION', 'PROCESSING'
+                         )
+                   ) AS "activeDisputeCount"
+            FROM orders o
+            WHERE o.shop_id = :shopId
+            """, nativeQuery = true)
+    SellerNotificationProjection findSellerNotificationCounts(
+            @Param("shopId") Long shopId,
+            @Param("recentSince") OffsetDateTime recentSince
+    );
 
     @Query(value = """
             SELECT o.id AS "orderId",

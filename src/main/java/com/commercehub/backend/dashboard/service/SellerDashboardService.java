@@ -120,12 +120,18 @@ public class SellerDashboardService {
     @Transactional(readOnly = true)
     public SellerNotificationResponse getNotifications(Long sellerId) {
         Shop shop = shopService.getShopByOwnerId(sellerId);
-        SellerDashboardRepository.PreOrderWorkloadProjection workload =
-                dashboardRepository.findCurrentPreOrderWorkload(shop.getId());
-        long newRequestCount = workload == null || workload.getNewRequestCount() == null
-                ? 0L
-                : workload.getNewRequestCount();
-        return new SellerNotificationResponse(newRequestCount);
+        SellerDashboardRepository.SellerNotificationProjection counts =
+                dashboardRepository.findSellerNotificationCounts(
+                        shop.getId(),
+                        OffsetDateTime.now(BUSINESS_TIMEZONE).minusHours(24)
+                );
+
+        return new SellerNotificationResponse(
+                projectionCount(counts == null ? null : counts.getRecentInstantOrderCount()),
+                projectionCount(counts == null ? null : counts.getNewPreOrderRequestCount()),
+                projectionCount(counts == null ? null : counts.getProcessingPreOrderCount()),
+                projectionCount(counts == null ? null : counts.getActiveDisputeCount())
+        );
     }
 
     private YearMonth parseMonth(String requestedMonth) {
@@ -153,5 +159,9 @@ public class SellerDashboardService {
 
     private BigDecimal zeroIfNull(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private long projectionCount(Long value) {
+        return value == null ? 0L : value;
     }
 }
