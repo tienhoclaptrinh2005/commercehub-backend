@@ -38,6 +38,7 @@ class OpenApiContractTest {
         assertTrue(paths.has("/api/v1/seller/products/assets/inventory"));
         assertTrue(paths.has("/api/v1/admin/fee-configs"));
         assertTrue(paths.has("/api/v1/seller/fees"));
+        assertTrue(paths.has("/api/v1/seller/fees/current-config"));
         assertTrue(paths.has("/api/v1/wallet/deposits"));
         assertTrue(paths.has("/api/v1/wallet/deposits/{transactionCode}"));
         assertTrue(paths.has("/api/v1/payments/sepay/webhook"));

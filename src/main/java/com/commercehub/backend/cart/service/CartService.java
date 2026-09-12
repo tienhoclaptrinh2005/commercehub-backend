@@ -11,6 +11,7 @@ import com.commercehub.backend.cart.repository.CartItemRepository;
 import com.commercehub.backend.cart.repository.CartRepository;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.policy.PreOrderPolicy;
 import com.commercehub.backend.order.dto.request.CheckoutItemRequest;
 import com.commercehub.backend.order.dto.request.CheckoutRequest;
 import com.commercehub.backend.order.service.CheckoutService;
@@ -278,7 +279,7 @@ public class CartService {
                 .lineTotal(lineTotal)
                 .stockCount(variant.getStockCount())
                 .available(active && inStock)
-                .maxProcessingHours(preOrderConfig != null ? preOrderConfig.getMaxProcessingHours() : null)
+                .maxProcessingHours(preOrderConfig != null ? PreOrderPolicy.PROCESSING_HOURS : null)
                 .orderInstructions(preOrderConfig != null ? preOrderConfig.getOrderInstructions() : null)
                 .buyerInputFields(preOrderConfig != null ? preOrderConfig.getBuyerInputFields() : null)
                 .build();

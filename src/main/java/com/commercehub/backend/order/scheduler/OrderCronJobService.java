@@ -28,14 +28,14 @@ public class OrderCronJobService {
     @Value("${commercehub.jobs.batch-size:200}")
     private int batchSize;
 
-    @Scheduled(cron = "0 0/30 * * * *")
-    @SchedulerLock(name = "order_autoCancelExpiredProcessing", lockAtMostFor = "25m", lockAtLeastFor = "30s")
+    @Scheduled(cron = "${commercehub.jobs.order-expiry-cron:0 * * * * *}")
+    @SchedulerLock(name = "order_autoCancelExpiredProcessing", lockAtMostFor = "5m", lockAtLeastFor = "30s")
     public void autoCancelExpiredProcessingOrders() {
         processExpired("PROCESSING", OffsetDateTime.now());
     }
 
-    @Scheduled(cron = "0 0/30 * * * *")
-    @SchedulerLock(name = "order_autoCancelExpiredWaitingApproval", lockAtMostFor = "25m", lockAtLeastFor = "30s")
+    @Scheduled(cron = "${commercehub.jobs.order-expiry-cron:0 * * * * *}")
+    @SchedulerLock(name = "order_autoCancelExpiredWaitingApproval", lockAtMostFor = "5m", lockAtLeastFor = "30s")
     public void autoCancelExpiredWaitingApproval() {
         processExpired("WAITING_APPROVAL", OffsetDateTime.now());
     }

@@ -37,6 +37,7 @@ public interface ProductMapper {
     ProductVariantResponse toVariantResponse(ProductVariant variant);
 
     @Mapping(target = "productId", source = "product.id")
+    @Mapping(target = "maxProcessingHours", expression = "java(com.commercehub.backend.common.policy.PreOrderPolicy.PROCESSING_HOURS)")
     PreOrderConfigResponse toPreOrderConfigResponse(PreOrderConfig config);
 
     @Mapping(target = "shopId", expression = "java(getShopId(product))")

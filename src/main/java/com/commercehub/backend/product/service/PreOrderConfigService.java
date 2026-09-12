@@ -2,6 +2,7 @@ package com.commercehub.backend.product.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.policy.PreOrderPolicy;
 import com.commercehub.backend.product.dto.request.CreatePreOrderConfigRequest;
 import com.commercehub.backend.product.entity.PreOrderConfig;
 import com.commercehub.backend.product.entity.Product;
@@ -43,9 +44,7 @@ public class PreOrderConfigService {
 
         config.setProduct(product);
 
-        if (request.getMaxProcessingHours() != null) {
-            config.setMaxProcessingHours(request.getMaxProcessingHours());
-        }
+        config.setMaxProcessingHours(PreOrderPolicy.PROCESSING_HOURS);
 
         config.setOrderInstructions(request.getOrderInstructions());
         config.setBuyerInputFields(request.getBuyerInputFields());

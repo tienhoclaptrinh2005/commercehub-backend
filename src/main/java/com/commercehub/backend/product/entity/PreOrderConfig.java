@@ -1,5 +1,6 @@
 package com.commercehub.backend.product.entity;
 
+import com.commercehub.backend.common.policy.PreOrderPolicy;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -31,7 +32,7 @@ public class PreOrderConfig {
 
     @Column(name = "max_processing_hours", nullable = false)
     @Builder.Default
-    Integer maxProcessingHours = 24;
+    Integer maxProcessingHours = PreOrderPolicy.PROCESSING_HOURS;
 
 
     @Column(name = "order_instructions", columnDefinition = "TEXT")

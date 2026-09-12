@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * Seller xem lịch sử phí sàn của shop mình.
- * Base path: /api/seller/fees
+ * Base path: /api/v1/seller/fees
  *
  * shopId LUÔN được suy ra từ user đang đăng nhập (SecurityContext) —
  * seller không thể truyền shopId của shop khác để đọc trộm dữ liệu.
@@ -28,10 +28,20 @@ public class SellerFeeController {
 
     private final PlatformFeeLedgerService ledgerService;
     private final ShopFeeSummaryService summaryService;
+    private final PlatformFeeConfigService configService;
     private final ShopService shopService;
 
     /**
-     * GET /api/seller/fees?page=0&size=20
+     * GET /api/v1/seller/fees/current-config
+     * Seller xem cấu hình phí sàn đang thực sự được dùng để tính cho đơn mới.
+     */
+    @GetMapping("/current-config")
+    public ResponseEntity<ApiResponse<FeeConfigResponse>> getCurrentConfig() {
+        return ResponseEntity.ok(ApiResponse.success(configService.getActiveConfig()));
+    }
+
+    /**
+     * GET /api/v1/seller/fees?page=0&size=20
      * Seller xem danh sách phí đã/chưa thu của shop mình.
      */
     @GetMapping
@@ -47,7 +57,7 @@ public class SellerFeeController {
     }
 
     /**
-     * GET /api/seller/fees/summary?year=2026&month=1
+     * GET /api/v1/seller/fees/summary?year=2026&month=1
      * Xem tổng hợp phí theo tháng của shop mình.
      */
     @GetMapping("/summary")
@@ -60,7 +70,7 @@ public class SellerFeeController {
     }
 
     /**
-     * GET /api/seller/fees/{ledgerId}
+     * GET /api/v1/seller/fees/{ledgerId}
      * Xem chi tiết 1 bản ghi phí — chỉ khi ledger thuộc shop của mình.
      */
     @GetMapping("/{ledgerId}")

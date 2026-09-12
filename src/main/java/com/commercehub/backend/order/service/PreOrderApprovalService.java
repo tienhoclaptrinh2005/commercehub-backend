@@ -2,6 +2,7 @@ package com.commercehub.backend.order.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.policy.PreOrderPolicy;
 import com.commercehub.backend.fee.repository.PlatformFeeLedgerRepository;
 import com.commercehub.backend.fee.service.FeeCalculationService;
 import com.commercehub.backend.order.dto.request.DeliverPreOrderRequest;
@@ -68,7 +69,7 @@ public class PreOrderApprovalService {
         String oldStatus = order.getStatus();
         order.setStatus("PROCESSING");
         order.setApprovedAt(OffsetDateTime.now());
-        order.setProcessingDeadlineAt(OffsetDateTime.now().plusHours(24));
+        order.setProcessingDeadlineAt(OffsetDateTime.now().plusHours(PreOrderPolicy.PROCESSING_HOURS));
         orderRepository.save(order);
 
         // Đồng bộ vòng đời pre_order_items bằng một truy vấn thay vì N truy vấn.

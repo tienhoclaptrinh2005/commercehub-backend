@@ -2,6 +2,7 @@ package com.commercehub.backend.order.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.policy.PreOrderPolicy;
 import com.commercehub.backend.fee.dto.FeeResult;
 import com.commercehub.backend.fee.service.FeeCalculationService;
 import com.commercehub.backend.order.dto.request.CheckoutItemRequest;
@@ -121,7 +122,7 @@ public class PreOrderService {
                 .paymentStatus("PAID")
                 .status("WAITING_APPROVAL")
                 .placedAt(OffsetDateTime.now())
-                .approvalDeadlineAt(OffsetDateTime.now().plusHours(48))
+                .approvalDeadlineAt(OffsetDateTime.now().plusHours(PreOrderPolicy.ACCEPTANCE_HOURS))
                 .idempotencyKey(request.getIdempotencyKey())
                 .checkoutRequestId(request.getCheckoutRequestId())
                 .build();

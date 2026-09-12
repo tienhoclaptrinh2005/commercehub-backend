@@ -82,6 +82,8 @@ commercehub:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
   jobs:
     batch-size: ${JOB_BATCH_SIZE:200}
+    # Quét mỗi phút để đơn quá hạn 24 giờ được hoàn tiền gần sát deadline.
+    order-expiry-cron: "${ORDER_EXPIRY_CRON:0 * * * * *}"
   dispute:
     seller-response-hours: ${DISPUTE_SELLER_RESPONSE_HOURS:24}
     warranty-processing-hours: ${DISPUTE_WARRANTY_PROCESSING_HOURS:24}

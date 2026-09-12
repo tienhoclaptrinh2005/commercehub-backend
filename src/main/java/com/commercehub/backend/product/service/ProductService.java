@@ -4,6 +4,7 @@ import com.commercehub.backend.category.entity.Category;
 import com.commercehub.backend.category.repository.CategoryRepository;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.policy.PreOrderPolicy;
 import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SlugUtils;
 import com.commercehub.backend.product.dto.request.CreateProductRequest;
@@ -104,7 +105,7 @@ public class ProductService {
         if ("PRE_ORDER".equals(request.getDeliveryType())) {
             PreOrderConfig preOrderConfig = PreOrderConfig.builder()
                     .product(product)
-                    .maxProcessingHours(24)
+                    .maxProcessingHours(PreOrderPolicy.PROCESSING_HOURS)
                     .autoRejectIfUnavailable(false)
                     .build();
             product.setPreOrderConfig(preOrderConfig);
