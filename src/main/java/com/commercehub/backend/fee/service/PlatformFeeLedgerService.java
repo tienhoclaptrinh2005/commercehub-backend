@@ -8,14 +8,24 @@ import com.commercehub.backend.fee.entity.PlatformFeeLog;
 import com.commercehub.backend.fee.mapper.FeeMapper;
 import com.commercehub.backend.fee.repository.PlatformFeeLedgerRepository;
 import com.commercehub.backend.fee.repository.PlatformFeeLogRepository;
+import com.commercehub.backend.order.entity.Order;
+import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.repository.OrderItemRepository;
+import com.commercehub.backend.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -26,6 +36,8 @@ public class PlatformFeeLedgerService {
     private final PlatformFeeLogRepository logRepository;
     private final ShopFeeSummaryService summaryService;
     private final FeeMapper feeMapper;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
 
     // ======================================================
     // SELLER: Xem lịch sử phí của shop mình
@@ -33,8 +45,7 @@ public class PlatformFeeLedgerService {
 
     @Transactional(readOnly = true)
     public Page<FeeLedgerResponse> getMyShopFees(Long shopId, Pageable pageable) {
-        return ledgerRepository.findByShopIdOrderByCreatedAtDesc(shopId, pageable)
-                .map(feeMapper::toFeeLedgerResponse);
+        return toResponsePage(ledgerRepository.findByShopIdOrderByCreatedAtDesc(shopId, pageable));
     }
 
     /**
@@ -49,7 +60,7 @@ public class PlatformFeeLedgerService {
         if (!ledger.getShopId().equals(shopId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        return feeMapper.toFeeLedgerResponse(ledger);
+        return toResponse(ledger);
     }
 
     // ======================================================
@@ -58,7 +69,7 @@ public class PlatformFeeLedgerService {
 
     @Transactional(readOnly = true)
     public FeeLedgerResponse getLedgerById(Long ledgerId) {
-        return feeMapper.toFeeLedgerResponse(
+        return toResponse(
                 ledgerRepository.findById(ledgerId)
                         .orElseThrow(() -> new AppException(ErrorCode.FEE_LEDGER_NOT_FOUND))
         );
@@ -67,10 +78,9 @@ public class PlatformFeeLedgerService {
     @Transactional(readOnly = true)
     public Page<FeeLedgerResponse> getAllLedgers(String status, Pageable pageable) {
         if (status != null && !status.isBlank()) {
-            return ledgerRepository.findByStatusOrderByCreatedAtDesc(status, pageable)
-                    .map(feeMapper::toFeeLedgerResponse);
+            return toResponsePage(ledgerRepository.findByStatusOrderByCreatedAtDesc(status, pageable));
         }
-        return ledgerRepository.findAll(pageable).map(feeMapper::toFeeLedgerResponse);
+        return toResponsePage(ledgerRepository.findAll(pageable));
     }
 
     // ======================================================
@@ -149,5 +159,37 @@ public class PlatformFeeLedgerService {
                 .reason(reason)
                 .build();
         logRepository.save(log);
+    }
+
+    private Page<FeeLedgerResponse> toResponsePage(Page<PlatformFeeLedger> ledgerPage) {
+        List<FeeLedgerResponse> responses = toResponses(ledgerPage.getContent());
+        return new PageImpl<>(responses, ledgerPage.getPageable(), ledgerPage.getTotalElements());
+    }
+
+    private FeeLedgerResponse toResponse(PlatformFeeLedger ledger) {
+        return toResponses(List.of(ledger)).get(0);
+    }
+
+    private List<FeeLedgerResponse> toResponses(List<PlatformFeeLedger> ledgers) {
+        Set<Long> orderIds = ledgers.stream()
+                .map(PlatformFeeLedger::getOrderId)
+                .collect(Collectors.toSet());
+        Set<Long> orderItemIds = ledgers.stream()
+                .map(PlatformFeeLedger::getOrderItemId)
+                .collect(Collectors.toSet());
+        Map<Long, Order> ordersById = orderRepository.findAllById(orderIds).stream()
+                .collect(Collectors.toMap(Order::getId, Function.identity()));
+        Map<Long, OrderItem> itemsById = orderItemRepository.findAllById(orderItemIds).stream()
+                .collect(Collectors.toMap(OrderItem::getId, Function.identity()));
+
+        return ledgers.stream().map(ledger -> {
+            FeeLedgerResponse response = feeMapper.toFeeLedgerResponse(ledger);
+            Order order = ordersById.get(ledger.getOrderId());
+            OrderItem item = itemsById.get(ledger.getOrderItemId());
+            response.setOrderCode(order == null ? null : order.getOrderCode());
+            response.setProductName(item == null ? null : item.getProductName());
+            response.setVariantName(item == null ? null : item.getVariantName());
+            return response;
+        }).toList();
     }
 }

@@ -9,6 +9,9 @@ public class FeeLedgerResponse {
     private Long id;
     private Long orderItemId;
     private Long orderId;
+    private String orderCode;
+    private String productName;
+    private String variantName;
     private Long shopId;
     private BigDecimal feeRateSnapshot;      // Tỷ lệ tại thời điểm tạo đơn
     private BigDecimal saleAmount;           // Giá bán gốc

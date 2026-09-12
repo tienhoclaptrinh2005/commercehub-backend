@@ -338,31 +338,51 @@ public class OrderService {
         Set<Long> disputedOrderIds = orderIds.isEmpty()
                 ? Set.of()
                 : orderDisputeRepository.findOrderIdsWithStatuses(orderIds, ACTIVE_DISPUTE_STATUSES);
-        Map<Long, List<String>> variantNamesByOrder = orderIds.isEmpty()
-                ? Map.of()
-                : orderItemRepository.findByOrderIdIn(orderIds).stream()
-                        .collect(Collectors.groupingBy(
-                                item -> item.getOrder().getId(),
-                                LinkedHashMap::new,
-                                Collectors.mapping(
-                                        item -> item.getVariantName() == null || item.getVariantName().isBlank()
-                                                ? "Mặc định"
-                                                : item.getVariantName(),
-                                        Collectors.collectingAndThen(
-                                                Collectors.toCollection(java.util.LinkedHashSet::new),
-                                                List::copyOf
-                                        )
-                                )
-                        ));
+        List<OrderItem> orderItems = orderIds.isEmpty()
+                ? List.of()
+                : orderItemRepository.findByOrderIdIn(orderIds);
+        Map<Long, List<String>> productNamesByOrder = groupUniqueItemNames(
+                orderItems,
+                OrderItem::getProductName,
+                "Sản phẩm"
+        );
+        Map<Long, List<String>> variantNamesByOrder = groupUniqueItemNames(
+                orderItems,
+                OrderItem::getVariantName,
+                "Mặc định"
+        );
 
         return orders.map(order -> {
             OrderResponse response = orderMapper.toOrderResponse(order);
+            response.setProductNames(productNamesByOrder.getOrDefault(order.getId(), List.of()));
             response.setVariantNames(variantNamesByOrder.getOrDefault(order.getId(), List.of()));
             if (disputedOrderIds.contains(order.getId())) {
                 response.setEffectiveStatus("DISPUTED");
             }
             return response;
         });
+    }
+
+    private Map<Long, List<String>> groupUniqueItemNames(
+            List<OrderItem> orderItems,
+            Function<OrderItem, String> nameExtractor,
+            String fallback
+    ) {
+        return orderItems.stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getOrder().getId(),
+                        LinkedHashMap::new,
+                        Collectors.mapping(
+                                item -> {
+                                    String name = nameExtractor.apply(item);
+                                    return name == null || name.isBlank() ? fallback : name;
+                                },
+                                Collectors.collectingAndThen(
+                                        Collectors.toCollection(java.util.LinkedHashSet::new),
+                                        List::copyOf
+                                )
+                        )
+                ));
     }
 
     /**

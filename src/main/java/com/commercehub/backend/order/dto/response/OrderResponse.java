@@ -20,6 +20,7 @@ public class OrderResponse {
     private String shopName;
     private String sellerUsername;
     private String buyerUsername;
+    private List<String> productNames;
     private List<String> variantNames;
     private String deliveryType;
     private String status;
