@@ -1,6 +1,7 @@
 package com.commercehub.backend.fee.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.fee.dto.response.*;
 import com.commercehub.backend.fee.service.*;
@@ -34,14 +35,15 @@ public class SellerFeeController {
      * Seller xem danh sách phí đã/chưa thu của shop mình.
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<FeeLedgerResponse>>> getMyFees(
+    public ResponseEntity<ApiResponse<PageResponse<FeeLedgerResponse>>> getMyFees(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
         Shop myShop = shopService.getShopByOwnerId(SecurityUtils.getCurrentUserId());
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
                 Sort.by("createdAt").descending());
-        return ResponseEntity.ok(ApiResponse.success(ledgerService.getMyShopFees(myShop.getId(), pageable)));
+        Page<FeeLedgerResponse> fees = ledgerService.getMyShopFees(myShop.getId(), pageable);
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(fees)));
     }
 
     /**

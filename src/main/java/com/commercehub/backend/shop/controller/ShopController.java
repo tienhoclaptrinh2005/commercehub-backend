@@ -44,10 +44,11 @@ public class ShopController {
 
     @GetMapping("/admin/all")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<Page<ShopApplicationResponse>>> getAllShopsForAdmin(
+    public ResponseEntity<ApiResponse<PageResponse<ShopApplicationResponse>>> getAllShopsForAdmin(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(ApiResponse.success(shopService.getAllShopsForAdmin(page, size)));
+        Page<ShopApplicationResponse> shops = shopService.getAllShopsForAdmin(page, size);
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(shops)));
     }
 
     @PatchMapping("/admin/{shopId}/status")

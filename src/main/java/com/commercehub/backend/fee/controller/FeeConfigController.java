@@ -1,6 +1,7 @@
 package com.commercehub.backend.fee.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.fee.dto.request.*;
 import com.commercehub.backend.fee.dto.response.*;
@@ -82,14 +83,15 @@ public class FeeConfigController {
      * Admin xem tất cả ledgers với filter.
      */
     @GetMapping("/ledgers")
-    public ResponseEntity<ApiResponse<Page<FeeLedgerResponse>>> getAllLedgers(
+    public ResponseEntity<ApiResponse<PageResponse<FeeLedgerResponse>>> getAllLedgers(
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
                 Sort.by("createdAt").descending());
-        return ResponseEntity.ok(ApiResponse.success(ledgerService.getAllLedgers(status, pageable)));
+        Page<FeeLedgerResponse> ledgers = ledgerService.getAllLedgers(status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(ledgers)));
     }
 
     /**
@@ -106,7 +108,7 @@ public class FeeConfigController {
      * Admin xem tổng hợp phí theo tháng của tất cả shops.
      */
     @GetMapping("/summaries")
-    public ResponseEntity<ApiResponse<Page<ShopFeeSummaryResponse>>> getAllSummaries(
+    public ResponseEntity<ApiResponse<PageResponse<ShopFeeSummaryResponse>>> getAllSummaries(
             @RequestParam int year,
             @RequestParam int month,
             @RequestParam(defaultValue = "0") int page,
@@ -114,6 +116,11 @@ public class FeeConfigController {
     ) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
                 Sort.by("totalFee").descending());
-        return ResponseEntity.ok(ApiResponse.success(summaryService.getAllSummariesByMonth(year, month, pageable)));
+        Page<ShopFeeSummaryResponse> summaries = summaryService.getAllSummariesByMonth(
+                year,
+                month,
+                pageable
+        );
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(summaries)));
     }
 }

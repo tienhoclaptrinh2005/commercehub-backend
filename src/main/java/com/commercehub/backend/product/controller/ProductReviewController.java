@@ -1,6 +1,7 @@
 package com.commercehub.backend.product.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.product.dto.request.CreateProductReviewRequest;
 import com.commercehub.backend.product.dto.request.UpdateProductReviewVisibilityRequest;
 import com.commercehub.backend.product.dto.response.ProductReviewResponse;
@@ -34,13 +35,16 @@ public class ProductReviewController {
     }
 
     @GetMapping("/product/{productId}")
-    public ResponseEntity<ApiResponse<Page<ProductReviewResponse>>> getReviewsByProduct(
+    public ResponseEntity<ApiResponse<PageResponse<ProductReviewResponse>>> getReviewsByProduct(
             @PathVariable Long productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         Page<ProductReviewResponse> responses = reviewService.getReviewsByProduct(productId, page, size);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách đánh giá thành công!", responses));
+        return ResponseEntity.ok(ApiResponse.success(
+                "Lấy danh sách đánh giá thành công!",
+                PageResponse.of(responses)
+        ));
     }
 
     @PatchMapping("/{reviewId}/visibility")
