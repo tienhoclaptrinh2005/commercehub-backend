@@ -6,6 +6,9 @@ import com.commercehub.backend.order.dto.request.CheckoutItemRequest;
 import com.commercehub.backend.order.dto.request.CheckoutRequest;
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.entity.OrderPaymentStatus;
+import com.commercehub.backend.order.entity.OrderStatus;
+import com.commercehub.backend.wallet.entity.HoldReleaseStatus;
 import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.order.repository.OrderRepository;
 import com.commercehub.backend.product.entity.DigitalAsset;
@@ -169,8 +172,8 @@ public class InstantOrderService {
                 .subtotalAmount(orderTotalAmount)
                 .totalAmount(orderTotalAmount)
                 .paymentMethod("WALLET")
-                .paymentStatus("PAID")
-                .status("DELIVERED")
+                .paymentStatus(OrderPaymentStatus.PAID)
+                .status(OrderStatus.DELIVERED)
                 .placedAt(OffsetDateTime.now())
                 .deliveredAt(OffsetDateTime.now())
                 .idempotencyKey(request.getIdempotencyKey())
@@ -182,7 +185,7 @@ public class InstantOrderService {
         walletService.deductBalance(buyerId, orderTotalAmount, "ORDER_PAYMENT", order.getId(), "ORDER");
         Wallet sellerWallet = walletService.systemHoldForSeller(sellerId, orderTotalAmount, order.getId());
 
-        orderStatusService.logStatusChange(order, null, "DELIVERED", buyerId, "Checkout tức thì - giao hàng ngay");
+        orderStatusService.logStatusChange(order, null, OrderStatus.DELIVERED, buyerId, "Checkout tức thì - giao hàng ngay");
 
         // ================= 4. TẠO ITEM + HOLD + LEDGER PER-ITEM =================
         OffsetDateTime scheduledReleaseAt = OffsetDateTime.now().plusDays(7);
@@ -222,7 +225,7 @@ public class InstantOrderService {
                     .holdAmount(lineTotal)
                     .feeAmount(feeResult.getFeeAmount())
                     .sellerNetAmount(feeResult.getSellerNetAmount())
-                    .status("HOLDING")
+                    .status(HoldReleaseStatus.HOLDING)
                     .scheduledReleaseAt(scheduledReleaseAt)
                     .build();
             holdRelease = holdReleaseRepository.save(holdRelease);

@@ -1,6 +1,7 @@
 package com.commercehub.backend.dispute.repository;
 
 import com.commercehub.backend.dispute.entity.OrderDispute;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,7 +34,7 @@ public interface OrderDisputeRepository
             """)
     Set<Long> findOrderIdsWithStatuses(
             @Param("orderIds") List<Long> orderIds,
-            @Param("statuses") Set<String> statuses
+            @Param("statuses") Set<DisputeStatus> statuses
     );
 
     Optional<OrderDispute> findByOrderIdAndOrderItemId(
@@ -201,7 +202,7 @@ public interface OrderDisputeRepository
 
     @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
     Page<OrderDispute> findByStatusOrderByCreatedAtDesc(
-            String status,
+            DisputeStatus status,
             Pageable pageable
     );
 
@@ -222,7 +223,7 @@ public interface OrderDisputeRepository
             ORDER BY d.deadlineAt ASC, d.id ASC
             """)
     List<Long> findExpiredIds(
-            @Param("status") String status,
+            @Param("status") DisputeStatus status,
             @Param("now") OffsetDateTime now,
             Pageable pageable
     );

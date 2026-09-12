@@ -86,12 +86,10 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
             ), valued_orders AS (
                 SELECT placed_at,
                        CASE
-                           WHEN status IN (
-                               'REJECTED', 'REFUNDED', 'CANCELLED',
-                               'CANCELLED_BY_SELLER', 'CANCELLED_BY_SYSTEM'
-                           ) OR payment_status NOT IN ('PAID', 'PARTIAL_REFUND')
+                           WHEN status IN ('REJECTED', 'CANCELLED')
+                                OR payment_status NOT IN ('PAID', 'PARTIALLY_REFUNDED')
                                THEN 0
-                           WHEN payment_status = 'PARTIAL_REFUND'
+                           WHEN payment_status = 'PARTIALLY_REFUNDED'
                                THEN CASE
                                    WHEN original_item_total <= 0 THEN 0
                                    ELSE ROUND(
@@ -119,29 +117,14 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
     );
 
     @Query(value = """
-            WITH effective_orders AS (
-                SELECT CASE
-                           WHEN EXISTS (
-                               SELECT 1
-                               FROM order_disputes dispute
-                               WHERE dispute.order_id = o.id
-                                 AND dispute.status IN (
-                                     'OPEN', 'WARRANTY_IN_PROGRESS',
-                                     'WAITING_BUYER_CONFIRMATION', 'PROCESSING'
-                                 )
-                           ) THEN 'DISPUTED'
-                           ELSE o.status
-                       END AS effective_status
-                FROM orders o
-                WHERE o.shop_id = :shopId
-                  AND o.placed_at >= :fromTime
-                  AND o.placed_at < :toTime
-            )
-            SELECT effective_status AS "status",
+            SELECT o.status AS "status",
                    COUNT(*)::BIGINT AS "count"
-            FROM effective_orders
-            GROUP BY effective_status
-            ORDER BY COUNT(*) DESC, effective_status
+            FROM orders o
+            WHERE o.shop_id = :shopId
+              AND o.placed_at >= :fromTime
+              AND o.placed_at < :toTime
+            GROUP BY o.status
+            ORDER BY COUNT(*) DESC, o.status
             """, nativeQuery = true)
     List<OrderStatusCountProjection> findMonthlyOrderStatusCounts(
             @Param("shopId") Long shopId,
@@ -156,7 +139,7 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
     @Query(value = """
             SELECT COUNT(*) FILTER (
                        WHERE o.delivery_type = 'PRE_ORDER'
-                         AND o.status = 'WAITING_APPROVAL'
+                         AND o.status = 'WAITING_SELLER_ACCEPTANCE'
                    )::BIGINT AS "newRequestCount",
                    COUNT(*) FILTER (
                        WHERE o.delivery_type = 'PRE_ORDER'
@@ -165,7 +148,7 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
             FROM orders o
             WHERE o.shop_id = :shopId
               AND o.delivery_type = 'PRE_ORDER'
-              AND o.status IN ('WAITING_APPROVAL', 'PROCESSING')
+              AND o.status IN ('WAITING_SELLER_ACCEPTANCE', 'PROCESSING')
             """, nativeQuery = true)
     PreOrderWorkloadProjection findCurrentPreOrderWorkload(@Param("shopId") Long shopId);
 
@@ -186,15 +169,12 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
                              ),
                              TIMESTAMPTZ 'epoch'
                          )
-                         AND o.payment_status IN ('PAID', 'PARTIAL_REFUND')
-                         AND o.status NOT IN (
-                             'REJECTED', 'REFUNDED', 'CANCELLED',
-                             'CANCELLED_BY_SELLER', 'CANCELLED_BY_SYSTEM'
-                         )
+                         AND o.payment_status IN ('PAID', 'PARTIALLY_REFUNDED')
+                         AND o.status NOT IN ('REJECTED', 'CANCELLED')
                    )::BIGINT AS "recentInstantOrderCount",
                    COUNT(*) FILTER (
                        WHERE o.delivery_type = 'PRE_ORDER'
-                         AND o.status = 'WAITING_APPROVAL'
+                         AND o.status = 'WAITING_SELLER_ACCEPTANCE'
                          AND o.placed_at > COALESCE(
                              (
                                  SELECT reads.pre_orders_read_at
@@ -222,7 +202,7 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
                        WHERE dispute.shop_id = :shopId
                          AND dispute.status IN (
                              'OPEN', 'WARRANTY_IN_PROGRESS',
-                             'WAITING_BUYER_CONFIRMATION', 'PROCESSING'
+                             'WAITING_BUYER_CONFIRMATION', 'ADMIN_REVIEW'
                          )
                          AND dispute.created_at > COALESCE(
                              (
@@ -298,18 +278,7 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
                        WHERE oi.order_id = o.id
                    )::BIGINT AS "itemCount",
                    o.total_amount AS "totalAmount",
-                   CASE
-                       WHEN EXISTS (
-                           SELECT 1
-                           FROM order_disputes dispute
-                           WHERE dispute.order_id = o.id
-                             AND dispute.status IN (
-                                 'OPEN', 'WARRANTY_IN_PROGRESS',
-                                 'WAITING_BUYER_CONFIRMATION', 'PROCESSING'
-                             )
-                       ) THEN 'DISPUTED'
-                       ELSE o.status
-                   END AS "status",
+                   o.status AS "status",
                    o.placed_at AS "placedAt"
             FROM orders o
             WHERE o.shop_id = :shopId

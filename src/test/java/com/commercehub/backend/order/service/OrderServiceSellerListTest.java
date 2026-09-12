@@ -6,6 +6,7 @@ import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
 import com.commercehub.backend.order.dto.response.OrderResponse;
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.mapper.OrderMapper;
 import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.order.repository.OrderRepository;
@@ -56,9 +57,9 @@ class OrderServiceSellerListTest {
     @Test
     void sellerOrdersNormalizeFiltersAndUseSliceWithoutCount() {
         Order order = Order.builder().id(41L).placedAt(OffsetDateTime.parse("2026-09-10T10:00:00+07:00")).build();
-        OrderResponse response = OrderResponse.builder().id(41L).status("PROCESSING").build();
+        OrderResponse response = OrderResponse.builder().id(41L).status(OrderStatus.PROCESSING).build();
         when(orderRepository.findFirstSellerOrders(
-                eq(9L), eq("ORD-S1"), eq("PRE_ORDER"), eq("PROCESSING"),
+                eq(9L), eq("ORD-S1"), eq("PRE_ORDER"), eq(OrderStatus.PROCESSING), eq(false),
                 any(OffsetDateTime.class), any(OffsetDateTime.class), anySet(), eq(PageRequest.of(0, 10))
         )).thenReturn(new SliceImpl<>(List.of(order), PageRequest.of(0, 10), false));
         when(disputeRepository.findOrderIdsWithStatuses(eq(List.of(41L)), anySet())).thenReturn(Set.of());
@@ -88,7 +89,7 @@ class OrderServiceSellerListTest {
         assertThat(response.getProductNames()).containsExactly("Microsoft 365");
         assertThat(response.getVariantNames()).containsExactly("12 tháng");
         verify(orderRepository).findFirstSellerOrders(
-                eq(9L), eq("ORD-S1"), eq("PRE_ORDER"), eq("PROCESSING"),
+                eq(9L), eq("ORD-S1"), eq("PRE_ORDER"), eq(OrderStatus.PROCESSING), eq(false),
                 eq(OffsetDateTime.parse("2026-09-01T00:00:00+07:00")),
                 eq(OffsetDateTime.parse("2026-10-01T00:00:00+07:00")),
                 anySet(), eq(PageRequest.of(0, 10))

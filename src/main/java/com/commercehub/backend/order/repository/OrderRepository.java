@@ -1,6 +1,8 @@
 package com.commercehub.backend.order.repository;
 
 import com.commercehub.backend.order.entity.Order;
+import com.commercehub.backend.order.entity.OrderStatus;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,9 +29,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
               AND o.placedAt >= :fromDateTime
               AND o.placedAt < :toDateTimeExclusive
               AND (
-                    :status = ''
-                    OR (
-                        :status = 'DISPUTED'
+                    (
+                        :activeDisputeOnly = true
                         AND EXISTS (
                             SELECT d.id
                             FROM OrderDispute d
@@ -38,14 +39,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                         )
                     )
                     OR (
-                        :status <> 'DISPUTED'
-                        AND o.status = :status
-                        AND NOT EXISTS (
-                            SELECT d.id
-                            FROM OrderDispute d
-                            WHERE d.orderId = o.id
-                              AND d.status IN :activeDisputeStatuses
-                        )
+                        :activeDisputeOnly = false
+                        AND (:orderStatus IS NULL OR o.status = :orderStatus)
                     )
               )
             ORDER BY o.placedAt DESC, o.id DESC
@@ -53,10 +48,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Slice<Order> findFirstBuyerOrders(
             @Param("userId") Long userId,
             @Param("orderCode") String orderCode,
-            @Param("status") String status,
+            @Param("orderStatus") OrderStatus orderStatus,
+            @Param("activeDisputeOnly") boolean activeDisputeOnly,
             @Param("fromDateTime") OffsetDateTime fromDateTime,
             @Param("toDateTimeExclusive") OffsetDateTime toDateTimeExclusive,
-            @Param("activeDisputeStatuses") Set<String> activeDisputeStatuses,
+            @Param("activeDisputeStatuses") Set<DisputeStatus> activeDisputeStatuses,
             Pageable pageable
     );
 
@@ -73,9 +69,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                     OR (o.placedAt = :beforePlacedAt AND o.id < :beforeId)
               )
               AND (
-                    :status = ''
-                    OR (
-                        :status = 'DISPUTED'
+                    (
+                        :activeDisputeOnly = true
                         AND EXISTS (
                             SELECT d.id
                             FROM OrderDispute d
@@ -84,14 +79,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                         )
                     )
                     OR (
-                        :status <> 'DISPUTED'
-                        AND o.status = :status
-                        AND NOT EXISTS (
-                            SELECT d.id
-                            FROM OrderDispute d
-                            WHERE d.orderId = o.id
-                              AND d.status IN :activeDisputeStatuses
-                        )
+                        :activeDisputeOnly = false
+                        AND (:orderStatus IS NULL OR o.status = :orderStatus)
                     )
               )
             ORDER BY o.placedAt DESC, o.id DESC
@@ -99,12 +88,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Slice<Order> findBuyerOrdersBefore(
             @Param("userId") Long userId,
             @Param("orderCode") String orderCode,
-            @Param("status") String status,
+            @Param("orderStatus") OrderStatus orderStatus,
+            @Param("activeDisputeOnly") boolean activeDisputeOnly,
             @Param("fromDateTime") OffsetDateTime fromDateTime,
             @Param("toDateTimeExclusive") OffsetDateTime toDateTimeExclusive,
             @Param("beforePlacedAt") OffsetDateTime beforePlacedAt,
             @Param("beforeId") Long beforeId,
-            @Param("activeDisputeStatuses") Set<String> activeDisputeStatuses,
+            @Param("activeDisputeStatuses") Set<DisputeStatus> activeDisputeStatuses,
             Pageable pageable
     );
 
@@ -122,9 +112,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
               AND o.placedAt >= :fromDateTime
               AND o.placedAt < :toDateTimeExclusive
               AND (
-                    :status = ''
-                    OR (
-                        :status = 'DISPUTED'
+                    (
+                        :activeDisputeOnly = true
                         AND EXISTS (
                             SELECT d.id
                             FROM OrderDispute d
@@ -133,14 +122,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                         )
                     )
                     OR (
-                        :status <> 'DISPUTED'
-                        AND o.status = :status
-                        AND NOT EXISTS (
-                            SELECT d.id
-                            FROM OrderDispute d
-                            WHERE d.orderId = o.id
-                              AND d.status IN :activeDisputeStatuses
-                        )
+                        :activeDisputeOnly = false
+                        AND (:orderStatus IS NULL OR o.status = :orderStatus)
                     )
               )
             ORDER BY o.placedAt DESC, o.id DESC
@@ -149,10 +132,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("shopId") Long shopId,
             @Param("search") String search,
             @Param("deliveryType") String deliveryType,
-            @Param("status") String status,
+            @Param("orderStatus") OrderStatus orderStatus,
+            @Param("activeDisputeOnly") boolean activeDisputeOnly,
             @Param("fromDateTime") OffsetDateTime fromDateTime,
             @Param("toDateTimeExclusive") OffsetDateTime toDateTimeExclusive,
-            @Param("activeDisputeStatuses") Set<String> activeDisputeStatuses,
+            @Param("activeDisputeStatuses") Set<DisputeStatus> activeDisputeStatuses,
             Pageable pageable
     );
 
@@ -174,9 +158,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                     OR (o.placedAt = :beforePlacedAt AND o.id < :beforeId)
               )
               AND (
-                    :status = ''
-                    OR (
-                        :status = 'DISPUTED'
+                    (
+                        :activeDisputeOnly = true
                         AND EXISTS (
                             SELECT d.id
                             FROM OrderDispute d
@@ -185,14 +168,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                         )
                     )
                     OR (
-                        :status <> 'DISPUTED'
-                        AND o.status = :status
-                        AND NOT EXISTS (
-                            SELECT d.id
-                            FROM OrderDispute d
-                            WHERE d.orderId = o.id
-                              AND d.status IN :activeDisputeStatuses
-                        )
+                        :activeDisputeOnly = false
+                        AND (:orderStatus IS NULL OR o.status = :orderStatus)
                     )
               )
             ORDER BY o.placedAt DESC, o.id DESC
@@ -201,12 +178,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("shopId") Long shopId,
             @Param("search") String search,
             @Param("deliveryType") String deliveryType,
-            @Param("status") String status,
+            @Param("orderStatus") OrderStatus orderStatus,
+            @Param("activeDisputeOnly") boolean activeDisputeOnly,
             @Param("fromDateTime") OffsetDateTime fromDateTime,
             @Param("toDateTimeExclusive") OffsetDateTime toDateTimeExclusive,
             @Param("beforePlacedAt") OffsetDateTime beforePlacedAt,
             @Param("beforeId") Long beforeId,
-            @Param("activeDisputeStatuses") Set<String> activeDisputeStatuses,
+            @Param("activeDisputeStatuses") Set<DisputeStatus> activeDisputeStatuses,
             Pageable pageable
     );
 
@@ -227,11 +205,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     //  Hàm tìm các đơn hàng Shop ĐÃ NHẬN nhưng xử lý quá hạn (quá 24h)
     @Query("SELECT o.id FROM Order o WHERE o.deliveryType = 'PRE_ORDER' AND o.status = :status AND o.processingDeadlineAt < :deadline ORDER BY o.processingDeadlineAt ASC, o.id ASC")
-    List<Long> findExpiredProcessingIds(@Param("status") String status, @Param("deadline") OffsetDateTime deadline, Pageable pageable);
+    List<Long> findExpiredProcessingIds(@Param("status") OrderStatus status, @Param("deadline") OffsetDateTime deadline, Pageable pageable);
 
     // Hàm tìm các đơn hàng Shop BỎ QUÊN không thèm duyệt
     @Query("SELECT o.id FROM Order o WHERE o.deliveryType = 'PRE_ORDER' AND o.status = :status AND o.approvalDeadlineAt < :deadline ORDER BY o.approvalDeadlineAt ASC, o.id ASC")
-    List<Long> findExpiredApprovalIds(@Param("status") String status, @Param("deadline") OffsetDateTime deadline, Pageable pageable);
+    List<Long> findExpiredApprovalIds(@Param("status") OrderStatus status, @Param("deadline") OffsetDateTime deadline, Pageable pageable);
 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -25,11 +25,13 @@ public class OrderStatusLog {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "from_status", length = 30)
-    private String fromStatus;
+    private OrderStatus fromStatus;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "to_status", nullable = false, length = 30)
-    private String toStatus;
+    private OrderStatus toStatus;
 
     @Column(name = "changed_by")
     private Long changedBy; // ID user tác động, null = System tự động

@@ -6,6 +6,7 @@ import com.commercehub.backend.fee.service.PlatformFeeLedgerService;
 import com.commercehub.backend.product.repository.ProductRepository;
 //import com.commercehub.backend.outbox.service.OutboxEventService;
 import com.commercehub.backend.wallet.entity.HoldRelease;
+import com.commercehub.backend.wallet.entity.HoldReleaseStatus;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,7 @@ public class HoldReleaseProcessor {
         HoldRelease hr = holdReleaseRepository.findByIdWithLock(holdReleaseId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
 
-        if (!"HOLDING".equals(hr.getStatus())) {
+        if (hr.getStatus() != HoldReleaseStatus.HOLDING) {
             log.info("BỎ QUA: HoldRelease ID {} đã bị đổi trạng thái thành {} (có thể do khiếu nại).", hr.getId(), hr.getStatus());
             return;
         }
@@ -47,7 +48,7 @@ public class HoldReleaseProcessor {
                 hr.getId()
         );
 
-        hr.setStatus("RELEASED");
+        hr.setStatus(HoldReleaseStatus.RELEASED);
         hr.setReleasedAt(OffsetDateTime.now());
         holdReleaseRepository.save(hr);
 

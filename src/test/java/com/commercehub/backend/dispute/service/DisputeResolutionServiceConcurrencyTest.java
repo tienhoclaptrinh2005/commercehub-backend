@@ -3,6 +3,9 @@ package com.commercehub.backend.dispute.service;
 import com.commercehub.backend.dispute.dto.request.AdminResolveDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.entity.OrderDispute;
+import com.commercehub.backend.dispute.entity.DisputeResolution;
+import com.commercehub.backend.dispute.entity.DisputeResolvedBy;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.dispute.mapper.DisputeMapper;
 import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
 import com.commercehub.backend.wallet.entity.HoldRelease;
@@ -40,7 +43,7 @@ class DisputeResolutionServiceConcurrencyTest {
                 .orderItemId(30L)
                 .userId(40L)
                 .shopId(50L)
-                .status(OrderDispute.STATUS_WARRANTY_IN_PROGRESS)
+                .status(DisputeStatus.WARRANTY_IN_PROGRESS)
                 .deadlineAt(now.minusSeconds(1))
                 .build();
         HoldRelease holdRelease = HoldRelease.builder()
@@ -52,7 +55,7 @@ class DisputeResolutionServiceConcurrencyTest {
         ReentrantLock simulatedDatabaseLock = new ReentrantLock();
         when(disputeRepository.findByIdWithLock(10L)).thenAnswer(invocation -> {
             simulatedDatabaseLock.lock();
-            if (!OrderDispute.STATUS_WARRANTY_IN_PROGRESS.equals(dispute.getStatus())) {
+            if (dispute.getStatus() != DisputeStatus.WARRANTY_IN_PROGRESS) {
                 simulatedDatabaseLock.unlock();
             }
             return Optional.of(dispute);
@@ -86,10 +89,12 @@ class DisputeResolutionServiceConcurrencyTest {
         verify(holdReleaseService, times(1)).escalateDispute(30L);
         verify(disputeRepository, times(1)).linkFeeLedgerToDispute(30L, 10L);
         verify(holdReleaseService, times(1)).resolveDispute(60L, true, 40L, 70L, 20L);
-        assertThat(dispute.getStatus()).isEqualTo(OrderDispute.STATUS_BUYER_WIN);
+        assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.RESOLVED);
+        assertThat(dispute.getResolution()).isEqualTo(DisputeResolution.BUYER_WIN);
+        assertThat(dispute.getResolvedBy()).isEqualTo(DisputeResolvedBy.SYSTEM);
         assertThat(dispute.getRefundAmount()).isEqualByComparingTo("100.00");
         assertThat(dispute.getResolverId()).isNull();
-        assertThat(dispute.getAdminNote()).contains("seller không hoàn tất bảo hành");
+        assertThat(dispute.getResolutionNote()).contains("seller không hoàn tất bảo hành");
     }
 
     @Test
@@ -107,7 +112,7 @@ class DisputeResolutionServiceConcurrencyTest {
                 .orderItemId(30L)
                 .userId(40L)
                 .shopId(50L)
-                .status(OrderDispute.STATUS_PROCESSING)
+                .status(DisputeStatus.ADMIN_REVIEW)
                 .build();
         HoldRelease holdRelease = HoldRelease.builder()
                 .id(60L)
@@ -122,7 +127,7 @@ class DisputeResolutionServiceConcurrencyTest {
         ReentrantLock simulatedDatabaseLock = new ReentrantLock();
         when(disputeRepository.findByIdWithLock(10L)).thenAnswer(invocation -> {
             simulatedDatabaseLock.lock();
-            if (!OrderDispute.STATUS_PROCESSING.equals(dispute.getStatus())) {
+            if (dispute.getStatus() != DisputeStatus.ADMIN_REVIEW) {
                 simulatedDatabaseLock.unlock();
             }
             return Optional.of(dispute);
@@ -138,7 +143,7 @@ class DisputeResolutionServiceConcurrencyTest {
         when(mapper.toResponse(dispute)).thenReturn(response);
 
         AdminResolveDisputeRequest request =
-                new AdminResolveDisputeRequest(OrderDispute.STATUS_BUYER_WIN, "Buyer thắng");
+                new AdminResolveDisputeRequest(DisputeResolution.BUYER_WIN, "Buyer thắng");
         CountDownLatch start = new CountDownLatch(1);
 
         try (var executor = Executors.newFixedThreadPool(2)) {

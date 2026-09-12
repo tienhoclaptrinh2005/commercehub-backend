@@ -4,6 +4,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.commercehub.backend.order.entity.OrderCancellationCode;
+import com.commercehub.backend.order.entity.OrderCancelledBy;
+import com.commercehub.backend.order.entity.OrderPaymentStatus;
+import com.commercehub.backend.order.entity.OrderStatus;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -22,9 +26,13 @@ public class OrderDetailResponse {
     private String sellerUsername;
     private String buyerUsername;
     private String deliveryType;
-    private String status;
-    private String effectiveStatus;
-    private String paymentStatus;
+    private OrderStatus status;
+    private OrderPaymentStatus paymentStatus;
+    private OrderCancelledBy cancelledBy;
+    private OrderCancellationCode cancellationCode;
+    private String cancellationReason;
+    private OffsetDateTime cancelledAt;
+    private boolean activeDispute;
     private String paymentMethod;
     private BigDecimal subtotalAmount;
     private BigDecimal voucherDiscount;

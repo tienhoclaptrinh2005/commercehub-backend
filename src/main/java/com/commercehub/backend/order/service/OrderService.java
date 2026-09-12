@@ -9,14 +9,17 @@ import com.commercehub.backend.order.dto.response.OrderResponse;
 import com.commercehub.backend.order.dto.response.PreOrderItemResponse;
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.mapper.OrderMapper;
 import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.order.repository.OrderRepository;
 import com.commercehub.backend.order.repository.OrderStatusLogRepository;
 import com.commercehub.backend.order.repository.PreOrderItemRepository;
 import com.commercehub.backend.dispute.entity.OrderDispute;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
 import com.commercehub.backend.wallet.entity.HoldRelease;
+import com.commercehub.backend.wallet.entity.HoldReleaseStatus;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -47,34 +50,28 @@ public class OrderService {
             LocalDate.of(1970, 1, 1).atStartOfDay().atOffset(BUSINESS_TIMEZONE_OFFSET);
     private static final OffsetDateTime MAX_FILTER_TIME =
             LocalDate.of(9999, 12, 31).atStartOfDay().atOffset(BUSINESS_TIMEZONE_OFFSET);
-    private static final Set<String> ACTIVE_DISPUTE_STATUSES = Set.of(
-            OrderDispute.STATUS_OPEN,
-            OrderDispute.STATUS_WARRANTY_IN_PROGRESS,
-            OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION,
-            OrderDispute.STATUS_PROCESSING
+    private static final String ACTIVE_DISPUTE_FILTER = "ACTIVE_DISPUTE";
+    private static final Set<DisputeStatus> ACTIVE_DISPUTE_STATUSES = Set.of(
+            DisputeStatus.OPEN,
+            DisputeStatus.WARRANTY_IN_PROGRESS,
+            DisputeStatus.WAITING_BUYER_CONFIRMATION,
+            DisputeStatus.ADMIN_REVIEW
     );
     private static final Set<String> BUYER_ORDER_FILTER_STATUSES = Set.of(
-            "WAITING_APPROVAL",
+            "WAITING_SELLER_ACCEPTANCE",
             "PROCESSING",
             "DELIVERED",
-            "DISPUTED",
-            "REFUNDED",
             "REJECTED",
             "CANCELLED",
-            "CANCELLED_BY_SELLER",
-            "CANCELLED_BY_SYSTEM",
-            "PENDING",
-            "APPROVED"
+            ACTIVE_DISPUTE_FILTER
     );
     private static final Set<String> SELLER_ORDER_FILTER_STATUSES = Set.of(
-            "WAITING_APPROVAL",
+            "WAITING_SELLER_ACCEPTANCE",
             "PROCESSING",
             "DELIVERED",
-            "DISPUTED",
             "REJECTED",
             "CANCELLED",
-            "CANCELLED_BY_SELLER",
-            "CANCELLED_BY_SYSTEM"
+            ACTIVE_DISPUTE_FILTER
     );
     private static final Set<String> ORDER_DELIVERY_TYPES = Set.of("INSTANT", "PRE_ORDER");
 
@@ -120,11 +117,16 @@ public class OrderService {
                 : toDate.plusDays(1).atStartOfDay().atOffset(BUSINESS_TIMEZONE_OFFSET);
 
         PageRequest pageRequest = PageRequest.of(0, size);
+        boolean activeDisputeOnly = ACTIVE_DISPUTE_FILTER.equals(normalizedStatus);
+        OrderStatus orderStatus = normalizedStatus.isEmpty() || activeDisputeOnly
+                ? null
+                : OrderStatus.valueOf(normalizedStatus);
         Slice<Order> orders = beforePlacedAt == null
                 ? orderRepository.findFirstBuyerOrders(
                         buyerId,
                         normalizedOrderCode,
-                        normalizedStatus,
+                        orderStatus,
+                        activeDisputeOnly,
                         fromDateTime,
                         toDateTimeExclusive,
                         ACTIVE_DISPUTE_STATUSES,
@@ -133,7 +135,8 @@ public class OrderService {
                 : orderRepository.findBuyerOrdersBefore(
                         buyerId,
                         normalizedOrderCode,
-                        normalizedStatus,
+                        orderStatus,
+                        activeDisputeOnly,
                         fromDateTime,
                         toDateTimeExclusive,
                         beforePlacedAt,
@@ -219,13 +222,17 @@ public class OrderService {
                 ? MAX_FILTER_TIME
                 : toDate.plusDays(1).atStartOfDay().atOffset(BUSINESS_TIMEZONE_OFFSET);
         PageRequest pageRequest = PageRequest.of(0, size);
+        boolean activeDisputeOnly = ACTIVE_DISPUTE_FILTER.equals(normalizedStatus);
+        OrderStatus orderStatus = normalizedStatus.isEmpty() || activeDisputeOnly
+                ? null
+                : OrderStatus.valueOf(normalizedStatus);
         Slice<Order> orders = beforePlacedAt == null
                 ? orderRepository.findFirstSellerOrders(
-                        shopId, normalizedSearch, normalizedDeliveryType, normalizedStatus,
+                        shopId, normalizedSearch, normalizedDeliveryType, orderStatus, activeDisputeOnly,
                         fromDateTime, toDateTimeExclusive, ACTIVE_DISPUTE_STATUSES, pageRequest
                 )
                 : orderRepository.findSellerOrdersBefore(
-                        shopId, normalizedSearch, normalizedDeliveryType, normalizedStatus,
+                        shopId, normalizedSearch, normalizedDeliveryType, orderStatus, activeDisputeOnly,
                         fromDateTime, toDateTimeExclusive, beforePlacedAt, beforeId,
                         ACTIVE_DISPUTE_STATUSES, pageRequest
                 );
@@ -282,7 +289,7 @@ public class OrderService {
                     itemResponse.setComplaintAllowed(
                             dispute == null
                                     && holdRelease != null
-                                    && "HOLDING".equals(holdRelease.getStatus())
+                                    && holdRelease.getStatus() == HoldReleaseStatus.HOLDING
                                     && holdRelease.getScheduledReleaseAt() != null
                                     && holdRelease.getScheduledReleaseAt().isAfter(now)
                     );
@@ -293,7 +300,6 @@ public class OrderService {
                         var preItem = preOrderItems.get(item.getId());
                         if (preItem != null) {
                             itemResponse.setPreOrder(PreOrderItemResponse.builder()
-                                    .status(preItem.getStatus())
                                     .buyerInputs(preItem.getBuyerInputs())
                                     .deliveryContentType(preItem.getDeliveryContentType() != null
                                             ? preItem.getDeliveryContentType().name() : null)
@@ -309,9 +315,7 @@ public class OrderService {
                 .collect(Collectors.toList());
 
         OrderDetailResponse response = orderMapper.toOrderDetailResponse(order);
-        if (disputes.values().stream().anyMatch(this::isActiveDispute)) {
-            response.setEffectiveStatus("DISPUTED");
-        }
+        response.setActiveDispute(disputes.values().stream().anyMatch(this::isActiveDispute));
         response.setItems(items);
         response.setStatusLogs(
                 orderStatusLogRepository.findByOrderIdOrderByCreatedAtDesc(order.getId()).stream()
@@ -356,9 +360,7 @@ public class OrderService {
             OrderResponse response = orderMapper.toOrderResponse(order);
             response.setProductNames(productNamesByOrder.getOrDefault(order.getId(), List.of()));
             response.setVariantNames(variantNamesByOrder.getOrDefault(order.getId(), List.of()));
-            if (disputedOrderIds.contains(order.getId())) {
-                response.setEffectiveStatus("DISPUTED");
-            }
+            response.setActiveDispute(disputedOrderIds.contains(order.getId()));
             return response;
         });
     }

@@ -27,11 +27,6 @@ public class PreOrderItem {
     @Column(name = "buyer_inputs", columnDefinition = "TEXT")
     private String buyerInputs;
 
-    // PENDING → ACCEPTED → PROCESSING → DELIVERED | REJECTED | CANCELLED
-    @Builder.Default
-    @Column(nullable = false, length = 30)
-    private String status = "PENDING";
-
     // Nội dung shop giao cho khách (account/key/tin nhắn) — buyer xem lại vĩnh viễn từ đây.
     // KHÔNG dùng sellerNotes để giao hàng (sellerNotes chỉ là ghi chú nội bộ).
     @Column(name = "delivery_content", columnDefinition = "TEXT")

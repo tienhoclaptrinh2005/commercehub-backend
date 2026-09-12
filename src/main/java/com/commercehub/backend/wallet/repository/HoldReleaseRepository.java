@@ -19,13 +19,12 @@ public interface HoldReleaseRepository extends JpaRepository<HoldRelease, Long> 
     /**
      * Scheduler chỉ lấy những khoản đang HOLDING và đã đến hạn.
      *
-     * COMPLAINED, WARRANTY_IN_PROGRESS, DISPUTED
-     * sẽ KHÔNG được scheduler xử lý.
+     * FROZEN sẽ KHÔNG được scheduler xử lý.
      */
     @Query("""
             SELECT h.id
             FROM HoldRelease h
-            WHERE h.status = 'HOLDING'
+            WHERE h.status = com.commercehub.backend.wallet.entity.HoldReleaseStatus.HOLDING
               AND h.scheduledReleaseAt <= :now
             ORDER BY h.scheduledReleaseAt ASC, h.id ASC
             """)

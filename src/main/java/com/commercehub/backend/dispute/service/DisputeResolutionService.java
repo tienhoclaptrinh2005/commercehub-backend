@@ -5,6 +5,9 @@ import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.dispute.dto.request.AdminResolveDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.entity.OrderDispute;
+import com.commercehub.backend.dispute.entity.DisputeResolution;
+import com.commercehub.backend.dispute.entity.DisputeResolvedBy;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.dispute.mapper.DisputeMapper;
 import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
 import com.commercehub.backend.wallet.entity.HoldRelease;
@@ -41,6 +44,11 @@ public class DisputeResolutionService {
             AdminResolveDisputeRequest request
     ) {
 
+        if (request.decision() != DisputeResolution.BUYER_WIN
+                && request.decision() != DisputeResolution.SELLER_WIN) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
         OrderDispute dispute =
                 disputeRepository
                         .findByIdWithLock(disputeId)
@@ -50,14 +58,15 @@ public class DisputeResolutionService {
                                 )
                         );
 
-        if (!OrderDispute.STATUS_PROCESSING.equals(dispute.getStatus())) {
-            if (request.decision().equals(dispute.getStatus())) {
+        if (dispute.getStatus() != DisputeStatus.ADMIN_REVIEW) {
+            if (dispute.getStatus() == DisputeStatus.RESOLVED
+                    && request.decision() == dispute.getResolution()) {
                 return disputeMapper.toResponse(dispute);
             }
             throw new AppException(ErrorCode.DISPUTE_INVALID_STATUS);
         }
 
-        return resolveLocked(dispute, adminId, request.decision(), request.adminNote());
+        return resolveLocked(dispute, adminId, DisputeResolvedBy.ADMIN, request.decision(), request.resolutionNote());
     }
 
     /** Seller không phản hồi OPEN quá hạn: hệ thống xử buyer thắng 100%. */
@@ -66,7 +75,7 @@ public class DisputeResolutionService {
         OrderDispute dispute = disputeRepository.findByIdWithLock(disputeId)
                 .orElseThrow(() -> new AppException(ErrorCode.DISPUTE_NOT_FOUND));
 
-        if (!OrderDispute.STATUS_OPEN.equals(dispute.getStatus())
+        if (dispute.getStatus() != DisputeStatus.OPEN
                 || dispute.getDeadlineAt().isAfter(now)) {
             return;
         }
@@ -76,7 +85,8 @@ public class DisputeResolutionService {
         resolveLocked(
                 dispute,
                 null,
-                OrderDispute.STATUS_BUYER_WIN,
+                DisputeResolvedBy.SYSTEM,
+                DisputeResolution.BUYER_WIN,
                 "Hệ thống xử buyer thắng do seller không phản hồi trong thời hạn"
         );
     }
@@ -87,7 +97,7 @@ public class DisputeResolutionService {
         OrderDispute dispute = disputeRepository.findByIdWithLock(disputeId)
                 .orElseThrow(() -> new AppException(ErrorCode.DISPUTE_NOT_FOUND));
 
-        if (!OrderDispute.STATUS_WARRANTY_IN_PROGRESS.equals(dispute.getStatus())
+        if (dispute.getStatus() != DisputeStatus.WARRANTY_IN_PROGRESS
                 || dispute.getDeadlineAt().isAfter(now)) {
             return;
         }
@@ -97,7 +107,8 @@ public class DisputeResolutionService {
         resolveLocked(
                 dispute,
                 null,
-                OrderDispute.STATUS_BUYER_WIN,
+                DisputeResolvedBy.SYSTEM,
+                DisputeResolution.BUYER_WIN,
                 "Hệ thống hoàn tiền do seller không hoàn tất bảo hành trong thời hạn"
         );
     }
@@ -105,8 +116,9 @@ public class DisputeResolutionService {
     private DisputeResponse resolveLocked(
             OrderDispute dispute,
             Long resolverId,
-            String decision,
-            String adminNote
+            DisputeResolvedBy resolvedBy,
+            DisputeResolution decision,
+            String resolutionNote
     ) {
 
         HoldRelease holdRelease =
@@ -131,7 +143,7 @@ public class DisputeResolutionService {
                                 )
                         );
 
-        boolean buyerWin = OrderDispute.STATUS_BUYER_WIN.equals(decision);
+        boolean buyerWin = decision == DisputeResolution.BUYER_WIN;
 
         /*
          * HoldReleaseService chịu trách nhiệm:
@@ -155,30 +167,26 @@ public class DisputeResolutionService {
         );
 
         dispute.setResolverId(resolverId);
+        dispute.setResolvedBy(resolvedBy);
 
-        dispute.setAdminNote(
-                adminNote
+        dispute.setResolutionNote(
+                resolutionNote
         );
 
         dispute.setResolvedAt(
                 OffsetDateTime.now()
         );
 
-        if (buyerWin) {
+        dispute.setStatus(DisputeStatus.RESOLVED);
+        dispute.setResolution(decision);
 
-            dispute.setStatus(
-                    OrderDispute.STATUS_BUYER_WIN
-            );
+        if (buyerWin) {
 
             dispute.setRefundAmount(
                     holdRelease.getHoldAmount()
             );
 
         } else {
-
-            dispute.setStatus(
-                    OrderDispute.STATUS_SELLER_WIN
-            );
 
             dispute.setRefundAmount(
                     BigDecimal.ZERO
@@ -234,11 +242,14 @@ public class DisputeResolutionService {
                     .map(disputeMapper::toResponse);
         }
 
+        DisputeStatus normalizedStatus;
+        try {
+            normalizedStatus = DisputeStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            throw new AppException(ErrorCode.INVALID_STATUS);
+        }
         return disputeRepository
-                .findByStatusOrderByCreatedAtDesc(
-                        status,
-                        limitPageable(pageable)
-                )
+                .findByStatusOrderByCreatedAtDesc(normalizedStatus, limitPageable(pageable))
                 .map(disputeMapper::toResponse);
     }
 

@@ -5,6 +5,9 @@ import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.dispute.dto.request.CreateDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.entity.OrderDispute;
+import com.commercehub.backend.dispute.entity.DisputeResolution;
+import com.commercehub.backend.dispute.entity.DisputeResolvedBy;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.dispute.mapper.DisputeMapper;
 import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
 import com.commercehub.backend.wallet.service.HoldReleaseService;
@@ -38,7 +41,7 @@ class DisputeServiceTest {
 
     @Test
     void buyerCanWithdrawOpenComplaintAndItIsClosedPermanently() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_OPEN);
+        OrderDispute dispute = dispute(DisputeStatus.OPEN);
         DisputeResponse response = mock(DisputeResponse.class);
         when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
         when(disputeMapper.toResponse(dispute)).thenReturn(response);
@@ -46,9 +49,9 @@ class DisputeServiceTest {
         DisputeResponse result = service.withdrawByBuyer(40L, 10L);
 
         assertThat(result).isSameAs(response);
-        assertThat(dispute.getStatus()).isEqualTo(OrderDispute.STATUS_CLOSED);
-        assertThat(dispute.getClosedReason())
-                .isEqualTo(OrderDispute.CLOSED_REASON_BUYER_WITHDREW);
+        assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.RESOLVED);
+        assertThat(dispute.getResolution()).isEqualTo(DisputeResolution.BUYER_WITHDREW);
+        assertThat(dispute.getResolvedBy()).isEqualTo(DisputeResolvedBy.BUYER);
         assertThat(dispute.getResolvedAt()).isNotNull();
         verify(holdReleaseService).withdrawComplaint(30L);
         verify(disputeRepository).save(dispute);
@@ -56,7 +59,7 @@ class DisputeServiceTest {
 
     @Test
     void buyerCannotWithdrawAnotherBuyersComplaint() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_OPEN);
+        OrderDispute dispute = dispute(DisputeStatus.OPEN);
         when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
 
         assertThatThrownBy(() -> service.withdrawByBuyer(41L, 10L))
@@ -69,7 +72,7 @@ class DisputeServiceTest {
 
     @Test
     void buyerCannotWithdrawWaitingOrTerminalComplaint() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION);
+        OrderDispute dispute = dispute(DisputeStatus.WAITING_BUYER_CONFIRMATION);
         when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
 
         assertThatThrownBy(() -> service.withdrawByBuyer(40L, 10L))
@@ -115,21 +118,20 @@ class DisputeServiceTest {
 
     @Test
     void buyerCanWithdrawWarrantyBeforeDeadline() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
+        OrderDispute dispute = dispute(DisputeStatus.WARRANTY_IN_PROGRESS);
         dispute.setDeadlineAt(OffsetDateTime.now().plusMinutes(1));
         when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
 
         service.withdrawByBuyer(40L, 10L);
 
-        assertThat(dispute.getStatus()).isEqualTo(OrderDispute.STATUS_CLOSED);
-        assertThat(dispute.getClosedReason())
-                .isEqualTo(OrderDispute.CLOSED_REASON_BUYER_WITHDREW);
+        assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.RESOLVED);
+        assertThat(dispute.getResolution()).isEqualTo(DisputeResolution.BUYER_WITHDREW);
         verify(holdReleaseService).withdrawComplaint(30L);
     }
 
     @Test
     void sellerStartingWarrantyGetsFreshTwentyFourHourDeadline() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_OPEN);
+        OrderDispute dispute = dispute(DisputeStatus.OPEN);
         when(disputeRepository.sellerOwnsOrderItem(70L, 20L, 30L)).thenReturn(true);
         when(disputeRepository.findByOrderItemIdWithLock(30L)).thenReturn(Optional.of(dispute));
 
@@ -137,7 +139,7 @@ class DisputeServiceTest {
         service.startWarranty(70L, 20L, 30L, null);
         OffsetDateTime latestDeadline = OffsetDateTime.now().plusHours(24);
 
-        assertThat(dispute.getStatus()).isEqualTo(OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
+        assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.WARRANTY_IN_PROGRESS);
         assertThat(dispute.getDeadlineAt()).isBetween(earliestDeadline, latestDeadline);
         verify(holdReleaseService).startWarranty(30L);
         verify(disputeRepository).save(dispute);
@@ -145,7 +147,7 @@ class DisputeServiceTest {
 
     @Test
     void sellerCannotCompleteWarrantyAfterDeadlineBeforeSchedulerRuns() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
+        OrderDispute dispute = dispute(DisputeStatus.WARRANTY_IN_PROGRESS);
         dispute.setDeadlineAt(OffsetDateTime.now().minusSeconds(1));
         when(disputeRepository.sellerOwnsOrderItem(70L, 20L, 30L)).thenReturn(true);
         when(disputeRepository.findByOrderItemIdWithLock(30L)).thenReturn(Optional.of(dispute));
@@ -161,7 +163,7 @@ class DisputeServiceTest {
 
     @Test
     void buyerCannotWithdrawExpiredWarrantyBeforeSchedulerRuns() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
+        OrderDispute dispute = dispute(DisputeStatus.WARRANTY_IN_PROGRESS);
         dispute.setDeadlineAt(OffsetDateTime.now().minusSeconds(1));
         when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
 
@@ -176,7 +178,7 @@ class DisputeServiceTest {
 
     @Test
     void expiredOpenCannotBeWithdrawnStartedOrEscalatedBeforeSchedulerRuns() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_OPEN);
+        OrderDispute dispute = dispute(DisputeStatus.OPEN);
         dispute.setDeadlineAt(OffsetDateTime.now().minusSeconds(1));
         when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
         when(disputeRepository.sellerOwnsOrderItem(70L, 20L, 30L)).thenReturn(true);
@@ -201,7 +203,7 @@ class DisputeServiceTest {
 
     @Test
     void expiredWarrantyCannotBeEscalatedBeforeSchedulerRuns() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
+        OrderDispute dispute = dispute(DisputeStatus.WARRANTY_IN_PROGRESS);
         dispute.setDeadlineAt(OffsetDateTime.now().minusSeconds(1));
         when(disputeRepository.sellerOwnsOrderItem(70L, 20L, 30L)).thenReturn(true);
         when(disputeRepository.findByOrderItemIdWithLock(30L)).thenReturn(Optional.of(dispute));
@@ -217,7 +219,7 @@ class DisputeServiceTest {
 
     @Test
     void expiredBuyerConfirmationCannotBeConfirmedOrEscalatedBeforeSchedulerRuns() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION);
+        OrderDispute dispute = dispute(DisputeStatus.WAITING_BUYER_CONFIRMATION);
         dispute.setDeadlineAt(OffsetDateTime.now().minusSeconds(1));
         when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
 
@@ -236,34 +238,34 @@ class DisputeServiceTest {
 
     @Test
     void buyerConfirmationStoresAcceptedWarrantyReason() {
-        OrderDispute dispute = dispute(OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION);
+        OrderDispute dispute = dispute(DisputeStatus.WAITING_BUYER_CONFIRMATION);
         when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
 
         service.confirmWarrantyByBuyer(40L, 10L);
 
-        assertThat(dispute.getStatus()).isEqualTo(OrderDispute.STATUS_CLOSED);
-        assertThat(dispute.getClosedReason())
-                .isEqualTo(OrderDispute.CLOSED_REASON_BUYER_ACCEPTED_WARRANTY);
+        assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.RESOLVED);
+        assertThat(dispute.getResolution()).isEqualTo(DisputeResolution.WARRANTY_ACCEPTED);
+        assertThat(dispute.getResolvedBy()).isEqualTo(DisputeResolvedBy.BUYER);
         verify(holdReleaseService).confirmWarrantyResolved(30L);
     }
 
     @Test
     void expiredBuyerConfirmationStoresTimeoutReason() {
         OffsetDateTime now = OffsetDateTime.now();
-        OrderDispute dispute = dispute(OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION);
+        OrderDispute dispute = dispute(DisputeStatus.WAITING_BUYER_CONFIRMATION);
         dispute.setDeadlineAt(now.minusSeconds(1));
         when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
 
         service.closeExpiredBuyerConfirmation(10L, now);
 
-        assertThat(dispute.getStatus()).isEqualTo(OrderDispute.STATUS_CLOSED);
-        assertThat(dispute.getClosedReason())
-                .isEqualTo(OrderDispute.CLOSED_REASON_BUYER_CONFIRMATION_TIMEOUT);
+        assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.RESOLVED);
+        assertThat(dispute.getResolution()).isEqualTo(DisputeResolution.BUYER_CONFIRMATION_TIMEOUT);
+        assertThat(dispute.getResolvedBy()).isEqualTo(DisputeResolvedBy.SYSTEM);
         assertThat(dispute.getResolvedAt()).isEqualTo(now);
         verify(holdReleaseService).confirmWarrantyResolved(30L);
     }
 
-    private OrderDispute dispute(String status) {
+    private OrderDispute dispute(DisputeStatus status) {
         return OrderDispute.builder()
                 .id(10L)
                 .orderId(20L)

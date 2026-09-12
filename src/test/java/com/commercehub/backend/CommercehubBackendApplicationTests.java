@@ -8,6 +8,7 @@ import com.commercehub.backend.product.mapper.ProductMapper;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.product.service.ProductReviewService;
 import com.commercehub.backend.order.repository.OrderRepository;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.shop.dto.request.CreateShopRequest;
 import com.commercehub.backend.shop.mapper.ShopMapper;
 import com.commercehub.backend.shop.repository.ShopRepository;
@@ -120,16 +121,17 @@ class CommercehubBackendApplicationTests {
 	@Test
 	@Transactional
 	void buyerOrderFiltersAcceptEmptyOptionalCriteria() {
-		Set<String> activeDisputeStatuses = Set.of(
-				"OPEN",
-				"WARRANTY_IN_PROGRESS",
-				"WAITING_BUYER_CONFIRMATION",
-				"PROCESSING"
+		Set<DisputeStatus> activeDisputeStatuses = Set.of(
+				DisputeStatus.OPEN,
+				DisputeStatus.WARRANTY_IN_PROGRESS,
+				DisputeStatus.WAITING_BUYER_CONFIRMATION,
+				DisputeStatus.ADMIN_REVIEW
 		);
 		assertDoesNotThrow(() -> orderRepository.findFirstBuyerOrders(
 				-1L,
 				"",
-				"",
+				null,
+				false,
 				OffsetDateTime.parse("1970-01-01T00:00:00+07:00"),
 				OffsetDateTime.parse("9999-12-31T00:00:00+07:00"),
 				activeDisputeStatuses,
@@ -138,7 +140,8 @@ class CommercehubBackendApplicationTests {
 		assertDoesNotThrow(() -> orderRepository.findBuyerOrdersBefore(
 				-1L,
 				"ORD-",
-				"DISPUTED",
+				null,
+				true,
 				OffsetDateTime.now().minusYears(1),
 				OffsetDateTime.now().plusDays(1),
 				OffsetDateTime.now(),

@@ -13,7 +13,6 @@ import java.time.OffsetDateTime;
 @Data
 @Builder
 public class PreOrderItemResponse {
-    private String status;                 // PENDING | ACCEPTED | PROCESSING | DELIVERED | REJECTED | CANCELLED
     private String buyerInputs;            // JSON string buyer đã nhập lúc đặt
     private String deliveryContentType;    // ACCOUNT | KEY | MESSAGE | OTHER (null khi chưa giao)
     private String deliveryContent;        // null khi chưa giao

@@ -1,9 +1,11 @@
 package com.commercehub.backend.order.scheduler;
 
 import com.commercehub.backend.order.entity.Order;
-import com.commercehub.backend.order.repository.OrderItemRepository;
+import com.commercehub.backend.order.entity.OrderCancellationCode;
+import com.commercehub.backend.order.entity.OrderCancelledBy;
+import com.commercehub.backend.order.entity.OrderPaymentStatus;
+import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.repository.OrderRepository;
-import com.commercehub.backend.order.repository.PreOrderItemRepository;
 import com.commercehub.backend.order.service.OrderStatusService;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.user.entity.User;
@@ -12,24 +14,20 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderCancelProcessorTest {
 
     @Test
     void expiredOrderUsesCanonicalOrderReferenceTypeWhenRefunding() {
         OrderRepository orderRepository = mock(OrderRepository.class);
-        OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
-        PreOrderItemRepository preOrderItemRepository = mock(PreOrderItemRepository.class);
         WalletService walletService = mock(WalletService.class);
         OrderStatusService orderStatusService = mock(OrderStatusService.class);
         OrderCancelProcessor processor = new OrderCancelProcessor(
                 orderRepository,
-                orderItemRepository,
-                preOrderItemRepository,
                 walletService,
                 orderStatusService
         );
@@ -41,17 +39,22 @@ class OrderCancelProcessorTest {
                 .id(40L)
                 .user(buyer)
                 .shop(shop)
-                .status("WAITING_APPROVAL")
-                .paymentStatus("PAID")
+                .status(OrderStatus.WAITING_SELLER_ACCEPTANCE)
+                .paymentStatus(OrderPaymentStatus.PAID)
                 .totalAmount(new BigDecimal("100000.00"))
                 .approvalDeadlineAt(OffsetDateTime.now().minusMinutes(1))
                 .build();
-        String reason = "Hệ thống tự động hủy và hoàn tiền do đơn quá hạn ở trạng thái WAITING_APPROVAL";
+        String reason = "Hệ thống tự động hủy và hoàn tiền do đơn quá hạn chờ người bán nhận";
 
         when(orderRepository.findByIdWithLock(40L)).thenReturn(Optional.of(order));
-        when(orderItemRepository.findByOrder(order)).thenReturn(List.of());
-
         processor.cancelSingleOrder(40L, reason);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getPaymentStatus()).isEqualTo(OrderPaymentStatus.REFUNDED);
+        assertThat(order.getCancelledBy()).isEqualTo(OrderCancelledBy.SYSTEM);
+        assertThat(order.getCancellationCode()).isEqualTo(OrderCancellationCode.SELLER_ACCEPTANCE_TIMEOUT);
+        assertThat(order.getCancellationReason()).isEqualTo(reason);
+        assertThat(order.getCancelledAt()).isNotNull();
 
         verify(walletService).systemCancelSellerHold(2L, new BigDecimal("100000.00"), 40L);
         verify(walletService).systemCreditBalance(
@@ -63,8 +66,8 @@ class OrderCancelProcessorTest {
         );
         verify(orderStatusService).logStatusChange(
                 order,
-                "WAITING_APPROVAL",
-                "CANCELLED_BY_SYSTEM",
+                OrderStatus.WAITING_SELLER_ACCEPTANCE,
+                OrderStatus.CANCELLED,
                 null,
                 reason
         );

@@ -12,7 +12,7 @@ UPDATE orders
 SET approval_deadline_at = placed_at + INTERVAL '24 hours',
     updated_at = NOW()
 WHERE delivery_type = 'PRE_ORDER'
-  AND status = 'WAITING_APPROVAL'
+  AND status = 'WAITING_SELLER_ACCEPTANCE'
   AND placed_at IS NOT NULL
   AND approval_deadline_at IS DISTINCT FROM placed_at + INTERVAL '24 hours';
 

@@ -1,6 +1,7 @@
 package com.commercehub.backend.dispute.scheduler;
 
 import com.commercehub.backend.dispute.entity.OrderDispute;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
 import com.commercehub.backend.dispute.service.DisputeResolutionService;
 import com.commercehub.backend.dispute.service.DisputeService;
@@ -29,7 +30,7 @@ class DisputeDeadlineSchedulerTest {
         ReflectionTestUtils.setField(scheduler, "batchSize", 10);
 
         when(repository.findExpiredIds(
-                eq(OrderDispute.STATUS_WARRANTY_IN_PROGRESS),
+                eq(DisputeStatus.WARRANTY_IN_PROGRESS),
                 any(OffsetDateTime.class),
                 any(Pageable.class)
         )).thenReturn(List.of(10L)).thenReturn(List.of());

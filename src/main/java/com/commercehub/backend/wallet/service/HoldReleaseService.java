@@ -5,10 +5,12 @@ import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.fee.service.PlatformFeeLedgerService;
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.entity.OrderPaymentStatus;
 import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.order.repository.OrderRepository;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.wallet.entity.HoldRelease;
+import com.commercehub.backend.wallet.entity.HoldReleaseStatus;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,13 +34,6 @@ public class HoldReleaseService {
     // HOLD RELEASE STATUS
     // =========================================================
 
-    private static final String STATUS_HOLDING = "HOLDING";
-    private static final String STATUS_COMPLAINED = "COMPLAINED";
-    private static final String STATUS_WARRANTY_IN_PROGRESS = "WARRANTY_IN_PROGRESS";
-    private static final String STATUS_WAITING_BUYER_CONFIRMATION = "WAITING_BUYER_CONFIRMATION";
-    private static final String STATUS_DISPUTED = "DISPUTED";
-    private static final String STATUS_REFUNDED = "REFUNDED";
-
     private final HoldReleaseRepository holdReleaseRepository;
     private final HoldReleaseProcessor holdReleaseProcessor;
     private final PlatformFeeLedgerService platformFeeLedgerService;
@@ -61,8 +56,8 @@ public class HoldReleaseService {
      * status = HOLDING
      * scheduledReleaseAt <= now
      *
-     * COMPLAINED / WARRANTY_IN_PROGRESS / WAITING_BUYER_CONFIRMATION / DISPUTED
-     * không được phép nhả tiền.
+     * FROZEN không được phép nhả tiền. Trạng thái chi tiết của khiếu nại
+     * được quản lý riêng trong OrderDispute.
      */
     public void processDueReleases(OffsetDateTime now) {
 
@@ -95,7 +90,7 @@ public class HoldReleaseService {
     // =========================================================
     // 1. BUYER COMPLAIN
     //
-    // HOLDING -> COMPLAINED
+    // HOLDING -> FROZEN
     // =========================================================
 
     /**
@@ -109,7 +104,7 @@ public class HoldReleaseService {
      * - lưu complaintReason
      * - lưu complainedAt
      * - lưu remainingHoldSeconds
-     * - chuyển trạng thái COMPLAINED
+     * - chuyển trạng thái FROZEN
      *
      * remainingHoldSeconds dùng để tạm dừng đồng hồ T+7.
      */
@@ -127,7 +122,7 @@ public class HoldReleaseService {
                         )
                 );
 
-        if (!STATUS_HOLDING.equals(hr.getStatus())) {
+        if (hr.getStatus() != HoldReleaseStatus.HOLDING) {
             throw new AppException(
                     ErrorCode.HOLD_RELEASE_INVALID_STATUS
             );
@@ -159,7 +154,7 @@ public class HoldReleaseService {
             );
         }
 
-        hr.setStatus(STATUS_COMPLAINED);
+        hr.setStatus(HoldReleaseStatus.FROZEN);
         hr.setComplaintReason(reason);
         hr.setComplainedAt(now);
         hr.setRemainingHoldSeconds(remainingSeconds);
@@ -167,7 +162,7 @@ public class HoldReleaseService {
         holdReleaseRepository.save(hr);
 
         log.info(
-                "OrderItem {} chuyển HOLDING -> COMPLAINED, remainingHoldSeconds={}",
+                "OrderItem {} chuyển HOLDING -> FROZEN, remainingHoldSeconds={}",
                 orderItemId,
                 remainingSeconds
         );
@@ -176,13 +171,13 @@ public class HoldReleaseService {
     // =========================================================
     // 2. SELLER START WARRANTY
     //
-    // COMPLAINED -> WARRANTY_IN_PROGRESS
+    // HoldRelease tiếp tục FROZEN; OrderDispute chuyển WARRANTY_IN_PROGRESS
     // =========================================================
 
     /**
      * Seller chấp nhận xử lý bảo hành.
      *
-     * Chỉ được gọi khi HoldRelease đang COMPLAINED.
+     * Chỉ được gọi khi HoldRelease đang FROZEN.
      */
     @Transactional
     public void startWarranty(Long orderItemId) {
@@ -195,21 +190,21 @@ public class HoldReleaseService {
                         )
                 );
 
-        if (!STATUS_COMPLAINED.equals(hr.getStatus())) {
+        if (hr.getStatus() != HoldReleaseStatus.FROZEN) {
             throw new AppException(
-                    ErrorCode.HOLD_RELEASE_NOT_COMPLAINED
+                    ErrorCode.HOLD_RELEASE_NOT_FROZEN
             );
         }
 
         validateRemainingHoldSeconds(hr);
 
-        hr.setStatus(STATUS_WARRANTY_IN_PROGRESS);
+        hr.setStatus(HoldReleaseStatus.FROZEN);
         hr.setWarrantyStartedAt(OffsetDateTime.now());
 
         holdReleaseRepository.save(hr);
 
         log.info(
-                "OrderItem {} chuyển COMPLAINED -> WARRANTY_IN_PROGRESS",
+                "OrderItem {} vẫn FROZEN khi seller bắt đầu bảo hành",
                 orderItemId
         );
     }
@@ -217,7 +212,7 @@ public class HoldReleaseService {
     // =========================================================
     // 3. SELLER COMPLETE WARRANTY
     //
-    // WARRANTY_IN_PROGRESS -> WAITING_BUYER_CONFIRMATION
+    // HoldRelease tiếp tục FROZEN; OrderDispute chờ buyer xác nhận
     // =========================================================
 
     /**
@@ -225,7 +220,7 @@ public class HoldReleaseService {
      *
      * Sau khi hoàn thành:
      *
-     * WARRANTY_IN_PROGRESS -> WAITING_BUYER_CONFIRMATION.
+     * HoldRelease vẫn FROZEN trong lúc chờ buyer xác nhận.
      * Đồng hồ T+7 chỉ tiếp tục khi buyer đồng ý hoặc hết hạn phản hồi.
      */
     @Transactional
@@ -239,14 +234,14 @@ public class HoldReleaseService {
                         )
                 );
 
-        if (!STATUS_WARRANTY_IN_PROGRESS.equals(hr.getStatus())) {
+        if (hr.getStatus() != HoldReleaseStatus.FROZEN) {
             throw new AppException(
-                    ErrorCode.HOLD_RELEASE_NOT_WARRANTY
+                    ErrorCode.HOLD_RELEASE_NOT_FROZEN
             );
         }
 
         validateRemainingHoldSeconds(hr);
-        hr.setStatus(STATUS_WAITING_BUYER_CONFIRMATION);
+        hr.setStatus(HoldReleaseStatus.FROZEN);
 
         holdReleaseRepository.save(hr);
 
@@ -263,12 +258,12 @@ public class HoldReleaseService {
                 .findByOrderItemIdWithLock(orderItemId)
                 .orElseThrow(() -> new AppException(ErrorCode.HOLD_RELEASE_NOT_FOUND));
 
-        if (!STATUS_WAITING_BUYER_CONFIRMATION.equals(hr.getStatus())) {
+        if (hr.getStatus() != HoldReleaseStatus.FROZEN) {
             throw new AppException(ErrorCode.HOLD_RELEASE_INVALID_STATUS);
         }
 
         long remainingSeconds = validateRemainingHoldSeconds(hr);
-        hr.setStatus(STATUS_HOLDING);
+        hr.setStatus(HoldReleaseStatus.HOLDING);
         hr.setScheduledReleaseAt(OffsetDateTime.now().plusSeconds(remainingSeconds));
         hr.setRemainingHoldSeconds(null);
         holdReleaseRepository.save(hr);
@@ -284,17 +279,13 @@ public class HoldReleaseService {
                 .findByOrderItemIdWithLock(orderItemId)
                 .orElseThrow(() -> new AppException(ErrorCode.HOLD_RELEASE_NOT_FOUND));
 
-        boolean canWithdraw =
-                STATUS_COMPLAINED.equals(hr.getStatus())
-                        || STATUS_WARRANTY_IN_PROGRESS.equals(hr.getStatus());
-
-        if (!canWithdraw) {
+        if (hr.getStatus() != HoldReleaseStatus.FROZEN) {
             throw new AppException(ErrorCode.HOLD_RELEASE_INVALID_STATUS);
         }
 
         long remainingSeconds = validateRemainingHoldSeconds(hr);
-        String oldStatus = hr.getStatus();
-        hr.setStatus(STATUS_HOLDING);
+        HoldReleaseStatus oldStatus = hr.getStatus();
+        hr.setStatus(HoldReleaseStatus.HOLDING);
         hr.setScheduledReleaseAt(OffsetDateTime.now().plusSeconds(remainingSeconds));
         hr.setRemainingHoldSeconds(null);
         holdReleaseRepository.save(hr);
@@ -310,25 +301,13 @@ public class HoldReleaseService {
     // =========================================================
     // 4. ESCALATE TO DISPUTE
     //
-    // COMPLAINED
-    // hoặc
-    // WARRANTY_IN_PROGRESS
-    //
-    // ->
-    //
-    // DISPUTED
+    // HoldRelease tiếp tục FROZEN; OrderDispute chuyển ADMIN_REVIEW
     // =========================================================
 
     /**
      * Leo thang khiếu nại thành tranh chấp cần Admin xử lý.
      *
-     * Cho phép từ:
-     * - COMPLAINED
-     * - WARRANTY_IN_PROGRESS
-     * - WAITING_BUYER_CONFIRMATION
-     *
-     * Không cho phép trực tiếp:
-     * HOLDING -> DISPUTED
+     * Chỉ cho phép khi khoản tiền đã FROZEN bởi một khiếu nại hợp lệ.
      */
     @Transactional
     public void escalateDispute(Long orderItemId) {
@@ -341,14 +320,7 @@ public class HoldReleaseService {
                         )
                 );
 
-        boolean canEscalate =
-                STATUS_COMPLAINED.equals(hr.getStatus())
-                        ||
-                        STATUS_WARRANTY_IN_PROGRESS.equals(hr.getStatus())
-                        ||
-                        STATUS_WAITING_BUYER_CONFIRMATION.equals(hr.getStatus());
-
-        if (!canEscalate) {
+        if (hr.getStatus() != HoldReleaseStatus.FROZEN) {
             throw new AppException(
                     ErrorCode.HOLD_RELEASE_INVALID_STATUS
             );
@@ -356,14 +328,14 @@ public class HoldReleaseService {
 
         validateRemainingHoldSeconds(hr);
 
-        String oldStatus = hr.getStatus();
+        HoldReleaseStatus oldStatus = hr.getStatus();
 
-        hr.setStatus(STATUS_DISPUTED);
+        hr.setStatus(HoldReleaseStatus.FROZEN);
 
         holdReleaseRepository.save(hr);
 
         log.info(
-                "OrderItem {} chuyển {} -> DISPUTED",
+                "OrderItem {} giữ trạng thái {} khi khiếu nại chuyển ADMIN_REVIEW",
                 orderItemId,
                 oldStatus
         );
@@ -372,7 +344,7 @@ public class HoldReleaseService {
     // =========================================================
     // 5. ADMIN RESOLVE DISPUTE
     //
-    // DISPUTED
+    // FROZEN
     //
     // BUYER WIN  -> REFUNDED
     // SELLER WIN -> HOLDING
@@ -383,7 +355,7 @@ public class HoldReleaseService {
      *
      * BUYER WIN:
      *
-     * DISPUTED -> REFUNDED
+     * FROZEN -> REFUNDED
      *
      * - gỡ hold của seller
      * - hoàn tiền buyer
@@ -392,7 +364,7 @@ public class HoldReleaseService {
      *
      * SELLER WIN:
      *
-     * DISPUTED -> HOLDING
+     * FROZEN -> HOLDING
      *
      * - không hoàn buyer
      * - tiếp tục phần thời gian T+7 còn lại
@@ -414,9 +386,9 @@ public class HoldReleaseService {
                         )
                 );
 
-        if (!STATUS_DISPUTED.equals(hr.getStatus())) {
+        if (hr.getStatus() != HoldReleaseStatus.FROZEN) {
             throw new AppException(
-                    ErrorCode.HOLD_RELEASE_NOT_DISPUTED
+                    ErrorCode.HOLD_RELEASE_NOT_FROZEN
             );
         }
 
@@ -465,7 +437,7 @@ public class HoldReleaseService {
                 );
             }
 
-            hr.setStatus(STATUS_REFUNDED);
+            hr.setStatus(HoldReleaseStatus.REFUNDED);
 
             holdReleaseRepository.save(hr);
             markOrderItemRefunded(hr.getOrderItemId());
@@ -490,7 +462,7 @@ public class HoldReleaseService {
         long remainingSeconds =
                 validateRemainingHoldSeconds(hr);
 
-        hr.setStatus(STATUS_HOLDING);
+        hr.setStatus(HoldReleaseStatus.HOLDING);
 
         hr.setScheduledReleaseAt(
                 OffsetDateTime.now()
@@ -551,11 +523,10 @@ public class HoldReleaseService {
         long refundedItems = orderItemRepository.countByOrderIdAndRefundStatus(order.getId(), "REFUNDED");
 
         if (totalItems > 0 && totalItems == refundedItems) {
-            order.setPaymentStatus("REFUNDED");
-            order.setStatus("REFUNDED");
+            order.setPaymentStatus(OrderPaymentStatus.REFUNDED);
         } else {
-            // Mỗi item hoàn 100%; PARTIAL_REFUND chỉ mô tả order nhiều item.
-            order.setPaymentStatus("PARTIAL_REFUND");
+            // Mỗi item hoàn 100%; PARTIALLY_REFUNDED chỉ mô tả order nhiều item.
+            order.setPaymentStatus(OrderPaymentStatus.PARTIALLY_REFUNDED);
         }
         orderRepository.save(order);
     }

@@ -2,6 +2,7 @@ package com.commercehub.backend.order.repository;
 
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.entity.OrderStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -16,7 +17,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     List<OrderItem> findByOrderIdIn(List<Long> orderIds);
     List<OrderItem> findByOrder(Order order);
 
-    boolean existsByOrder_UserIdAndProductVariant_Product_IdAndOrder_Status(Long userId, Long productId, String status);
+    boolean existsByOrder_UserIdAndProductVariant_Product_IdAndOrder_Status(Long userId, Long productId, OrderStatus status);
 
     @Query(value = """
             SELECT EXISTS (

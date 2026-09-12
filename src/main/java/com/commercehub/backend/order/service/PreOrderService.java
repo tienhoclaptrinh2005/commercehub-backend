@@ -9,6 +9,8 @@ import com.commercehub.backend.order.dto.request.CheckoutItemRequest;
 import com.commercehub.backend.order.dto.request.CheckoutRequest;
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.entity.OrderPaymentStatus;
+import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.entity.PreOrderItem;
 import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.order.repository.OrderRepository;
@@ -110,7 +112,7 @@ public class PreOrderService {
 
         Long sellerId = targetShop.getOwner().getId();
 
-        // 2. Tạo Order với trạng thái WAITING_APPROVAL và PAID
+        // 2. Tạo Order đã thanh toán và chờ Shop tiếp nhận.
         Order order = Order.builder()
                 .orderCode(OrderCodeGenerator.generate(targetShop.getId()))
                 .user(buyer)
@@ -119,8 +121,8 @@ public class PreOrderService {
                 .subtotalAmount(totalOrderAmount)
                 .totalAmount(totalOrderAmount)
                 .paymentMethod("WALLET") // Hệ thống hiện tại: nạp ví trước - mua hàng trừ ví
-                .paymentStatus("PAID")
-                .status("WAITING_APPROVAL")
+                .paymentStatus(OrderPaymentStatus.PAID)
+                .status(OrderStatus.WAITING_SELLER_ACCEPTANCE)
                 .placedAt(OffsetDateTime.now())
                 .approvalDeadlineAt(OffsetDateTime.now().plusHours(PreOrderPolicy.ACCEPTANCE_HOURS))
                 .idempotencyKey(request.getIdempotencyKey())
@@ -134,7 +136,8 @@ public class PreOrderService {
         walletService.systemHoldForSeller(sellerId, totalOrderAmount, order.getId());
 
         orderStatusService.logStatusChange(
-                order, null, "WAITING_APPROVAL", buyerId, "Đã thanh toán và đặt hàng thành công, chờ Shop duyệt"
+                order, null, OrderStatus.WAITING_SELLER_ACCEPTANCE, buyerId,
+                "Đã thanh toán và đặt hàng thành công, chờ Shop tiếp nhận"
         );
 
         // 3. Tạo OrderItem và PreOrderItem

@@ -5,6 +5,7 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import com.commercehub.backend.wallet.entity.HoldReleaseStatus;
 
 @Data
 @Builder
@@ -17,7 +18,7 @@ public class HoldReleaseResponse {
     BigDecimal holdAmount;
     BigDecimal feeAmount;
     BigDecimal sellerNetAmount;
-    String status;
+    HoldReleaseStatus status;
     OffsetDateTime scheduledReleaseAt;
     OffsetDateTime releasedAt;
 }

@@ -1,6 +1,7 @@
 package com.commercehub.backend.dispute.scheduler;
 
 import com.commercehub.backend.dispute.entity.OrderDispute;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
 import com.commercehub.backend.dispute.service.DisputeResolutionService;
 import com.commercehub.backend.dispute.service.DisputeService;
@@ -33,12 +34,12 @@ public class DisputeDeadlineScheduler {
     @SchedulerLock(name = "dispute_processDeadlines", lockAtMostFor = "4m", lockAtLeastFor = "10s")
     public void processDeadlines() {
         OffsetDateTime now = OffsetDateTime.now();
-        processStatus(OrderDispute.STATUS_OPEN, now);
-        processStatus(OrderDispute.STATUS_WARRANTY_IN_PROGRESS, now);
-        processStatus(OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION, now);
+        processStatus(DisputeStatus.OPEN, now);
+        processStatus(DisputeStatus.WARRANTY_IN_PROGRESS, now);
+        processStatus(DisputeStatus.WAITING_BUYER_CONFIRMATION, now);
     }
 
-    private void processStatus(String status, OffsetDateTime now) {
+    private void processStatus(DisputeStatus status, OffsetDateTime now) {
         int safeBatchSize = Math.min(Math.max(batchSize, 1), 500);
         for (int batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
             List<Long> ids = disputeRepository.findExpiredIds(
@@ -52,9 +53,9 @@ public class DisputeDeadlineScheduler {
 
             for (Long id : ids) {
                 try {
-                    if (OrderDispute.STATUS_OPEN.equals(status)) {
+                    if (status == DisputeStatus.OPEN) {
                         resolutionService.resolveExpiredOpenForBuyer(id, now);
-                    } else if (OrderDispute.STATUS_WARRANTY_IN_PROGRESS.equals(status)) {
+                    } else if (status == DisputeStatus.WARRANTY_IN_PROGRESS) {
                         resolutionService.resolveExpiredWarrantyForBuyer(id, now);
                     } else {
                         disputeService.closeExpiredBuyerConfirmation(id, now);

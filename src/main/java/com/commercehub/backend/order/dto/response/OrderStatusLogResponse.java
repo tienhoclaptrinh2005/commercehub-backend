@@ -4,6 +4,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.OffsetDateTime;
+import com.commercehub.backend.order.entity.OrderStatus;
 
 @Data
 @Builder
@@ -12,8 +13,8 @@ import java.time.OffsetDateTime;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class OrderStatusLogResponse {
     Long id;
-    String fromStatus;
-    String toStatus;
+    OrderStatus fromStatus;
+    OrderStatus toStatus;
     Long changedBy;
     String note;
     OffsetDateTime createdAt;

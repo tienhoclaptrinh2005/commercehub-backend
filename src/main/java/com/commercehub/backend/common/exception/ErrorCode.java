@@ -115,8 +115,8 @@ public enum ErrorCode {
     CART_ITEM_NOT_FOUND(404, "Không tìm thấy sản phẩm này trong giỏ hàng của bạn!", HttpStatus.NOT_FOUND),
     CART_EMPTY(400, "Giỏ hàng của bạn đang trống!", HttpStatus.BAD_REQUEST),
 
-    ORDER_NOT_WAITING_APPROVAL(400, "Đơn hàng không ở trạng thái chờ duyệt!", HttpStatus.BAD_REQUEST),
-    ORDER_APPROVAL_TIMEOUT(400, "Đơn hàng đã quá thời hạn duyệt!", HttpStatus.BAD_REQUEST),
+    ORDER_NOT_WAITING_SELLER_ACCEPTANCE(400, "Đơn hàng không ở trạng thái chờ Shop tiếp nhận!", HttpStatus.BAD_REQUEST),
+    ORDER_DEADLINE_EXPIRED(400, "Đơn hàng đã quá thời hạn xử lý!", HttpStatus.BAD_REQUEST),
 
 
     VARIANT_INACTIVE(400, "Phân loại sản phẩm không hoạt động hoặc đã bị khóa", HttpStatus.BAD_REQUEST),
@@ -148,9 +148,7 @@ public enum ErrorCode {
     HOLD_RELEASE_NOT_FOUND(404, "Không tìm thấy bản ghi giữ tiền cho sản phẩm này!", HttpStatus.NOT_FOUND),
     ORDER_ITEM_NOT_FOUND(404, "Không tìm thấy dòng sản phẩm trong đơn hàng!", HttpStatus.NOT_FOUND),
     COMPLAINT_NOT_ALLOWED(400, "Không thể khiếu nại lúc này! Sản phẩm phải đang ở trạng thái HOLDING và chưa hết thời hạn.", HttpStatus.BAD_REQUEST),
-    HOLD_RELEASE_NOT_COMPLAINED(400, "Sản phẩm này chưa ở trạng thái khiếu nại (COMPLAINED)!", HttpStatus.BAD_REQUEST),
-    HOLD_RELEASE_NOT_WARRANTY(400, "Sản phẩm này không đang trong quá trình bảo hành (WARRANTY_IN_PROGRESS)!", HttpStatus.BAD_REQUEST),
-    HOLD_RELEASE_NOT_DISPUTED(400, "Sản phẩm này chưa ở trạng thái tranh chấp (DISPUTED) để Admin phán xử!", HttpStatus.BAD_REQUEST),
+    HOLD_RELEASE_NOT_FROZEN(400, "Khoản tiền chưa ở trạng thái đóng băng để xử lý khiếu nại!", HttpStatus.BAD_REQUEST),
 
 
     DISPUTE_NOT_FOUND(404, "Không tìm thấy tranh chấp!", HttpStatus.NOT_FOUND),

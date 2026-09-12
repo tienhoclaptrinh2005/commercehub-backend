@@ -8,6 +8,7 @@ import com.commercehub.backend.order.dto.request.CheckoutItemRequest;
 import com.commercehub.backend.order.dto.request.CheckoutRequest;
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.order.repository.OrderRepository;
 import com.commercehub.backend.order.repository.PreOrderItemRepository;
@@ -145,7 +146,7 @@ class PreOrderDeadlinePolicyTest {
                 .id(40L)
                 .shop(shop)
                 .deliveryType("PRE_ORDER")
-                .status("WAITING_APPROVAL")
+                .status(OrderStatus.WAITING_SELLER_ACCEPTANCE)
                 .approvalDeadlineAt(OffsetDateTime.now().plusHours(1))
                 .build();
         when(orderRepository.findByIdWithLock(40L)).thenReturn(Optional.of(order));
@@ -156,7 +157,7 @@ class PreOrderDeadlinePolicyTest {
         service.acceptOrder(2L, 40L);
         OffsetDateTime after = OffsetDateTime.now();
 
-        assertThat(order.getStatus()).isEqualTo("PROCESSING");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PROCESSING);
         assertThat(order.getProcessingDeadlineAt())
                 .isBetween(
                         before.plusHours(PreOrderPolicy.PROCESSING_HOURS),

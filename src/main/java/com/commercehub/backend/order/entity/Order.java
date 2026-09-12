@@ -47,11 +47,13 @@ public class Order {
     @Column(name = "delivery_type", nullable = false, length = 20)
     private String deliveryType; // INSTANT, PRE_ORDER
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private String status; // PENDING, PROCESSING, DELIVERED, WAITING_APPROVAL, APPROVED, REJECTED, DISPUTED, REFUNDED, CANCELLED
+    private OrderStatus status;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false, length = 30)
-    private String paymentStatus; // UNPAID, PAID, REFUNDED, PARTIAL_REFUND
+    private OrderPaymentStatus paymentStatus;
 
     @Column(name = "payment_method", nullable = false, length = 30)
     private String paymentMethod; // Đơn mua hàng hiện chỉ thanh toán bằng WALLET.
@@ -79,6 +81,20 @@ public class Order {
 
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancelled_by", length = 20)
+    private OrderCancelledBy cancelledBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancellation_code", length = 40)
+    private OrderCancellationCode cancellationCode;
+
+    @Column(name = "cancellation_reason", columnDefinition = "TEXT")
+    private String cancellationReason;
+
+    @Column(name = "cancelled_at")
+    private OffsetDateTime cancelledAt;
 
     /**
      * Idempotency key do client gửi kèm checkout — chống double-submit tạo

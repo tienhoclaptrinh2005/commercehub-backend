@@ -3,9 +3,11 @@ package com.commercehub.backend.order.scheduler;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.entity.Order;
-import com.commercehub.backend.order.repository.OrderItemRepository;
+import com.commercehub.backend.order.entity.OrderCancellationCode;
+import com.commercehub.backend.order.entity.OrderCancelledBy;
+import com.commercehub.backend.order.entity.OrderPaymentStatus;
+import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.repository.OrderRepository;
-import com.commercehub.backend.order.repository.PreOrderItemRepository;
 import com.commercehub.backend.order.service.OrderStatusService;
 import com.commercehub.backend.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderCancelProcessor {
 
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
-    private final PreOrderItemRepository preOrderItemRepository;
     private final WalletService walletService;
     private final OrderStatusService orderStatusService;
 
@@ -37,9 +37,10 @@ public class OrderCancelProcessor {
         // 2. GUARD trạng thái: chỉ hủy đơn còn đang chờ/đang xử lý và CHƯA hoàn tiền.
         // Đơn vừa được seller accept (PROCESSING với deadline mới) hoặc đã DELIVERED
         // / CANCELLED / REFUNDED thì tuyệt đối không đụng vào tiền.
-        String status = order.getStatus();
-        boolean cancellableStatus = "WAITING_APPROVAL".equals(status) || "PROCESSING".equals(status);
-        if (!cancellableStatus || !"PAID".equals(order.getPaymentStatus())) {
+        OrderStatus status = order.getStatus();
+        boolean cancellableStatus = status == OrderStatus.WAITING_SELLER_ACCEPTANCE
+                || status == OrderStatus.PROCESSING;
+        if (!cancellableStatus || order.getPaymentStatus() != OrderPaymentStatus.PAID) {
             log.info("Bỏ qua auto-cancel đơn ID {}: status={}, paymentStatus={} (không đủ điều kiện hủy).",
                     orderId, status, order.getPaymentStatus());
             return;
@@ -47,20 +48,26 @@ public class OrderCancelProcessor {
 
         // 3. Re-check deadline sau khi có lock — seller có thể vừa accept làm deadline thay đổi
         java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
-        boolean waitingExpired = "WAITING_APPROVAL".equals(status)
+        boolean waitingExpired = status == OrderStatus.WAITING_SELLER_ACCEPTANCE
                 && order.getApprovalDeadlineAt() != null && order.getApprovalDeadlineAt().isBefore(now);
-        boolean processingExpired = "PROCESSING".equals(status)
+        boolean processingExpired = status == OrderStatus.PROCESSING
                 && order.getProcessingDeadlineAt() != null && order.getProcessingDeadlineAt().isBefore(now);
         if (!waitingExpired && !processingExpired) {
             log.info("Bỏ qua auto-cancel đơn ID {}: deadline đã được gia hạn (seller vừa thao tác).", orderId);
             return;
         }
 
-        String oldStatus = order.getStatus();
+        OrderStatus oldStatus = order.getStatus();
 
         // 4. Cập nhật trạng thái
-        order.setStatus("CANCELLED_BY_SYSTEM");
-        order.setPaymentStatus("REFUNDED");
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setPaymentStatus(OrderPaymentStatus.REFUNDED);
+        order.setCancelledBy(OrderCancelledBy.SYSTEM);
+        order.setCancellationCode(waitingExpired
+                ? OrderCancellationCode.SELLER_ACCEPTANCE_TIMEOUT
+                : OrderCancellationCode.SELLER_PROCESSING_TIMEOUT);
+        order.setCancellationReason(reason);
+        order.setCancelledAt(now);
         orderRepository.save(order);
 
         // 5. Hoàn tiền: gỡ hold của seller, trả tiền về ví buyer (cùng transaction)
@@ -69,15 +76,8 @@ public class OrderCancelProcessor {
         // Truyền `reason` vào đây làm PostgreSQL từ chối vì cột VARCHAR(30).
         walletService.systemCreditBalance(order.getUser().getId(), order.getTotalAmount(), "ORDER_REFUND", order.getId(), "ORDER");
 
-        // Đồng bộ vòng đời pre_order_items khi hệ thống tự hủy
-        orderItemRepository.findByOrder(order).forEach(item ->
-                preOrderItemRepository.findByOrderItemId(item.getId()).ifPresent(preItem -> {
-                    preItem.setStatus("CANCELLED");
-                    preOrderItemRepository.save(preItem);
-                }));
-
         // 6. Ghi log trạng thái
-        orderStatusService.logStatusChange(order, oldStatus, "CANCELLED_BY_SYSTEM", null, reason);
+        orderStatusService.logStatusChange(order, oldStatus, OrderStatus.CANCELLED, null, reason);
 
         log.info("CronJob đã hủy thành công đơn hàng ID: {}", orderId);
     }

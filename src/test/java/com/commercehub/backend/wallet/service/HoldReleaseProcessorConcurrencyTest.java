@@ -4,6 +4,7 @@ import com.commercehub.backend.fee.service.PlatformFeeLedgerService;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.wallet.entity.HoldRelease;
+import com.commercehub.backend.wallet.entity.HoldReleaseStatus;
 import com.commercehub.backend.wallet.entity.Wallet;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
 import org.junit.jupiter.api.Test;
@@ -36,13 +37,13 @@ class HoldReleaseProcessorConcurrencyTest {
                 .holdAmount(new BigDecimal("100.00"))
                 .feeAmount(new BigDecimal("4.00"))
                 .sellerNetAmount(new BigDecimal("96.00"))
-                .feeLedgerId(60L).status("HOLDING")
+                .feeLedgerId(60L).status(HoldReleaseStatus.HOLDING)
                 .scheduledReleaseAt(OffsetDateTime.now().minusMinutes(1)).build();
 
         ReentrantLock simulatedDatabaseLock = new ReentrantLock();
         when(holdRepository.findByIdWithLock(30L)).thenAnswer(invocation -> {
             simulatedDatabaseLock.lock();
-            if (!"HOLDING".equals(hold.getStatus())) {
+            if (hold.getStatus() != HoldReleaseStatus.HOLDING) {
                 simulatedDatabaseLock.unlock();
             }
             return Optional.of(hold);

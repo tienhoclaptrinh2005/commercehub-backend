@@ -5,6 +5,9 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import com.commercehub.backend.dispute.entity.DisputeResolution;
+import com.commercehub.backend.dispute.entity.DisputeResolvedBy;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 
 @Getter
 @Setter
@@ -39,15 +42,17 @@ public class DisputeResponse {
 
     private List<String> shopEvidenceUrls;
 
-    private String status;
+    private DisputeStatus status;
+
+    private DisputeResolution resolution;
+
+    private DisputeResolvedBy resolvedBy;
 
     private BigDecimal refundAmount;
 
-    private String adminNote;
+    private String resolutionNote;
 
     private Long resolverId;
-
-    private String closedReason;
 
     private OffsetDateTime createdAt;
 

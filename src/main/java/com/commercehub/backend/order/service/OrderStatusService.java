@@ -2,6 +2,7 @@ package com.commercehub.backend.order.service;
 
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderStatusLog;
+import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.repository.OrderStatusLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,7 +15,7 @@ public class OrderStatusService {
     private final OrderStatusLogRepository statusLogRepository;
 
     @Transactional
-    public void logStatusChange(Order order, String fromStatus, String toStatus, Long changedById, String note) {
+    public void logStatusChange(Order order, OrderStatus fromStatus, OrderStatus toStatus, Long changedById, String note) {
         OrderStatusLog log = OrderStatusLog.builder()
                 .order(order)
                 .fromStatus(fromStatus)

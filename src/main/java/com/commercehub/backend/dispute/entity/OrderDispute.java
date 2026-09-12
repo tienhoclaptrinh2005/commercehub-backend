@@ -24,18 +24,6 @@ import java.time.OffsetDateTime;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class OrderDispute {
 
-    public static final String STATUS_OPEN = "OPEN";
-    public static final String STATUS_WARRANTY_IN_PROGRESS = "WARRANTY_IN_PROGRESS";
-    public static final String STATUS_WAITING_BUYER_CONFIRMATION = "WAITING_BUYER_CONFIRMATION";
-    public static final String STATUS_PROCESSING = "PROCESSING";
-    public static final String STATUS_BUYER_WIN = "BUYER_WIN";
-    public static final String STATUS_SELLER_WIN = "SELLER_WIN";
-    public static final String STATUS_CLOSED = "CLOSED";
-
-    public static final String CLOSED_REASON_BUYER_WITHDREW = "BUYER_WITHDREW";
-    public static final String CLOSED_REASON_BUYER_ACCEPTED_WARRANTY = "BUYER_ACCEPTED_WARRANTY";
-    public static final String CLOSED_REASON_BUYER_CONFIRMATION_TIMEOUT = "BUYER_CONFIRMATION_TIMEOUT";
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
@@ -84,10 +72,19 @@ public class OrderDispute {
     @Column(name = "shop_evidence_urls", columnDefinition = "TEXT[]")
     String[] shopEvidenceUrls;
 
+    @Enumerated(EnumType.STRING)
     @Builder.Default
     @Column(name = "status", nullable = false, length = 30
     )
-    String status = STATUS_OPEN;
+    DisputeStatus status = DisputeStatus.OPEN;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "resolution", length = 40)
+    DisputeResolution resolution;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "resolved_by", length = 20)
+    DisputeResolvedBy resolvedBy;
 
     /*
      * Buyer thắng:
@@ -100,16 +97,13 @@ public class OrderDispute {
     BigDecimal refundAmount;
 
     @Column(
-            name = "admin_note",
+            name = "resolution_note",
             columnDefinition = "TEXT"
     )
-    String adminNote;
+    String resolutionNote;
 
     @Column(name = "resolver_id")
     Long resolverId;
-
-    @Column(name = "closed_reason", length = 40)
-    String closedReason;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

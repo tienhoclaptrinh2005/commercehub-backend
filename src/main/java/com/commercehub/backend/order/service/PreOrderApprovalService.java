@@ -8,6 +8,10 @@ import com.commercehub.backend.fee.service.FeeCalculationService;
 import com.commercehub.backend.order.dto.request.DeliverPreOrderRequest;
 import com.commercehub.backend.order.entity.Order;
 import com.commercehub.backend.order.entity.OrderItem;
+import com.commercehub.backend.order.entity.OrderCancellationCode;
+import com.commercehub.backend.order.entity.OrderCancelledBy;
+import com.commercehub.backend.order.entity.OrderPaymentStatus;
+import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.order.repository.OrderRepository;
 import com.commercehub.backend.order.repository.PreOrderItemRepository;
@@ -20,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.commercehub.backend.wallet.entity.HoldRelease;
+import com.commercehub.backend.wallet.entity.HoldReleaseStatus;
 import com.commercehub.backend.fee.entity.PlatformFeeLedger;
 import com.commercehub.backend.fee.dto.FeeResult;
 
@@ -58,16 +63,16 @@ public class PreOrderApprovalService {
         if (!"PRE_ORDER".equals(order.getDeliveryType())) {
             throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE);
         }
-        if (!"WAITING_APPROVAL".equals(order.getStatus())) {
-            throw new AppException(ErrorCode.ORDER_NOT_WAITING_APPROVAL);
+        if (order.getStatus() != OrderStatus.WAITING_SELLER_ACCEPTANCE) {
+            throw new AppException(ErrorCode.ORDER_NOT_WAITING_SELLER_ACCEPTANCE);
         }
 
         if (order.getApprovalDeadlineAt() != null && OffsetDateTime.now().isAfter(order.getApprovalDeadlineAt())) {
-            throw new AppException(ErrorCode.ORDER_APPROVAL_TIMEOUT);
+            throw new AppException(ErrorCode.ORDER_DEADLINE_EXPIRED);
         }
 
-        String oldStatus = order.getStatus();
-        order.setStatus("PROCESSING");
+        OrderStatus oldStatus = order.getStatus();
+        order.setStatus(OrderStatus.PROCESSING);
         order.setApprovedAt(OffsetDateTime.now());
         order.setProcessingDeadlineAt(OffsetDateTime.now().plusHours(PreOrderPolicy.PROCESSING_HOURS));
         orderRepository.save(order);
@@ -77,16 +82,13 @@ public class PreOrderApprovalService {
         List<OrderItem> items = orderItemRepository.findByOrder(order);
         List<com.commercehub.backend.order.entity.PreOrderItem> preItems =
                 loadPreOrderItems(items).values().stream().toList();
-        for (var preItem : preItems) {
-            preItem.setStatus("ACCEPTED");
-            preItem.setAcceptedAt(acceptedAt);
-        }
+        for (var preItem : preItems) preItem.setAcceptedAt(acceptedAt);
         preOrderItemRepository.saveAll(preItems);
 
         orderStatusService.logStatusChange(
                 order,
                 oldStatus,
-                "PROCESSING",
+                OrderStatus.PROCESSING,
                 sellerId,
                 "Shop đã tiếp nhận đơn đặt hàng và đang tiến hành xử lý."
         );
@@ -106,13 +108,13 @@ public class PreOrderApprovalService {
         if (!"PRE_ORDER".equals(order.getDeliveryType())) {
             throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE);
         }
-        if (!"WAITING_APPROVAL".equals(order.getStatus())) {
-            throw new AppException(ErrorCode.ORDER_NOT_WAITING_APPROVAL);
+        if (order.getStatus() != OrderStatus.WAITING_SELLER_ACCEPTANCE) {
+            throw new AppException(ErrorCode.ORDER_NOT_WAITING_SELLER_ACCEPTANCE);
         }
 
-        String oldStatus = order.getStatus();
-        order.setStatus("REJECTED");
-        order.setPaymentStatus("REFUNDED");
+        OrderStatus oldStatus = order.getStatus();
+        order.setStatus(OrderStatus.REJECTED);
+        order.setPaymentStatus(OrderPaymentStatus.REFUNDED);
         order.setRejectedAt(OffsetDateTime.now());
         order.setRejectionReason(rejectReason);
         orderRepository.save(order);
@@ -131,7 +133,6 @@ public class PreOrderApprovalService {
         List<com.commercehub.backend.order.entity.PreOrderItem> preItems =
                 loadPreOrderItems(items).values().stream().toList();
         for (var preItem : preItems) {
-            preItem.setStatus("REJECTED");
             if (rejectReason != null && !rejectReason.trim().isEmpty()) {
                 preItem.setSellerNotes(rejectReason);
             }
@@ -139,7 +140,7 @@ public class PreOrderApprovalService {
         preOrderItemRepository.saveAll(preItems);
 
         String logNote = "Shop đã từ chối đơn hàng. Lý do: " + (rejectReason != null ? rejectReason : "Không có");
-        orderStatusService.logStatusChange(order, oldStatus, "REJECTED", sellerId, logNote);
+        orderStatusService.logStatusChange(order, oldStatus, OrderStatus.REJECTED, sellerId, logNote);
 
         log.info(" Shop Owner ID {} đã REJECT đơn {}. Đã hoàn {} vào ví Buyer.", sellerId, orderId, order.getTotalAmount());
     }
@@ -164,17 +165,17 @@ public class PreOrderApprovalService {
             throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE);
         }
 
-        if (!"PROCESSING".equals(order.getStatus())) {
+        if (order.getStatus() != OrderStatus.PROCESSING) {
             throw new AppException(ErrorCode.ORDER_NOT_PROCESSING);
         }
         if (order.getProcessingDeadlineAt() != null
                 && OffsetDateTime.now().isAfter(order.getProcessingDeadlineAt())) {
-            throw new AppException(ErrorCode.ORDER_APPROVAL_TIMEOUT);
+            throw new AppException(ErrorCode.ORDER_DEADLINE_EXPIRED);
         }
 
-        String oldStatus = order.getStatus();
+        OrderStatus oldStatus = order.getStatus();
         OffsetDateTime deliveredAt = OffsetDateTime.now();
-        order.setStatus("DELIVERED");
+        order.setStatus(OrderStatus.DELIVERED);
         order.setDeliveredAt(deliveredAt);
         orderRepository.save(order);
 
@@ -191,7 +192,6 @@ public class PreOrderApprovalService {
             DeliveryPayload delivery = deliveries.get(item.getId());
             preItem.setDeliveryContent(delivery.content());
             preItem.setDeliveryContentType(delivery.contentType());
-            preItem.setStatus("DELIVERED");
             preItem.setDeliveredAt(deliveredAt);
             preItem.setCompletedAt(deliveredAt);
             if (delivery.sellerNotes() != null && !delivery.sellerNotes().trim().isEmpty()) {
@@ -209,7 +209,7 @@ public class PreOrderApprovalService {
                     .holdAmount(item.getLineTotal())
                     .feeAmount(feeResult.getFeeAmount())
                     .sellerNetAmount(feeResult.getSellerNetAmount())
-                    .status("HOLDING")
+                    .status(HoldReleaseStatus.HOLDING)
                     .scheduledReleaseAt(OffsetDateTime.now().plusDays(7))
                     .build();
             holdRelease = holdReleaseRepository.save(holdRelease);
@@ -236,7 +236,7 @@ public class PreOrderApprovalService {
         }
         preOrderItemRepository.saveAll(preItems.values());
 
-        orderStatusService.logStatusChange(order, oldStatus, "DELIVERED", sellerId, "Shop đã hoàn tất giao hàng/dịch vụ.");
+        orderStatusService.logStatusChange(order, oldStatus, OrderStatus.DELIVERED, sellerId, "Shop đã hoàn tất giao hàng/dịch vụ.");
         log.info(" Shop Owner {} đã COMPLETE đơn {}. Đã tính phí và tạo lịch nhả tiền cho từng item.", sellerId, orderId);
     }
 
@@ -266,28 +266,24 @@ public class PreOrderApprovalService {
             throw new AppException(ErrorCode.ORDER_ACCESS_DENIED);
         }
 
-        if (!"WAITING_APPROVAL".equals(order.getStatus())) {
+        if (order.getStatus() != OrderStatus.WAITING_SELLER_ACCEPTANCE) {
             throw new AppException(ErrorCode.ORDER_CANNOT_CANCEL);
         }
 
-        String oldStatus = order.getStatus();
-        order.setStatus("CANCELLED");
-        order.setPaymentStatus("REFUNDED");
+        OrderStatus oldStatus = order.getStatus();
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setPaymentStatus(OrderPaymentStatus.REFUNDED);
+        order.setCancelledBy(OrderCancelledBy.BUYER);
+        order.setCancellationCode(OrderCancellationCode.BUYER_REQUEST);
+        order.setCancellationReason("Người mua chủ động hủy trước khi Shop tiếp nhận");
+        order.setCancelledAt(OffsetDateTime.now());
         orderRepository.save(order);
 
         walletService.systemCancelSellerHold(order.getShop().getOwner().getId(), order.getTotalAmount(), order.getId());
 
         walletService.systemCreditBalance(buyerId, order.getTotalAmount(), "ORDER_REFUND", order.getId(), "ORDER");
 
-        List<OrderItem> items = orderItemRepository.findByOrder(order);
-        List<com.commercehub.backend.order.entity.PreOrderItem> preItems =
-                loadPreOrderItems(items).values().stream().toList();
-        for (var preItem : preItems) {
-            preItem.setStatus("CANCELLED");
-        }
-        preOrderItemRepository.saveAll(preItems);
-
-        orderStatusService.logStatusChange(order, oldStatus, "CANCELLED", buyerId, "Người mua đã chủ động hủy đơn hàng trước khi Shop tiếp nhận.");
+        orderStatusService.logStatusChange(order, oldStatus, OrderStatus.CANCELLED, buyerId, "Người mua đã chủ động hủy đơn hàng trước khi Shop tiếp nhận.");
     }
 
     @Transactional
@@ -299,13 +295,17 @@ public class PreOrderApprovalService {
             throw new AppException(ErrorCode.ORDER_ACCESS_DENIED);
         }
 
-        if (!"PROCESSING".equals(order.getStatus())) {
+        if (order.getStatus() != OrderStatus.PROCESSING) {
             throw new AppException(ErrorCode.ORDER_NOT_PROCESSING);
         }
 
-        String oldStatus = order.getStatus();
-        order.setStatus("CANCELLED_BY_SELLER");
-        order.setPaymentStatus("REFUNDED");
+        OrderStatus oldStatus = order.getStatus();
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setPaymentStatus(OrderPaymentStatus.REFUNDED);
+        order.setCancelledBy(OrderCancelledBy.SELLER);
+        order.setCancellationCode(OrderCancellationCode.SELLER_CANCELLED);
+        order.setCancellationReason(cancelReason);
+        order.setCancelledAt(OffsetDateTime.now());
         orderRepository.save(order);
 
         walletService.systemCancelSellerHold(sellerId, order.getTotalAmount(), order.getId());
@@ -316,14 +316,13 @@ public class PreOrderApprovalService {
         List<com.commercehub.backend.order.entity.PreOrderItem> preItems =
                 loadPreOrderItems(items).values().stream().toList();
         for (var preItem : preItems) {
-            preItem.setStatus("CANCELLED");
             if (cancelReason != null && !cancelReason.trim().isEmpty()) {
                 preItem.setSellerNotes(cancelReason);
             }
         }
         preOrderItemRepository.saveAll(preItems);
 
-        orderStatusService.logStatusChange(order, oldStatus, "CANCELLED_BY_SELLER", sellerId, "Shop hủy đơn đang xử lý. Lý do: " + cancelReason);
+        orderStatusService.logStatusChange(order, oldStatus, OrderStatus.CANCELLED, sellerId, "Shop hủy đơn đang xử lý. Lý do: " + cancelReason);
     }
 
     private Map<Long, com.commercehub.backend.order.entity.PreOrderItem> loadPreOrderItems(

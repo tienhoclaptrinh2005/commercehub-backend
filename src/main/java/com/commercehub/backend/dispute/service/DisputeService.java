@@ -6,6 +6,9 @@ import com.commercehub.backend.dispute.dto.request.CreateDisputeRequest;
 import com.commercehub.backend.dispute.dto.request.SellerRespondRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.entity.OrderDispute;
+import com.commercehub.backend.dispute.entity.DisputeResolution;
+import com.commercehub.backend.dispute.entity.DisputeResolvedBy;
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.dispute.mapper.DisputeMapper;
 import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
 import com.commercehub.backend.wallet.service.HoldReleaseService;
@@ -86,7 +89,7 @@ public class DisputeService {
         }
 
         /*
-         * HOLDING -> COMPLAINED
+         * HoldRelease: HOLDING -> FROZEN
          *
          * HoldReleaseService dùng PESSIMISTIC LOCK.
          */
@@ -119,7 +122,7 @@ public class DisputeService {
                                 )
                         )
                         .status(
-                                OrderDispute.STATUS_OPEN
+                                DisputeStatus.OPEN
                         )
                         .deadlineAt(
                                 now.plusHours(
@@ -160,7 +163,7 @@ public class DisputeService {
             );
         }
 
-        requireStatus(dispute, OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION);
+        requireStatus(dispute, DisputeStatus.WAITING_BUYER_CONFIRMATION);
         requireDeadlineActive(
                 dispute,
                 OffsetDateTime.now(),
@@ -168,16 +171,14 @@ public class DisputeService {
         );
 
         /*
-         * COMPLAINED / WARRANTY_IN_PROGRESS
-         * ->
-         * DISPUTED
+         * OrderDispute: WAITING_BUYER_CONFIRMATION -> ADMIN_REVIEW
          */
         holdReleaseService.escalateDispute(
                 dispute.getOrderItemId()
         );
 
         dispute.setStatus(
-                OrderDispute.STATUS_PROCESSING
+                DisputeStatus.ADMIN_REVIEW
         );
 
         /*
@@ -224,22 +225,23 @@ public class DisputeService {
         }
 
         boolean canWithdraw =
-                OrderDispute.STATUS_OPEN.equals(dispute.getStatus())
-                        || OrderDispute.STATUS_WARRANTY_IN_PROGRESS.equals(dispute.getStatus());
+                dispute.getStatus() == DisputeStatus.OPEN
+                        || dispute.getStatus() == DisputeStatus.WARRANTY_IN_PROGRESS;
 
         if (!canWithdraw) {
             throw new AppException(ErrorCode.DISPUTE_WITHDRAW_NOT_ALLOWED);
         }
 
-        ErrorCode deadlineError = OrderDispute.STATUS_OPEN.equals(dispute.getStatus())
+        ErrorCode deadlineError = dispute.getStatus() == DisputeStatus.OPEN
                 ? ErrorCode.DISPUTE_SELLER_RESPONSE_DEADLINE_EXPIRED
                 : ErrorCode.DISPUTE_WARRANTY_DEADLINE_EXPIRED;
         requireDeadlineActive(dispute, OffsetDateTime.now(), deadlineError);
 
         holdReleaseService.withdrawComplaint(dispute.getOrderItemId());
 
-        dispute.setStatus(OrderDispute.STATUS_CLOSED);
-        dispute.setClosedReason(OrderDispute.CLOSED_REASON_BUYER_WITHDREW);
+        dispute.setStatus(DisputeStatus.RESOLVED);
+        dispute.setResolution(DisputeResolution.BUYER_WITHDREW);
+        dispute.setResolvedBy(DisputeResolvedBy.BUYER);
         dispute.setResolvedAt(OffsetDateTime.now());
         disputeRepository.save(dispute);
 
@@ -275,13 +277,13 @@ public class DisputeService {
         );
 
         /*
-         * COMPLAINED -> WARRANTY_IN_PROGRESS
+         * OrderDispute: OPEN -> WARRANTY_IN_PROGRESS
          */
         holdReleaseService.startWarranty(
                 orderItemId
         );
 
-        dispute.setStatus(OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
+        dispute.setStatus(DisputeStatus.WARRANTY_IN_PROGRESS);
         dispute.setDeadlineAt(
                 OffsetDateTime.now().plusHours(warrantyProcessingHours)
         );
@@ -317,7 +319,7 @@ public class DisputeService {
         OrderDispute dispute =
                 getByOrderItemWithLock(orderItemId);
 
-        requireStatus(dispute, OrderDispute.STATUS_WARRANTY_IN_PROGRESS);
+        requireStatus(dispute, DisputeStatus.WARRANTY_IN_PROGRESS);
         requireDeadlineActive(
                 dispute,
                 OffsetDateTime.now(),
@@ -337,7 +339,7 @@ public class DisputeService {
         );
 
         dispute.setStatus(
-                OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION
+                DisputeStatus.WAITING_BUYER_CONFIRMATION
         );
         dispute.setDeadlineAt(OffsetDateTime.now().plusHours(buyerConfirmationHours));
         dispute.setResolvedAt(null);
@@ -360,15 +362,16 @@ public class DisputeService {
             throw new AppException(ErrorCode.DISPUTE_ACCESS_DENIED);
         }
 
-        requireStatus(dispute, OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION);
+        requireStatus(dispute, DisputeStatus.WAITING_BUYER_CONFIRMATION);
         requireDeadlineActive(
                 dispute,
                 OffsetDateTime.now(),
                 ErrorCode.DISPUTE_BUYER_CONFIRMATION_DEADLINE_EXPIRED
         );
         holdReleaseService.confirmWarrantyResolved(dispute.getOrderItemId());
-        dispute.setStatus(OrderDispute.STATUS_CLOSED);
-        dispute.setClosedReason(OrderDispute.CLOSED_REASON_BUYER_ACCEPTED_WARRANTY);
+        dispute.setStatus(DisputeStatus.RESOLVED);
+        dispute.setResolution(DisputeResolution.WARRANTY_ACCEPTED);
+        dispute.setResolvedBy(DisputeResolvedBy.BUYER);
         dispute.setResolvedAt(OffsetDateTime.now());
         disputeRepository.save(dispute);
         return disputeMapper.toResponse(dispute);
@@ -379,15 +382,16 @@ public class DisputeService {
         OrderDispute dispute = disputeRepository.findByIdWithLock(disputeId)
                 .orElseThrow(() -> new AppException(ErrorCode.DISPUTE_NOT_FOUND));
 
-        if (!OrderDispute.STATUS_WAITING_BUYER_CONFIRMATION.equals(dispute.getStatus())
+        if (dispute.getStatus() != DisputeStatus.WAITING_BUYER_CONFIRMATION
                 || dispute.getDeadlineAt().isAfter(now)) {
             return;
         }
 
         holdReleaseService.confirmWarrantyResolved(dispute.getOrderItemId());
-        dispute.setStatus(OrderDispute.STATUS_CLOSED);
-        dispute.setClosedReason(OrderDispute.CLOSED_REASON_BUYER_CONFIRMATION_TIMEOUT);
-        dispute.setAdminNote("Hệ thống đóng do buyer không phản hồi đúng hạn");
+        dispute.setStatus(DisputeStatus.RESOLVED);
+        dispute.setResolution(DisputeResolution.BUYER_CONFIRMATION_TIMEOUT);
+        dispute.setResolvedBy(DisputeResolvedBy.SYSTEM);
+        dispute.setResolutionNote("Hệ thống đóng do buyer không phản hồi đúng hạn");
         dispute.setResolvedAt(now);
         disputeRepository.save(dispute);
     }
@@ -415,11 +419,11 @@ public class DisputeService {
 
         requireAnyStatus(
                 dispute,
-                OrderDispute.STATUS_OPEN,
-                OrderDispute.STATUS_WARRANTY_IN_PROGRESS
+                DisputeStatus.OPEN,
+                DisputeStatus.WARRANTY_IN_PROGRESS
         );
 
-        ErrorCode deadlineError = OrderDispute.STATUS_OPEN.equals(dispute.getStatus())
+        ErrorCode deadlineError = dispute.getStatus() == DisputeStatus.OPEN
                 ? ErrorCode.DISPUTE_SELLER_RESPONSE_DEADLINE_EXPIRED
                 : ErrorCode.DISPUTE_WARRANTY_DEADLINE_EXPIRED;
         requireDeadlineActive(dispute, OffsetDateTime.now(), deadlineError);
@@ -428,9 +432,7 @@ public class DisputeService {
          * Seller từ chối bảo hành
          * hoặc không thể giải quyết:
          *
-         * COMPLAINED / WARRANTY_IN_PROGRESS
-         * ->
-         * DISPUTED
+         * OrderDispute: OPEN / WARRANTY_IN_PROGRESS -> ADMIN_REVIEW
          */
         holdReleaseService.escalateDispute(
                 orderItemId
@@ -442,7 +444,7 @@ public class DisputeService {
         );
 
         dispute.setStatus(
-                OrderDispute.STATUS_PROCESSING
+                DisputeStatus.ADMIN_REVIEW
         );
 
         dispute.setDeadlineAt(
@@ -611,8 +613,7 @@ public class DisputeService {
     ) {
 
         if (
-                !OrderDispute.STATUS_OPEN
-                        .equals(dispute.getStatus())
+                dispute.getStatus() != DisputeStatus.OPEN
         ) {
 
             throw new AppException(
@@ -621,15 +622,15 @@ public class DisputeService {
         }
     }
 
-    private void requireStatus(OrderDispute dispute, String expectedStatus) {
-        if (!expectedStatus.equals(dispute.getStatus())) {
+    private void requireStatus(OrderDispute dispute, DisputeStatus expectedStatus) {
+        if (expectedStatus != dispute.getStatus()) {
             throw new AppException(ErrorCode.DISPUTE_INVALID_STATUS);
         }
     }
 
-    private void requireAnyStatus(OrderDispute dispute, String... expectedStatuses) {
-        for (String expectedStatus : expectedStatuses) {
-            if (expectedStatus.equals(dispute.getStatus())) {
+    private void requireAnyStatus(OrderDispute dispute, DisputeStatus... expectedStatuses) {
+        for (DisputeStatus expectedStatus : expectedStatuses) {
+            if (expectedStatus == dispute.getStatus()) {
                 return;
             }
         }

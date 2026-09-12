@@ -1,6 +1,7 @@
 package com.commercehub.backend.order.scheduler;
 
 import com.commercehub.backend.order.repository.OrderRepository;
+import com.commercehub.backend.order.entity.OrderStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -22,7 +23,7 @@ class OrderCronJobServiceTest {
         ReflectionTestUtils.setField(service, "batchSize", 200);
 
         when(orderRepository.findExpiredApprovalIds(
-                eq("WAITING_APPROVAL"),
+                eq(OrderStatus.WAITING_SELLER_ACCEPTANCE),
                 any(OffsetDateTime.class),
                 any(Pageable.class)
         )).thenReturn(List.of(40L));
@@ -35,7 +36,7 @@ class OrderCronJobServiceTest {
         verify(orderCancelProcessor, times(1))
                 .cancelSingleOrder(eq(40L), any(String.class));
         verify(orderRepository, times(2)).findExpiredApprovalIds(
-                eq("WAITING_APPROVAL"),
+                eq(OrderStatus.WAITING_SELLER_ACCEPTANCE),
                 any(OffsetDateTime.class),
                 any(Pageable.class)
         );

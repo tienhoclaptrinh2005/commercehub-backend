@@ -1,6 +1,6 @@
 package com.commercehub.backend.order.scheduler;
 
-import com.commercehub.backend.order.entity.Order;
+import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,20 +31,20 @@ public class OrderCronJobService {
     @Scheduled(cron = "${commercehub.jobs.order-expiry-cron:0 * * * * *}")
     @SchedulerLock(name = "order_autoCancelExpiredProcessing", lockAtMostFor = "5m", lockAtLeastFor = "30s")
     public void autoCancelExpiredProcessingOrders() {
-        processExpired("PROCESSING", OffsetDateTime.now());
+        processExpired(OrderStatus.PROCESSING, OffsetDateTime.now());
     }
 
     @Scheduled(cron = "${commercehub.jobs.order-expiry-cron:0 * * * * *}")
     @SchedulerLock(name = "order_autoCancelExpiredWaitingApproval", lockAtMostFor = "5m", lockAtLeastFor = "30s")
     public void autoCancelExpiredWaitingApproval() {
-        processExpired("WAITING_APPROVAL", OffsetDateTime.now());
+        processExpired(OrderStatus.WAITING_SELLER_ACCEPTANCE, OffsetDateTime.now());
     }
 
-    private void processExpired(String status, OffsetDateTime now) {
+    private void processExpired(OrderStatus status, OffsetDateTime now) {
         int safeBatchSize = Math.min(Math.max(batchSize, 1), 500);
         Set<Long> failedOrderIds = new HashSet<>();
         for (int batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
-            List<Long> ids = "PROCESSING".equals(status)
+            List<Long> ids = status == OrderStatus.PROCESSING
                     ? orderRepository.findExpiredProcessingIds(status, now, PageRequest.of(0, safeBatchSize))
                     : orderRepository.findExpiredApprovalIds(status, now, PageRequest.of(0, safeBatchSize));
             if (ids.isEmpty()) {

@@ -44,9 +44,10 @@ public class HoldRelease {
     @Column(name = "fee_ledger_id")
     Long feeLedgerId;
 
+    @Enumerated(EnumType.STRING)
     @Builder.Default
     @Column(name = "status", nullable = false, length = 30)
-    String status = "HOLDING";
+    HoldReleaseStatus status = HoldReleaseStatus.HOLDING;
 
     @Column(name = "scheduled_release_at", nullable = false)
     OffsetDateTime scheduledReleaseAt;
