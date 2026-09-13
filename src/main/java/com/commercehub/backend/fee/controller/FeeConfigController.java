@@ -6,11 +6,14 @@ import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.fee.dto.request.*;
 import com.commercehub.backend.fee.dto.response.*;
 import com.commercehub.backend.fee.service.*;
+import com.commercehub.backend.admin.service.AdminAuditService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,6 +34,7 @@ public class FeeConfigController {
     private final PlatformFeeConfigService configService;
     private final PlatformFeeLedgerService ledgerService;
     private final ShopFeeSummaryService summaryService;
+    private final AdminAuditService auditService;
 
     /**
      * GET /api/admin/fee-configs
@@ -55,13 +59,16 @@ public class FeeConfigController {
      * Tạo config phí mới (deactivate cũ tự động).
      */
     @PostMapping
+    @Transactional
     public ResponseEntity<ApiResponse<FeeConfigResponse>> createConfig(
-            @Valid @RequestBody CreateFeeConfigRequest request
+            @Valid @RequestBody CreateFeeConfigRequest request,
+            HttpServletRequest http
     ) {
         Long adminId = SecurityUtils.getCurrentUserId();
-        return ResponseEntity.ok(ApiResponse.success(
-                "Tạo cấu hình phí mới thành công!", configService.createConfig(request, adminId)
-        ));
+        FeeConfigResponse created = configService.createConfig(request, adminId);
+        auditService.record(adminId, "FEE_CONFIG_CREATED", "FEE_CONFIG", created.getId(), null,
+                java.util.Map.of("feeRate", created.getFeeRate()), request.getDescription(), clientIp(http), http.getHeader("User-Agent"));
+        return ResponseEntity.ok(ApiResponse.success("Tạo cấu hình phí mới thành công!", created));
     }
 
     /**
@@ -69,13 +76,18 @@ public class FeeConfigController {
      * Thay đổi tỷ lệ phí (deactivate cũ + tạo mới trong 1 transaction).
      */
     @PutMapping("/change-rate")
+    @Transactional
     public ResponseEntity<ApiResponse<FeeConfigResponse>> changeRate(
-            @Valid @RequestBody UpdateFeeConfigRequest request
+            @Valid @RequestBody UpdateFeeConfigRequest request,
+            HttpServletRequest http
     ) {
         Long adminId = SecurityUtils.getCurrentUserId();
-        return ResponseEntity.ok(ApiResponse.success(
-                "Thay đổi tỷ lệ phí thành công!", configService.changeRate(request, adminId)
-        ));
+        FeeConfigResponse previous = configService.getActiveConfig();
+        FeeConfigResponse changed = configService.changeRate(request, adminId);
+        auditService.record(adminId, "FEE_RATE_CHANGED", "FEE_CONFIG", changed.getId(),
+                java.util.Map.of("feeRate", previous.getFeeRate()), java.util.Map.of("feeRate", changed.getFeeRate()),
+                request.getChangeReason(), clientIp(http), http.getHeader("User-Agent"));
+        return ResponseEntity.ok(ApiResponse.success("Thay đổi tỷ lệ phí thành công!", changed));
     }
 
     /**
@@ -122,5 +134,10 @@ public class FeeConfigController {
                 pageable
         );
         return ResponseEntity.ok(ApiResponse.success(PageResponse.of(summaries)));
+    }
+
+    private static String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        return forwarded == null || forwarded.isBlank() ? request.getRemoteAddr() : forwarded.split(",")[0].trim();
     }
 }

@@ -145,6 +145,7 @@ class ShopServiceTest {
         assertThat(buyer.getFullName()).isEqualTo("Digital Store");
         assertThat(buyer.getRoles()).extracting(Role::getName).containsExactly("SELLER");
         verify(shopRepository).saveAndFlush(shop);
+        verify(userRepository).save(buyer);
     }
 
     @Test

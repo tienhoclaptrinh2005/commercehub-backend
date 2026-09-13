@@ -6,12 +6,15 @@ import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.dispute.dto.request.AdminResolveDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.service.DisputeResolutionService;
+import com.commercehub.backend.admin.service.AdminAuditService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminDisputeController {
 
     private final DisputeResolutionService disputeResolutionService;
+    private final AdminAuditService auditService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<DisputeResponse>>> list(
@@ -49,23 +53,29 @@ public class AdminDisputeController {
     }
 
     @PostMapping("/{disputeId}/resolve")
+    @Transactional
     public ResponseEntity<ApiResponse<DisputeResponse>> resolve(
             @PathVariable Long disputeId,
             @Valid
             @RequestBody
-            AdminResolveDisputeRequest request
+            AdminResolveDisputeRequest request,
+            HttpServletRequest http
     ) {
 
         Long adminId =
                 SecurityUtils.getCurrentUserId();
 
-        return ResponseEntity.ok(ApiResponse.success(
-                "Đã giải quyết tranh chấp!",
-                disputeResolutionService.resolve(
-                        adminId,
-                        disputeId,
-                        request
-                )
-        ));
+        DisputeResponse before = disputeResolutionService.getById(disputeId);
+        DisputeResponse resolved = disputeResolutionService.resolve(adminId, disputeId, request);
+        auditService.record(adminId, "DISPUTE_RESOLVED", "DISPUTE", disputeId,
+                java.util.Map.of("status", before.getStatus().name()),
+                java.util.Map.of("status", resolved.getStatus().name(), "resolution", resolved.getResolution().name()),
+                request.resolutionNote(), clientIp(http), http.getHeader("User-Agent"));
+        return ResponseEntity.ok(ApiResponse.success("Đã giải quyết tranh chấp!", resolved));
+    }
+
+    private static String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        return forwarded == null || forwarded.isBlank() ? request.getRemoteAddr() : forwarded.split(",")[0].trim();
     }
 }

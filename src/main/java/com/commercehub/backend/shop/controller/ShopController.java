@@ -10,6 +10,9 @@ import com.commercehub.backend.shop.dto.request.UpdateShopRequest;
 import com.commercehub.backend.shop.dto.response.ShopResponse;
 import com.commercehub.backend.shop.dto.response.ShopApplicationResponse;
 import com.commercehub.backend.shop.service.ShopService;
+import com.commercehub.backend.admin.dto.AdminRequests;
+import com.commercehub.backend.admin.service.AdminCommandService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 public class ShopController {
 
     private final ShopService shopService;
+    private final AdminCommandService adminCommandService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ShopResponse>>> getAllActiveShops(
@@ -55,9 +59,19 @@ public class ShopController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> changeShopStatus(
             @PathVariable Long shopId,
-            @RequestParam String status) {
-        shopService.changeShopStatus(shopId, status);
+            @RequestParam String status,
+            @RequestParam(required = false) String reason,
+            @RequestParam(required = false) Long version,
+            HttpServletRequest http) {
+        adminCommandService.changeShopStatus(SecurityUtils.getCurrentUserId(), shopId,
+                new AdminRequests.ShopStatusChange(status, reason, version),
+                clientIp(http), http.getHeader("User-Agent"));
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái gian hàng thành công!", null));
+    }
+
+    private static String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        return forwarded == null || forwarded.isBlank() ? request.getRemoteAddr() : forwarded.split(",")[0].trim();
     }
 
     @GetMapping("/{slug}")

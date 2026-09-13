@@ -187,6 +187,10 @@ public class ProductService {
         }
         validateShopCanSell(product.getShop());
 
+        if ("BANNED".equals(product.getStatus())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
         product.setStatus("DELETED");
         productRepository.save(product);
     }
@@ -209,6 +213,12 @@ public class ProductService {
 
         if ("DELETED".equals(product.getStatus())) {
             throw new AppException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+
+        // BANNED là quyết định kiểm duyệt của admin, seller không được tự sửa
+        // hoặc bật lại sản phẩm cho đến khi admin khôi phục.
+        if ("BANNED".equals(product.getStatus())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
         if (request.getStatus() != null) {

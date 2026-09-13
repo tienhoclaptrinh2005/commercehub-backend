@@ -2,7 +2,9 @@ package com.commercehub.backend.wallet.controller;
 
 import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.security.CustomUserDetails;
-import com.commercehub.backend.wallet.service.WithdrawalService;
+import com.commercehub.backend.admin.dto.AdminRequests;
+import com.commercehub.backend.admin.service.AdminCommandService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
 public class AdminWithdrawalController {
 
-    private final WithdrawalService withdrawalService;
+    private final AdminCommandService adminCommandService;
 
     /**
      * Admin duyệt hoặc từ chối đơn rút tiền.
@@ -33,14 +35,22 @@ public class AdminWithdrawalController {
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @PathVariable Long id,
             @RequestParam String action,
-            @RequestParam(required = false) String note) {
+            @RequestParam(required = false) String note,
+            HttpServletRequest http) {
 
-        withdrawalService.processWithdrawal(id, currentUser.getId(), action, note);
+        adminCommandService.processWithdrawal(currentUser.getId(), id,
+                new AdminRequests.WithdrawalDecision(action, note),
+                clientIp(http), http.getHeader("User-Agent"));
 
         String message = "APPROVE".equalsIgnoreCase(action)
                 ? "Đã duyệt đơn rút tiền thành công."
                 : "Đã từ chối đơn rút tiền. Tiền đã hoàn lại cho người dùng.";
 
         return ResponseEntity.ok(ApiResponse.success(message, null));
+    }
+
+    private static String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        return forwarded == null || forwarded.isBlank() ? request.getRemoteAddr() : forwarded.split(",")[0].trim();
     }
 }
