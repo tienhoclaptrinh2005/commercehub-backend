@@ -3,6 +3,7 @@ package com.commercehub.backend.config;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,6 +21,7 @@ import javax.sql.DataSource;
  * Yêu cầu bảng "shedlock" tồn tại trong DB (xem sql/2026-08-money-fixes.sql).
  */
 @Configuration
+@ConditionalOnProperty(name = "spring.task.scheduling.enabled", havingValue = "true", matchIfMissing = true)
 @EnableScheduling
 @EnableSchedulerLock(defaultLockAtMostFor = "10m")
 public class SchedulerConfig {
