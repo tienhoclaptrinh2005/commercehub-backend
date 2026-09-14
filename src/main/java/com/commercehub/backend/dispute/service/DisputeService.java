@@ -3,11 +3,13 @@ package com.commercehub.backend.dispute.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.dispute.dto.request.CreateDisputeRequest;
+import com.commercehub.backend.dispute.dto.request.EscalateDisputeRequest;
 import com.commercehub.backend.dispute.dto.request.SellerRespondRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.entity.OrderDispute;
 import com.commercehub.backend.dispute.entity.DisputeResolution;
 import com.commercehub.backend.dispute.entity.DisputeResolvedBy;
+import com.commercehub.backend.dispute.entity.DisputeEscalatedBy;
 import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.dispute.mapper.DisputeMapper;
 import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
@@ -145,7 +147,8 @@ public class DisputeService {
     @Transactional
     public DisputeResponse escalateByBuyer(
             Long buyerId,
-            Long disputeId
+            Long disputeId,
+            EscalateDisputeRequest request
     ) {
 
         OrderDispute dispute =
@@ -170,6 +173,9 @@ public class DisputeService {
                 ErrorCode.DISPUTE_BUYER_CONFIRMATION_DEADLINE_EXPIRED
         );
 
+        String escalationReason = requireEscalationReason(request);
+        OffsetDateTime escalatedAt = OffsetDateTime.now();
+
         /*
          * OrderDispute: WAITING_BUYER_CONFIRMATION -> ADMIN_REVIEW
          */
@@ -180,13 +186,16 @@ public class DisputeService {
         dispute.setStatus(
                 DisputeStatus.ADMIN_REVIEW
         );
+        dispute.setEscalatedAt(escalatedAt);
+        dispute.setEscalatedBy(DisputeEscalatedBy.BUYER);
+        dispute.setEscalationReason(escalationReason);
 
         /*
          * Khi chính thức lên Admin,
          * reset deadline tính từ thời điểm escalation.
          */
         dispute.setDeadlineAt(
-                OffsetDateTime.now()
+                escalatedAt
                         .plusHours(
                                 adminReviewHours
                         )
@@ -405,7 +414,7 @@ public class DisputeService {
             Long sellerId,
             Long orderId,
             Long orderItemId,
-            SellerRespondRequest request
+            EscalateDisputeRequest request
     ) {
 
         validateSellerOwnership(
@@ -428,6 +437,9 @@ public class DisputeService {
                 : ErrorCode.DISPUTE_WARRANTY_DEADLINE_EXPIRED;
         requireDeadlineActive(dispute, OffsetDateTime.now(), deadlineError);
 
+        String escalationReason = requireEscalationReason(request);
+        OffsetDateTime escalatedAt = OffsetDateTime.now();
+
         /*
          * Seller từ chối bảo hành
          * hoặc không thể giải quyết:
@@ -438,17 +450,20 @@ public class DisputeService {
                 orderItemId
         );
 
-        applySellerResponse(
-                dispute,
-                request
-        );
+        dispute.setShopResponse(escalationReason);
+        if (request.evidenceUrls() != null && !request.evidenceUrls().isEmpty()) {
+            dispute.setShopEvidenceUrls(disputeMapper.toArray(request.evidenceUrls()));
+        }
 
         dispute.setStatus(
                 DisputeStatus.ADMIN_REVIEW
         );
+        dispute.setEscalatedAt(escalatedAt);
+        dispute.setEscalatedBy(DisputeEscalatedBy.SELLER);
+        dispute.setEscalationReason(escalationReason);
 
         dispute.setDeadlineAt(
-                OffsetDateTime.now()
+                escalatedAt
                         .plusHours(
                                 adminReviewHours
                         )
@@ -685,6 +700,18 @@ public class DisputeService {
                     )
             );
         }
+    }
+
+    private String requireEscalationReason(EscalateDisputeRequest request) {
+        if (request == null || request.reason() == null) {
+            throw new AppException(ErrorCode.DISPUTE_ESCALATION_REASON_REQUIRED);
+        }
+
+        String reason = request.reason().trim();
+        if (reason.isEmpty() || reason.length() > 200) {
+            throw new AppException(ErrorCode.DISPUTE_ESCALATION_REASON_REQUIRED);
+        }
+        return reason;
     }
 
     /*

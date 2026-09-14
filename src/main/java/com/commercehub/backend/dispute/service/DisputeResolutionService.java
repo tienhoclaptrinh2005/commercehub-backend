@@ -3,6 +3,7 @@ package com.commercehub.backend.dispute.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.dispute.dto.request.AdminResolveDisputeRequest;
+import com.commercehub.backend.dispute.dto.response.AdminDisputeSummaryResponse;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.entity.OrderDispute;
 import com.commercehub.backend.dispute.entity.DisputeResolution;
@@ -48,6 +49,9 @@ public class DisputeResolutionService {
                 && request.decision() != DisputeResolution.SELLER_WIN) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
+        if (request.resolutionNote() == null || request.resolutionNote().trim().isEmpty()) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
 
         OrderDispute dispute =
                 disputeRepository
@@ -66,7 +70,13 @@ public class DisputeResolutionService {
             throw new AppException(ErrorCode.DISPUTE_INVALID_STATUS);
         }
 
-        return resolveLocked(dispute, adminId, DisputeResolvedBy.ADMIN, request.decision(), request.resolutionNote());
+        return resolveLocked(
+                dispute,
+                adminId,
+                DisputeResolvedBy.ADMIN,
+                request.decision(),
+                request.resolutionNote().trim()
+        );
     }
 
     /** Seller không phản hồi OPEN quá hạn: hệ thống xử buyer thắng 100%. */
@@ -225,37 +235,65 @@ public class DisputeResolutionService {
 
     @Transactional(readOnly = true)
     public Page<DisputeResponse> getAll(
+            String scope,
             String status,
+            String keyword,
+            boolean overdueOnly,
             Pageable pageable
     ) {
 
-        if (
-                status == null
-                        ||
-                        status.isBlank()
-        ) {
-
-            return disputeRepository
-                    .findAllByOrderByCreatedAtDesc(
-                            limitPageable(pageable)
-                    )
-                    .map(disputeMapper::toResponse);
+        String normalizedScope = scope == null || scope.isBlank()
+                ? "QUEUE"
+                : scope.trim().toUpperCase();
+        if (!normalizedScope.equals("QUEUE") && !normalizedScope.equals("ALL")) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
         }
 
-        DisputeStatus normalizedStatus;
+        DisputeStatus normalizedStatus = normalizedScope.equals("QUEUE")
+                ? DisputeStatus.ADMIN_REVIEW
+                : normalizeStatus(status);
+        String normalizedKeyword = keyword == null || keyword.isBlank()
+                ? ""
+                : keyword.trim();
+
+        return disputeRepository
+                .findAdminDisputes(
+                        normalizedStatus,
+                        normalizedKeyword,
+                        overdueOnly,
+                        DisputeStatus.ADMIN_REVIEW,
+                        OffsetDateTime.now(),
+                        limitPageable(pageable)
+                )
+                .map(disputeMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminDisputeSummaryResponse getSummary() {
+        OffsetDateTime now = OffsetDateTime.now();
+        return new AdminDisputeSummaryResponse(
+                disputeRepository.countByStatus(DisputeStatus.ADMIN_REVIEW),
+                disputeRepository.countByStatusAndDeadlineAtLessThanEqual(
+                        DisputeStatus.ADMIN_REVIEW,
+                        now
+                )
+        );
+    }
+
+    private DisputeStatus normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
         try {
-            normalizedStatus = DisputeStatus.valueOf(status.trim().toUpperCase());
+            return DisputeStatus.valueOf(status.trim().toUpperCase());
         } catch (IllegalArgumentException exception) {
             throw new AppException(ErrorCode.INVALID_STATUS);
         }
-        return disputeRepository
-                .findByStatusOrderByCreatedAtDesc(normalizedStatus, limitPageable(pageable))
-                .map(disputeMapper::toResponse);
     }
 
     private Pageable limitPageable(Pageable pageable) {
         int page = Math.max(0, pageable.getPageNumber());
         int size = Math.min(Math.max(1, pageable.getPageSize()), 100);
-        return PageRequest.of(page, size, pageable.getSort());
+        return PageRequest.of(page, size);
     }
 }

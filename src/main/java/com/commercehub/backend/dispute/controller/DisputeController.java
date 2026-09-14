@@ -4,6 +4,7 @@ import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.dispute.dto.request.CreateDisputeRequest;
+import com.commercehub.backend.dispute.dto.request.EscalateDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.service.DisputeService;
 import jakarta.validation.Valid;
@@ -70,7 +71,8 @@ public class DisputeController {
             "/disputes/{disputeId}/escalate"
     )
     public ResponseEntity<ApiResponse<DisputeResponse>> escalate(
-            @PathVariable Long disputeId
+            @PathVariable Long disputeId,
+            @Valid @RequestBody EscalateDisputeRequest request
     ) {
 
         Long buyerId =
@@ -80,7 +82,8 @@ public class DisputeController {
                 "Đã chuyển khiếu nại đến quản trị viên!",
                 disputeService.escalateByBuyer(
                         buyerId,
-                        disputeId
+                        disputeId,
+                        request
                 )
         ));
     }

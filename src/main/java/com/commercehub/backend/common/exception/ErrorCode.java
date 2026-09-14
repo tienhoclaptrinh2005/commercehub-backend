@@ -159,6 +159,7 @@ public enum ErrorCode {
     DISPUTE_SELLER_RESPONSE_DEADLINE_EXPIRED(409, "Seller đã hết thời hạn phản hồi. Hệ thống sẽ tự động hoàn tiền cho buyer!", HttpStatus.CONFLICT),
     DISPUTE_WARRANTY_DEADLINE_EXPIRED(409, "Thời hạn bảo hành đã hết. Hệ thống sẽ tự động hoàn tiền cho buyer!", HttpStatus.CONFLICT),
     DISPUTE_BUYER_CONFIRMATION_DEADLINE_EXPIRED(409, "Buyer đã hết thời hạn xác nhận. Hệ thống sẽ tự động đóng khiếu nại!", HttpStatus.CONFLICT),
+    DISPUTE_ESCALATION_REASON_REQUIRED(400, "Phải nhập lý do chuyển Admin và không được vượt quá 200 ký tự!", HttpStatus.BAD_REQUEST),
 
 
 

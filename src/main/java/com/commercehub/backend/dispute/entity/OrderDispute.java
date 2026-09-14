@@ -105,6 +105,16 @@ public class OrderDispute {
     @Column(name = "resolver_id")
     Long resolverId;
 
+    @Column(name = "escalated_at")
+    OffsetDateTime escalatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "escalated_by", length = 20)
+    DisputeEscalatedBy escalatedBy;
+
+    @Column(name = "escalation_reason", length = 200)
+    String escalationReason;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     OffsetDateTime createdAt;

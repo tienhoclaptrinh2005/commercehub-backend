@@ -34,6 +34,10 @@ public class DisputeResponse {
 
     private String variantName;
 
+    private String buyerUsername;
+
+    private String sellerUsername;
+
     private String reason;
 
     private List<String> evidenceUrls;
@@ -53,6 +57,14 @@ public class DisputeResponse {
     private String resolutionNote;
 
     private Long resolverId;
+
+    private OffsetDateTime escalatedAt;
+
+    private com.commercehub.backend.dispute.entity.DisputeEscalatedBy escalatedBy;
+
+    private String escalationReason;
+
+    private boolean adminOverdue;
 
     private OffsetDateTime createdAt;
 

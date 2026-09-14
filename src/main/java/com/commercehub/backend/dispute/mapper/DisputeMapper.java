@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.time.OffsetDateTime;
+
+import com.commercehub.backend.dispute.entity.DisputeStatus;
 
 @Component
 public class DisputeMapper {
@@ -25,6 +28,10 @@ public class DisputeMapper {
                 .shopName(dispute.getShop() == null ? null : dispute.getShop().getName())
                 .productName(dispute.getOrderItem() == null ? null : dispute.getOrderItem().getProductName())
                 .variantName(dispute.getOrderItem() == null ? null : dispute.getOrderItem().getVariantName())
+                .buyerUsername(dispute.getOrder() == null || dispute.getOrder().getUser() == null
+                        ? null : dispute.getOrder().getUser().getUsername())
+                .sellerUsername(dispute.getShop() == null || dispute.getShop().getOwner() == null
+                        ? null : dispute.getShop().getOwner().getUsername())
                 .reason(dispute.getReason())
                 .evidenceUrls(toList(dispute.getEvidenceUrls()))
                 .shopResponse(dispute.getShopResponse())
@@ -37,6 +44,12 @@ public class DisputeMapper {
                 .refundAmount(dispute.getRefundAmount())
                 .resolutionNote(dispute.getResolutionNote())
                 .resolverId(dispute.getResolverId())
+                .escalatedAt(dispute.getEscalatedAt())
+                .escalatedBy(dispute.getEscalatedBy())
+                .escalationReason(dispute.getEscalationReason())
+                .adminOverdue(dispute.getStatus() == DisputeStatus.ADMIN_REVIEW
+                        && dispute.getDeadlineAt() != null
+                        && !dispute.getDeadlineAt().isAfter(OffsetDateTime.now()))
                 .createdAt(dispute.getCreatedAt())
                 .deadlineAt(dispute.getDeadlineAt())
                 .resolvedAt(dispute.getResolvedAt())

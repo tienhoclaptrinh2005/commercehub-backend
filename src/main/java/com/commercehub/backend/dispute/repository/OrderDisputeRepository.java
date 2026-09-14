@@ -45,7 +45,7 @@ public interface OrderDisputeRepository
     // LOCK
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
+    @EntityGraph(attributePaths = {"order", "order.user", "orderItem", "shop", "shop.owner"})
     @Query("""
             SELECT d
             FROM OrderDispute d
@@ -56,7 +56,7 @@ public interface OrderDisputeRepository
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
+    @EntityGraph(attributePaths = {"order", "order.user", "orderItem", "shop", "shop.owner"})
     @Query("""
             SELECT d
             FROM OrderDispute d
@@ -188,32 +188,65 @@ public interface OrderDisputeRepository
 
     // LIST
 
-    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
+    @EntityGraph(attributePaths = {"order", "order.user", "orderItem", "shop", "shop.owner"})
     Page<OrderDispute> findByUserIdOrderByCreatedAtDesc(
             Long userId,
             Pageable pageable
     );
 
-    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
+    @EntityGraph(attributePaths = {"order", "order.user", "orderItem", "shop", "shop.owner"})
     Page<OrderDispute> findByShopIdOrderByCreatedAtDesc(
             Long shopId,
             Pageable pageable
     );
 
-    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
+    @EntityGraph(attributePaths = {"order", "order.user", "orderItem", "shop", "shop.owner"})
     Page<OrderDispute> findByStatusOrderByCreatedAtDesc(
             DisputeStatus status,
             Pageable pageable
     );
 
-    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
+    @EntityGraph(attributePaths = {"order", "order.user", "orderItem", "shop", "shop.owner"})
     Page<OrderDispute> findAllByOrderByCreatedAtDesc(
             Pageable pageable
     );
 
     @Override
-    @EntityGraph(attributePaths = {"order", "orderItem", "shop"})
+    @EntityGraph(attributePaths = {"order", "order.user", "orderItem", "shop", "shop.owner"})
     Optional<OrderDispute> findById(Long id);
+
+    @EntityGraph(attributePaths = {"order", "order.user", "orderItem", "shop", "shop.owner"})
+    @Query("""
+            SELECT d
+            FROM OrderDispute d
+            JOIN d.order o
+            WHERE (:status IS NULL OR d.status = :status)
+              AND LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              AND (:overdueOnly = FALSE OR (
+                    d.status = :adminReviewStatus
+                    AND d.deadlineAt <= :now
+              ))
+            ORDER BY
+              CASE WHEN d.status = :adminReviewStatus
+                         AND d.deadlineAt <= :now THEN 0 ELSE 1 END,
+              d.createdAt DESC,
+              d.id DESC
+            """)
+    Page<OrderDispute> findAdminDisputes(
+            @Param("status") DisputeStatus status,
+            @Param("keyword") String keyword,
+            @Param("overdueOnly") boolean overdueOnly,
+            @Param("adminReviewStatus") DisputeStatus adminReviewStatus,
+            @Param("now") OffsetDateTime now,
+            Pageable pageable
+    );
+
+    long countByStatus(DisputeStatus status);
+
+    long countByStatusAndDeadlineAtLessThanEqual(
+            DisputeStatus status,
+            OffsetDateTime deadline
+    );
 
     @Query("""
             SELECT d.id

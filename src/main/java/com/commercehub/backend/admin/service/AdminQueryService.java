@@ -82,7 +82,7 @@ public class AdminQueryService {
                 count("SELECT COUNT(*) FROM shops WHERE status='ACTIVE'"),
                 count("SELECT COUNT(*) FROM products WHERE status='ACTIVE'"),
                 count("SELECT COUNT(*) FROM orders WHERE placed_at >= ? AND placed_at < ?", startOf(monthStart), startOf(nextMonth)),
-                count("SELECT COUNT(*) FROM order_disputes WHERE status <> 'RESOLVED'"),
+                count("SELECT COUNT(*) FROM order_disputes WHERE status = 'ADMIN_REVIEW'"),
                 scalarMoney("""
                         SELECT CASE WHEN COUNT(oi.id)=0 THEN 0
                             ELSE ROUND(COUNT(d.id)::numeric * 100 / COUNT(oi.id), 2) END

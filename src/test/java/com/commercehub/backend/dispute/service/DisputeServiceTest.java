@@ -3,10 +3,12 @@ package com.commercehub.backend.dispute.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.dispute.dto.request.CreateDisputeRequest;
+import com.commercehub.backend.dispute.dto.request.EscalateDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.entity.OrderDispute;
 import com.commercehub.backend.dispute.entity.DisputeResolution;
 import com.commercehub.backend.dispute.entity.DisputeResolvedBy;
+import com.commercehub.backend.dispute.entity.DisputeEscalatedBy;
 import com.commercehub.backend.dispute.entity.DisputeStatus;
 import com.commercehub.backend.dispute.mapper.DisputeMapper;
 import com.commercehub.backend.dispute.repository.OrderDisputeRepository;
@@ -37,6 +39,7 @@ class DisputeServiceTest {
         holdReleaseService = mock(HoldReleaseService.class);
         service = new DisputeService(disputeRepository, disputeMapper, holdReleaseService);
         ReflectionTestUtils.setField(service, "warrantyProcessingHours", 24L);
+        ReflectionTestUtils.setField(service, "adminReviewHours", 72L);
     }
 
     @Test
@@ -228,7 +231,7 @@ class DisputeServiceTest {
                 ErrorCode.DISPUTE_BUYER_CONFIRMATION_DEADLINE_EXPIRED
         );
         assertDeadlineError(
-                () -> service.escalateByBuyer(40L, 10L),
+                () -> service.escalateByBuyer(40L, 10L, null),
                 ErrorCode.DISPUTE_BUYER_CONFIRMATION_DEADLINE_EXPIRED
         );
 
@@ -247,6 +250,63 @@ class DisputeServiceTest {
         assertThat(dispute.getResolution()).isEqualTo(DisputeResolution.WARRANTY_ACCEPTED);
         assertThat(dispute.getResolvedBy()).isEqualTo(DisputeResolvedBy.BUYER);
         verify(holdReleaseService).confirmWarrantyResolved(30L);
+    }
+
+    @Test
+    void buyerRejectingWarrantyRequiresAndStoresEscalationReason() {
+        OrderDispute dispute = dispute(DisputeStatus.WAITING_BUYER_CONFIRMATION);
+        when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
+
+        service.escalateByBuyer(
+                40L,
+                10L,
+                new EscalateDisputeRequest("Kết quả vẫn không sử dụng được", List.of())
+        );
+
+        assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.ADMIN_REVIEW);
+        assertThat(dispute.getEscalatedBy()).isEqualTo(DisputeEscalatedBy.BUYER);
+        assertThat(dispute.getEscalationReason()).isEqualTo("Kết quả vẫn không sử dụng được");
+        assertThat(dispute.getEscalatedAt()).isNotNull();
+        verify(holdReleaseService).escalateDispute(30L);
+        verify(disputeRepository).linkFeeLedgerToDispute(30L, 10L);
+    }
+
+    @Test
+    void sellerEscalationRequiresAndStoresReason() {
+        OrderDispute dispute = dispute(DisputeStatus.OPEN);
+        when(disputeRepository.sellerOwnsOrderItem(70L, 20L, 30L)).thenReturn(true);
+        when(disputeRepository.findByOrderItemIdWithLock(30L)).thenReturn(Optional.of(dispute));
+
+        service.escalateBySeller(
+                70L,
+                20L,
+                30L,
+                new EscalateDisputeRequest("Không còn dữ liệu thay thế", List.of())
+        );
+
+        assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.ADMIN_REVIEW);
+        assertThat(dispute.getEscalatedBy()).isEqualTo(DisputeEscalatedBy.SELLER);
+        assertThat(dispute.getEscalationReason()).isEqualTo("Không còn dữ liệu thay thế");
+        assertThat(dispute.getShopResponse()).isEqualTo("Không còn dữ liệu thay thế");
+        assertThat(dispute.getEscalatedAt()).isNotNull();
+        verify(holdReleaseService).escalateDispute(30L);
+    }
+
+    @Test
+    void activeDisputeCannotBeEscalatedWithBlankReason() {
+        OrderDispute dispute = dispute(DisputeStatus.WAITING_BUYER_CONFIRMATION);
+        when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(dispute));
+
+        assertThatThrownBy(() -> service.escalateByBuyer(
+                40L,
+                10L,
+                new EscalateDisputeRequest("   ", List.of())
+        )).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.DISPUTE_ESCALATION_REASON_REQUIRED));
+
+        verifyNoInteractions(holdReleaseService);
+        verify(disputeRepository, never()).save(any());
     }
 
     @Test

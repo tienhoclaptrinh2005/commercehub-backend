@@ -4,6 +4,7 @@ import com.commercehub.backend.common.response.ApiResponse;
 import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SecurityUtils;
 import com.commercehub.backend.dispute.dto.request.SellerRespondRequest;
+import com.commercehub.backend.dispute.dto.request.EscalateDisputeRequest;
 import com.commercehub.backend.dispute.dto.response.DisputeResponse;
 import com.commercehub.backend.dispute.service.DisputeService;
 import jakarta.validation.Valid;
@@ -83,8 +84,8 @@ public class SellerDisputeController {
             @PathVariable Long orderId,
             @PathVariable Long itemId,
             @Valid
-            @RequestBody(required = false)
-            SellerRespondRequest request
+            @RequestBody
+            EscalateDisputeRequest request
     ) {
 
         Long sellerId =
