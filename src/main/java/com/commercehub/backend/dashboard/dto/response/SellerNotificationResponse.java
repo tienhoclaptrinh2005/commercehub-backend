@@ -4,6 +4,7 @@ public record SellerNotificationResponse(
         long recentInstantOrderCount,
         long newPreOrderRequestCount,
         long processingPreOrderCount,
-        long activeDisputeCount
+        long activeDisputeCount,
+        long withdrawalUpdateCount
 ) {
 }

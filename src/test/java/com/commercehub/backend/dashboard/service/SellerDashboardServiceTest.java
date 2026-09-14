@@ -125,6 +125,7 @@ class SellerDashboardServiceTest {
         when(counts.getNewPreOrderRequestCount()).thenReturn(12L);
         when(counts.getProcessingPreOrderCount()).thenReturn(3L);
         when(counts.getActiveDisputeCount()).thenReturn(2L);
+        when(counts.getWithdrawalUpdateCount()).thenReturn(1L);
         when(dashboardRepository.findSellerNotificationCounts(eq(7L), eq(9L), any(OffsetDateTime.class)))
                 .thenReturn(counts);
 
@@ -134,6 +135,7 @@ class SellerDashboardServiceTest {
         assertThat(response.newPreOrderRequestCount()).isEqualTo(12L);
         assertThat(response.processingPreOrderCount()).isEqualTo(3L);
         assertThat(response.activeDisputeCount()).isEqualTo(2L);
+        assertThat(response.withdrawalUpdateCount()).isEqualTo(1L);
     }
 
     @Test
@@ -148,6 +150,20 @@ class SellerDashboardServiceTest {
 
         verify(dashboardRepository).markSellerNotificationCategoryRead(9L, "PRE_ORDERS");
         assertThat(response.newPreOrderRequestCount()).isZero();
+    }
+
+    @Test
+    void markingWithdrawalNotificationsReadUsesDedicatedCategory() {
+        SellerDashboardRepository.SellerNotificationProjection counts =
+                mock(SellerDashboardRepository.SellerNotificationProjection.class);
+        when(shopService.getShopByOwnerId(9L)).thenReturn(Shop.builder().id(7L).build());
+        when(dashboardRepository.findSellerNotificationCounts(eq(7L), eq(9L), any(OffsetDateTime.class)))
+                .thenReturn(counts);
+
+        SellerNotificationResponse response = service.markNotificationsRead(9L, "withdrawals");
+
+        verify(dashboardRepository).markSellerNotificationCategoryRead(9L, "WITHDRAWALS");
+        assertThat(response.withdrawalUpdateCount()).isZero();
     }
 
     private SellerDashboardRepository.DailyRevenueProjection dailyRow(

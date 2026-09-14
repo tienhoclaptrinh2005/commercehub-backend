@@ -1,6 +1,8 @@
 package com.commercehub.backend.admin.dto;
 
+import com.commercehub.backend.wallet.dto.request.WithdrawalAction;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public final class AdminRequests {
@@ -18,7 +20,8 @@ public final class AdminRequests {
     ) {}
 
     public record WithdrawalDecision(
-            @NotBlank String action,
-            @Size(max = 500) String note
+            @NotNull WithdrawalAction action,
+            @Size(max = 500) String note,
+            @Size(max = 100) String transferReference
     ) {}
 }

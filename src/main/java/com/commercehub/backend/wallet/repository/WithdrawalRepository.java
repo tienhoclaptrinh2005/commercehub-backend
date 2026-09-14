@@ -1,6 +1,7 @@
 package com.commercehub.backend.wallet.repository;
 
 import com.commercehub.backend.wallet.entity.Withdrawal;
+import com.commercehub.backend.wallet.entity.WithdrawalStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,10 +17,10 @@ import java.util.Optional;
 public interface WithdrawalRepository extends JpaRepository<Withdrawal, Long> {
 
 
-    Page<Withdrawal> findByWalletIdOrderByCreatedAtDesc(Long walletId, Pageable pageable);
+    Page<Withdrawal> findByWalletUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     // Dành cho Admin: Xem tất cả yêu cầu rút tiền theo trạng thái
-    Page<Withdrawal> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
+    Page<Withdrawal> findByStatusOrderByCreatedAtDesc(WithdrawalStatus status, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM Withdrawal w JOIN FETCH w.wallet wl JOIN FETCH wl.user WHERE w.id = :id")

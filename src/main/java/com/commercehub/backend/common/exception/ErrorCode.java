@@ -106,6 +106,10 @@ public enum ErrorCode {
 
 
     INVALID_REQUEST(400, "Dữ liệu yêu cầu không hợp lệ!", HttpStatus.BAD_REQUEST),
+    WITHDRAWAL_INVALID_TRANSITION(409, "Yêu cầu rút tiền không còn ở trạng thái phù hợp để thực hiện thao tác này!", HttpStatus.CONFLICT),
+    WITHDRAWAL_REJECTION_REASON_REQUIRED(400, "Phải nhập lý do từ chối yêu cầu rút tiền!", HttpStatus.BAD_REQUEST),
+    WITHDRAWAL_TRANSFER_REFERENCE_REQUIRED(400, "Phải nhập mã tham chiếu chuyển khoản trước khi xác nhận đã chuyển tiền!", HttpStatus.BAD_REQUEST),
+    WITHDRAWAL_IDEMPOTENCY_CONFLICT(409, "Khóa chống gửi trùng đã được dùng cho một yêu cầu rút tiền khác!", HttpStatus.CONFLICT),
     INVALID_DELIVERY_TYPE(400, "Loại hình giao hàng không hợp lệ! Chỉ chấp nhận INSTANT hoặc PRE_ORDER.", HttpStatus.BAD_REQUEST),
 
 

@@ -124,6 +124,30 @@ public class WalletService {
         logTransaction(wallet.getId(), type, "AVAILABLE", amount, before, wallet.getAvailableBalance(), refId, refType);
     }
 
+    /**
+     * Ghi nhận một sự kiện nghiệp vụ không làm biến động số dư. Withdrawal đã
+     * trừ tiền tại thời điểm tạo yêu cầu, nên lúc ngân hàng chuyển thành công
+     * chỉ cần thêm dấu mốc WITHDRAW_DONE với số dư trước/sau bằng nhau.
+     */
+    @Transactional
+    public void recordBalanceEvent(Long userId, String type, Long refId, String refType, String description) {
+        Wallet wallet = walletRepository.findByUserIdWithLock(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+        BigDecimal currentBalance = wallet.getAvailableBalance();
+        WalletTransaction tx = WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .transactionType(type)
+                .balanceType("AVAILABLE")
+                .amount(BigDecimal.ZERO)
+                .balanceBefore(currentBalance)
+                .balanceAfter(currentBalance)
+                .referenceId(refId)
+                .referenceType(refType)
+                .description(description)
+                .build();
+        transactionRepository.save(tx);
+    }
+
     @Transactional
     public void systemCancelSellerHold(Long sellerId, BigDecimal amount, Long refId) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {

@@ -92,12 +92,23 @@ public class AdminCommandService {
     public void processWithdrawal(Long actorId, Long withdrawalId, AdminRequests.WithdrawalDecision request, String ip, String agent) {
         Withdrawal before = withdrawalRepository.findById(withdrawalId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
-        String oldStatus = before.getStatus();
-        withdrawalService.processWithdrawal(withdrawalId, actorId, request.action(), request.note());
+        var oldStatus = before.getStatus();
+        withdrawalService.processWithdrawal(
+                withdrawalId,
+                actorId,
+                request.action(),
+                request.note(),
+                request.transferReference()
+        );
         Withdrawal after = withdrawalRepository.findById(withdrawalId)
                 .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
         auditService.record(actorId, "WITHDRAWAL_PROCESSED", "WITHDRAWAL", withdrawalId,
-                Map.of("status", oldStatus), Map.of("status", after.getStatus()), request.note(), ip, agent);
+                Map.of("status", oldStatus.name()),
+                Map.of(
+                        "status", after.getStatus().name(),
+                        "transferReference", safe(after.getTransferReference())
+                ),
+                request.note(), ip, agent);
     }
 
     private static void requireReasonWhenRestricted(String status, String reason) {

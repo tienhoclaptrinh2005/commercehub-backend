@@ -73,8 +73,9 @@ public final class AdminResponses {
     public record WithdrawalRow(
             Long id, Long userId, String username, String email, BigDecimal amount,
             BigDecimal fee, String bankName, String accountNumber, String accountName,
-            String status, String adminNote, String processorUsername,
-            OffsetDateTime processedAt, OffsetDateTime createdAt
+            String status, String adminNote, String transferReference,
+            String approvedByUsername, String processorUsername,
+            OffsetDateTime approvedAt, OffsetDateTime processedAt, OffsetDateTime createdAt
     ) {}
 
     public record WalletTransactionRow(

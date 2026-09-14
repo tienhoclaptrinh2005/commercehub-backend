@@ -43,11 +43,22 @@ public class Withdrawal {
     @Column(name = "idempotency_key", length = 100, unique = true)
     private String idempotencyKey;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private String status; // PENDING, APPROVED, REJECTED, DONE
+    private WithdrawalStatus status;
 
     @Column(name = "admin_note", columnDefinition = "TEXT")
     private String adminNote;
+
+    @Column(name = "transfer_reference", length = 100)
+    private String transferReference;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by_id")
+    private User approvedBy;
+
+    @Column(name = "approved_at")
+    private OffsetDateTime approvedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "processor_id")

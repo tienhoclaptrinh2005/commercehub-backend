@@ -89,7 +89,7 @@ public class AdminQueryService {
                         FROM order_items oi
                         LEFT JOIN order_disputes d ON d.order_item_id=oi.id
                         """),
-                count("SELECT COUNT(*) FROM withdrawals WHERE status='PENDING'"),
+                count("SELECT COUNT(*) FROM withdrawals WHERE status IN ('PENDING','APPROVED')"),
                 count("SELECT COUNT(*) FROM deposits WHERE status='REVIEW_REQUIRED'"),
                 scalarMoney("SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE placed_at >= ? AND placed_at < ? AND payment_status <> 'REFUNDED'", startOf(monthStart), startOf(nextMonth)),
                 scalarMoney("SELECT COALESCE(SUM(COALESCE(adjusted_fee_amount, fee_amount)),0) FROM platform_fee_ledgers WHERE status IN ('COLLECTED','ADJUSTED') AND COALESCE(collected_at, updated_at) >= ? AND COALESCE(collected_at, updated_at) < ?", startOf(monthStart), startOf(nextMonth)),
@@ -172,20 +172,21 @@ public class AdminQueryService {
     }
 
     public PageResponse<AdminResponses.WithdrawalRow> withdrawals(String keyword, String status, int page, int size) {
-        SqlFilter filter=new SqlFilter(" FROM withdrawals wd JOIN wallets w ON w.id=wd.wallet_id JOIN users u ON u.id=w.user_id LEFT JOIN users processor ON processor.id=wd.processor_id WHERE 1=1 ");
+        SqlFilter filter=new SqlFilter(" FROM withdrawals wd JOIN wallets w ON w.id=wd.wallet_id JOIN users u ON u.id=w.user_id LEFT JOIN users approved_by ON approved_by.id=wd.approved_by_id LEFT JOIN users processor ON processor.id=wd.processor_id WHERE 1=1 ");
         if(hasText(keyword)) filter.add(" AND (u.username ILIKE ? OR u.email ILIKE ? OR wd.account_number ILIKE ? OR wd.account_name ILIKE ?)",like(keyword),like(keyword),like(keyword),like(keyword));
         if(hasText(status)) filter.add(" AND wd.status=?",upper(status));
-        String select="SELECT wd.id,u.id user_id,u.username,u.email,wd.amount,wd.fee,wd.bank_name,wd.account_number,wd.account_name,wd.status,wd.admin_note,processor.username processor_username,wd.processed_at,wd.created_at";
-        return page(select,filter," ORDER BY CASE WHEN wd.status='PENDING' THEN 0 ELSE 1 END,wd.created_at DESC,wd.id DESC",page,size,(rs,n)->new AdminResponses.WithdrawalRow(
+        String select="SELECT wd.id,u.id user_id,u.username,u.email,wd.amount,wd.fee,wd.bank_name,wd.account_number,wd.account_name,wd.status,wd.admin_note,wd.transfer_reference,approved_by.username approved_by_username,processor.username processor_username,wd.approved_at,wd.processed_at,wd.created_at";
+        return page(select,filter," ORDER BY CASE wd.status WHEN 'PENDING' THEN 0 WHEN 'APPROVED' THEN 1 ELSE 2 END,wd.created_at DESC,wd.id DESC",page,size,(rs,n)->new AdminResponses.WithdrawalRow(
                 rs.getLong("id"),rs.getLong("user_id"),rs.getString("username"),rs.getString("email"),money(rs,"amount"),money(rs,"fee"),rs.getString("bank_name"),
-                rs.getString("account_number"),rs.getString("account_name"),rs.getString("status"),rs.getString("admin_note"),rs.getString("processor_username"),time(rs,"processed_at"),time(rs,"created_at")));
+                rs.getString("account_number"),rs.getString("account_name"),rs.getString("status"),rs.getString("admin_note"),rs.getString("transfer_reference"),
+                rs.getString("approved_by_username"),rs.getString("processor_username"),time(rs,"approved_at"),time(rs,"processed_at"),time(rs,"created_at")));
     }
 
     public PageResponse<AdminResponses.WalletTransactionRow> transactions(String keyword, String type, int page, int size) {
         SqlFilter filter=new SqlFilter(" FROM wallet_transactions wt JOIN wallets w ON w.id=wt.wallet_id LEFT JOIN users u ON u.id=w.user_id LEFT JOIN orders o ON wt.reference_type='ORDER' AND o.id=wt.reference_id LEFT JOIN deposits d ON wt.reference_type='DEPOSIT' AND d.id=wt.reference_id WHERE 1=1 ");
         if(hasText(keyword)) filter.add(" AND (u.username ILIKE ? OR u.email ILIKE ? OR CAST(wt.id AS text) ILIKE ? OR o.order_code ILIKE ? OR d.transaction_code ILIKE ?)",like(keyword),like(keyword),like(keyword),like(keyword),like(keyword));
         if(hasText(type)) filter.add(" AND wt.transaction_type=?",upper(type));
-        String select="SELECT wt.id,wt.wallet_id,u.id user_id,u.username,u.email,wt.transaction_type,wt.balance_type,wt.amount,wt.balance_before,wt.balance_after,wt.reference_id,wt.reference_type,COALESCE(o.order_code,d.transaction_code,CAST(wt.reference_id AS text)) reference_code,wt.description,wt.created_at";
+        String select="SELECT wt.id,wt.wallet_id,u.id user_id,u.username,u.email,wt.transaction_type,wt.balance_type,wt.amount,wt.balance_before,wt.balance_after,wt.reference_id,wt.reference_type,COALESCE(o.order_code,d.transaction_code,CASE WHEN wt.reference_type='WITHDRAWAL' THEN 'WD-' || LPAD(CAST(wt.reference_id AS text),6,'0') END,CAST(wt.reference_id AS text)) reference_code,wt.description,wt.created_at";
         return page(select,filter," ORDER BY wt.created_at DESC,wt.id DESC",page,size,(rs,n)->new AdminResponses.WalletTransactionRow(
                 rs.getObject("id", UUID.class),rs.getLong("wallet_id"),nullableLong(rs,"user_id"),rs.getString("username"),rs.getString("email"),rs.getString("transaction_type"),rs.getString("balance_type"),
                 money(rs,"amount"),money(rs,"balance_before"),money(rs,"balance_after"),nullableLong(rs,"reference_id"),rs.getString("reference_type"),rs.getString("reference_code"),rs.getString("description"),time(rs,"created_at")));

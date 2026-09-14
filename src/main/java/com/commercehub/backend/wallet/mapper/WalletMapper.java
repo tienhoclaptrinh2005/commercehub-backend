@@ -19,6 +19,9 @@ public interface WalletMapper {
 
     WalletTransactionResponse toTransactionResponse(WalletTransaction transaction);
 
+    @Mapping(target = "status", expression = "java(withdrawal.getStatus().name())")
+    @Mapping(target = "approvedByUsername", source = "approvedBy.username")
+    @Mapping(target = "processorUsername", source = "processor.username")
     WithdrawalResponse toWithdrawalResponse(Withdrawal withdrawal);
 
     HoldReleaseResponse toHoldReleaseResponse(HoldRelease holdRelease);

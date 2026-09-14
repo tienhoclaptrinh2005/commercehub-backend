@@ -137,6 +137,9 @@ public class WalletTransactionService {
                     : null;
             if (order != null) {
                 response.setReferenceCode(order.getOrderCode());
+            } else if ("WITHDRAWAL".equals(transaction.getReferenceType())
+                    && transaction.getReferenceId() != null) {
+                response.setReferenceCode("WD-%06d".formatted(transaction.getReferenceId()));
             }
             response.setDescription(buildDescription(transaction, order, references));
             return response;

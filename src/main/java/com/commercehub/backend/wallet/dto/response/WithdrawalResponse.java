@@ -20,6 +20,10 @@ public class WithdrawalResponse {
     String accountName;
     String status;
     String adminNote;
+    String transferReference;
+    String approvedByUsername;
+    String processorUsername;
     OffsetDateTime createdAt;
+    OffsetDateTime approvedAt;
     OffsetDateTime processedAt;
 }

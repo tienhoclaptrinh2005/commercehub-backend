@@ -34,7 +34,8 @@ public class SellerDashboardService {
     private static final Set<String> NOTIFICATION_CATEGORIES = Set.of(
             "INSTANT_ORDERS",
             "PRE_ORDERS",
-            "DISPUTES"
+            "DISPUTES",
+            "WITHDRAWALS"
     );
 
     private final ShopService shopService;
@@ -137,7 +138,8 @@ public class SellerDashboardService {
                 projectionCount(counts == null ? null : counts.getRecentInstantOrderCount()),
                 projectionCount(counts == null ? null : counts.getNewPreOrderRequestCount()),
                 projectionCount(counts == null ? null : counts.getProcessingPreOrderCount()),
-                projectionCount(counts == null ? null : counts.getActiveDisputeCount())
+                projectionCount(counts == null ? null : counts.getActiveDisputeCount()),
+                projectionCount(counts == null ? null : counts.getWithdrawalUpdateCount())
         );
     }
 

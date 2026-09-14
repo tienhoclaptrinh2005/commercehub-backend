@@ -57,6 +57,8 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
         Long getProcessingPreOrderCount();
 
         Long getActiveDisputeCount();
+
+        Long getWithdrawalUpdateCount();
     }
 
     /**
@@ -212,7 +214,23 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
                              ),
                              TIMESTAMPTZ 'epoch'
                          )
-                   ) AS "activeDisputeCount"
+                   ) AS "activeDisputeCount",
+                   (
+                       SELECT COUNT(*)::BIGINT
+                       FROM withdrawals withdrawal
+                       JOIN wallets withdrawal_wallet
+                         ON withdrawal_wallet.id = withdrawal.wallet_id
+                       WHERE withdrawal_wallet.user_id = :sellerId
+                         AND withdrawal.status IN ('APPROVED', 'DONE', 'REJECTED')
+                         AND withdrawal.updated_at > COALESCE(
+                             (
+                                 SELECT reads.withdrawals_read_at
+                                 FROM seller_notification_reads reads
+                                 WHERE reads.seller_id = :sellerId
+                             ),
+                             TIMESTAMPTZ 'epoch'
+                         )
+                   ) AS "withdrawalUpdateCount"
             FROM orders o
             WHERE o.shop_id = :shopId
             """, nativeQuery = true)
@@ -229,6 +247,7 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
                 instant_orders_read_at,
                 pre_orders_read_at,
                 disputes_read_at,
+                withdrawals_read_at,
                 created_at,
                 updated_at
             ) VALUES (
@@ -236,6 +255,7 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
                 CASE WHEN :category = 'INSTANT_ORDERS' THEN NOW() ELSE TIMESTAMPTZ 'epoch' END,
                 CASE WHEN :category = 'PRE_ORDERS' THEN NOW() ELSE TIMESTAMPTZ 'epoch' END,
                 CASE WHEN :category = 'DISPUTES' THEN NOW() ELSE TIMESTAMPTZ 'epoch' END,
+                CASE WHEN :category = 'WITHDRAWALS' THEN NOW() ELSE TIMESTAMPTZ 'epoch' END,
                 NOW(),
                 NOW()
             )
@@ -251,6 +271,10 @@ public interface SellerDashboardRepository extends Repository<Order, Long> {
                 disputes_read_at = CASE
                     WHEN :category = 'DISPUTES' THEN NOW()
                     ELSE seller_notification_reads.disputes_read_at
+                END,
+                withdrawals_read_at = CASE
+                    WHEN :category = 'WITHDRAWALS' THEN NOW()
+                    ELSE seller_notification_reads.withdrawals_read_at
                 END,
                 updated_at = NOW()
             """, nativeQuery = true)

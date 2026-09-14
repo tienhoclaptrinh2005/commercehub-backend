@@ -264,11 +264,13 @@ class CommercehubBackendApplicationTests {
 		assertTrue(notifications.getNewPreOrderRequestCount() >= 0);
 		assertTrue(notifications.getProcessingPreOrderCount() >= 0);
 		assertTrue(notifications.getActiveDisputeCount() >= 0);
+		assertTrue(notifications.getWithdrawalUpdateCount() >= 0);
 
 		assertDoesNotThrow(() -> {
 			sellerDashboardRepository.markSellerNotificationCategoryRead(sellerId, "INSTANT_ORDERS");
 			sellerDashboardRepository.markSellerNotificationCategoryRead(sellerId, "PRE_ORDERS");
 			sellerDashboardRepository.markSellerNotificationCategoryRead(sellerId, "DISPUTES");
+			sellerDashboardRepository.markSellerNotificationCategoryRead(sellerId, "WITHDRAWALS");
 		});
 		var notificationsAfterRead = sellerDashboardRepository.findSellerNotificationCounts(
 				shopId,
@@ -279,6 +281,7 @@ class CommercehubBackendApplicationTests {
 		assertEquals(0L, notificationsAfterRead.getNewPreOrderRequestCount());
 		assertEquals(0L, notificationsAfterRead.getProcessingPreOrderCount());
 		assertEquals(0L, notificationsAfterRead.getActiveDisputeCount());
+		assertEquals(0L, notificationsAfterRead.getWithdrawalUpdateCount());
 
 		var recentOrders = assertDoesNotThrow(() -> sellerDashboardRepository.findRecentOrders(shopId));
 		assertFalse(recentOrders.isEmpty());
