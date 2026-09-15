@@ -2,6 +2,8 @@ package com.commercehub.backend.shop.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.cache.CacheNames;
+import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SlugUtils;
 import com.commercehub.backend.order.service.OrderStatisticsService;
 import com.commercehub.backend.product.repository.ProductRepository;
@@ -19,8 +21,9 @@ import com.commercehub.backend.user.repository.RoleRepository;
 import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -54,7 +57,11 @@ public class ShopService {
     private final MediaUrlService mediaUrlService;
 
     @Transactional(readOnly = true)
-    public Page<ShopResponse> getAllActiveShops(
+    @Cacheable(
+            cacheNames = CacheNames.PUBLIC_SHOPS,
+            key = "T(com.commercehub.backend.common.cache.PublicCacheKeys).publicShops(#page, #size, #keyword, #categoryId, #sort)"
+    )
+    public PageResponse<ShopResponse> getAllActiveShops(
             int page,
             int size,
             String keyword,
@@ -86,7 +93,7 @@ public class ShopService {
                                 Function.identity()
                         ));
 
-        return shopPage.map(shop -> {
+        Page<ShopResponse> mappedPage = shopPage.map(shop -> {
             ShopResponse response = shopMapper.toResponse(shop);
             resolveMediaUrls(response);
             ProductRepository.ShopProductStats stats = statsByShopId.get(shop.getId());
@@ -94,6 +101,7 @@ public class ShopService {
             response.setSoldProductCount(stats == null ? 0L : stats.getSoldProductCount());
             return response;
         });
+        return PageResponse.of(mappedPage);
     }
 
     @Transactional(readOnly = true)
@@ -169,7 +177,11 @@ public class ShopService {
         return shopMapper.toApplicationResponse(shop);
     }
 
-    @CacheEvict(value = "shopByOwner", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_SHOPS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true)
+    })
     @Transactional
     public ShopResponse updateShop(Long id, UpdateShopRequest request, Long currentUserId) {
         Shop shop = shopRepository.findById(id)
@@ -201,7 +213,6 @@ public class ShopService {
         return response;
     }
 
-    @Cacheable(value = "shopByOwner", key = "#ownerId")
     @Transactional(readOnly = true)
     public Shop getShopByOwnerId(Long ownerId) {
         return shopRepository.findByOwnerId(ownerId)
@@ -219,7 +230,11 @@ public class ShopService {
         return shopPage.map(shopMapper::toApplicationResponse);
     }
 
-    @CacheEvict(value = "shopByOwner", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_SHOPS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true)
+    })
     @Transactional
     public void changeShopStatus(Long shopId, String newStatus) {
         Shop shop = shopRepository.findById(shopId)

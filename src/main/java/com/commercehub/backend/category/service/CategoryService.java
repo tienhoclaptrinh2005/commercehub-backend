@@ -8,10 +8,14 @@ import com.commercehub.backend.category.mapper.CategoryMapper;
 import com.commercehub.backend.category.repository.CategoryRepository;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.cache.CacheNames;
 import com.commercehub.backend.common.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 
 import java.util.Comparator;
 import java.util.List;
@@ -24,6 +28,7 @@ public class CategoryService {
     private final CategoryMapper categoryMapper;
 
     // Lấy toàn bộ danh mục đang hoạt động và xếp đúng vị trí để đưa lên Giao diện trang chủ
+    @Cacheable(cacheNames = CacheNames.ACTIVE_CATEGORIES, key = "'all'")
     @Transactional(readOnly = true)
     public List<CategoryResponse> getAllActiveCategories() {
         return categoryRepository.findAllByParentIsNullAndIsActiveTrueOrderBySortOrderAsc()
@@ -43,6 +48,11 @@ public class CategoryService {
         return toHierarchyResponse(category);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.ACTIVE_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true)
+    })
     @Transactional
     public CategoryResponse createCategory(CreateCategoryRequest request) {
         if (categoryRepository.existsByName(request.getName())) {
@@ -63,6 +73,11 @@ public class CategoryService {
         return toHierarchyResponse(categoryRepository.save(category));
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.ACTIVE_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true)
+    })
     @Transactional
     public CategoryResponse updateCategory(Long id, UpdateCategoryRequest request) {
         Category category = categoryRepository.findById(id)
@@ -99,6 +114,11 @@ public class CategoryService {
         return toHierarchyResponse(categoryRepository.save(category));
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.ACTIVE_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true)
+    })
     @Transactional
     public void deleteCategory(Long id) {
         Category category = categoryRepository.findById(id)

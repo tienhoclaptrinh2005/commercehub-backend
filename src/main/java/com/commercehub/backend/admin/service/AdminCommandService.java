@@ -3,6 +3,7 @@ package com.commercehub.backend.admin.service;
 import com.commercehub.backend.admin.dto.AdminRequests;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.cache.CacheNames;
 import com.commercehub.backend.product.entity.Product;
 import com.commercehub.backend.product.repository.ProductRepository;
 import com.commercehub.backend.auth.repository.RefreshTokenRepository;
@@ -17,6 +18,8 @@ import com.commercehub.backend.wallet.service.WithdrawalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 
 import java.util.Locale;
 import java.util.Map;
@@ -34,6 +37,11 @@ public class AdminCommandService {
     private final WithdrawalService withdrawalService;
     private final AdminAuditService auditService;
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_SHOPS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true)
+    })
     @Transactional
     public void changeUserStatus(Long actorId, Long userId, AdminRequests.StatusChange request, String ip, String agent) {
         if (actorId.equals(userId)) throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -73,6 +81,11 @@ public class AdminCommandService {
                 Map.of("status", previous), Map.of("status", after.getStatus()), request.reason(), ip, agent);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_SHOPS, allEntries = true)
+    })
     @Transactional
     public void changeProductStatus(Long actorId, Long productId, AdminRequests.StatusChange request, String ip, String agent) {
         Product product = productRepository.findById(productId).orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));

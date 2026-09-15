@@ -4,6 +4,7 @@ import com.commercehub.backend.category.entity.Category;
 import com.commercehub.backend.category.repository.CategoryRepository;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.cache.CacheNames;
 import com.commercehub.backend.common.policy.PreOrderPolicy;
 import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.common.util.SlugUtils;
@@ -27,6 +28,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 
 import java.math.BigDecimal;
 import java.util.HashSet;
@@ -58,6 +62,11 @@ public class ProductService {
     private final MediaUrlService mediaUrlService;
     private final ApplicationEventPublisher eventPublisher;
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_SHOPS, allEntries = true)
+    })
     @Transactional
     public ProductResponse createProduct(Long userId, CreateProductRequest request) {
 
@@ -177,6 +186,11 @@ public class ProductService {
                 .toList();
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_SHOPS, allEntries = true)
+    })
     @Transactional
     public void deleteProduct(Long userId, Long productId) {
         Product product = productRepository.findById(productId)
@@ -204,6 +218,11 @@ public class ProductService {
         return mapToSellerProductResponse(product);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_SHOPS, allEntries = true)
+    })
     @Transactional
     public ProductResponse updateProduct(Long userId, Long productId, UpdateProductRequest request) {
         Product product = productRepository.findSellerOwnedProductById(userId, productId)
@@ -300,6 +319,10 @@ public class ProductService {
         return mapToSellerProductResponse(savedProduct);
     }
 
+    @Cacheable(
+            cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES,
+            key = "T(com.commercehub.backend.common.cache.PublicCacheKeys).publicProductPage(#page, #size)"
+    )
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> getAllActiveProducts(int page, int size) {
         int validPage = Math.max(0, page);
@@ -322,6 +345,10 @@ public class ProductService {
         )));
     }
 
+    @Cacheable(
+            cacheNames = CacheNames.BEST_SELLING_PRODUCTS,
+            key = "T(com.commercehub.backend.common.cache.PublicCacheKeys).bestSellingProducts(#limit)"
+    )
     @Transactional(readOnly = true)
     public List<ProductResponse> getBestSellingProducts(int limit) {
         int validLimit = limit <= 0

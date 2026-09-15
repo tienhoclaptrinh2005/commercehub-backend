@@ -36,14 +36,14 @@ public class ShopController {
             @RequestParam(defaultValue = "") String keyword,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(defaultValue = "trusted") String sort) {
-        Page<ShopResponse> shops = shopService.getAllActiveShops(
+        PageResponse<ShopResponse> shops = shopService.getAllActiveShops(
                 page,
                 size,
                 keyword,
                 categoryId,
                 sort
         );
-        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(shops)));
+        return ResponseEntity.ok(ApiResponse.success(shops));
     }
 
     @GetMapping("/admin/all")

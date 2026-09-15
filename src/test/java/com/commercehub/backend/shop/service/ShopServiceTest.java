@@ -84,7 +84,7 @@ class ShopServiceTest {
 
         var result = service.getAllActiveShops(0, 999, "  vpn  ", null, "trusted");
 
-        assertThat(result.getContent()).containsExactly(response);
+        assertThat(result.getData()).containsExactly(response);
         assertThat(response.getActiveProductCount()).isEqualTo(4L);
         assertThat(response.getSoldProductCount()).isEqualTo(25L);
 

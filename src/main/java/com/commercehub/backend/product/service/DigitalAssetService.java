@@ -2,6 +2,7 @@ package com.commercehub.backend.product.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.cache.CacheNames;
 import com.commercehub.backend.common.response.SliceResponse;
 import com.commercehub.backend.order.dto.response.DeliveredAssetResponse;
 import com.commercehub.backend.product.dto.request.UploadDigitalAssetRequest;
@@ -19,6 +20,8 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -48,6 +51,10 @@ public class DigitalAssetService {
     // SELLER (Upload, Xem danh sách, Xóa)
 
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true)
+    })
     @Transactional
     public DigitalAssetImportResponse uploadAssets(Long sellerId, UploadDigitalAssetRequest request) {
         ProductVariant variant = getOwnedVariant(sellerId, request.getVariantId());
@@ -105,6 +112,10 @@ public class DigitalAssetService {
         return SliceResponse.of(assets);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true)
+    })
     @Transactional
     public void deleteAsset(Long sellerId, Long assetId) {
         DigitalAsset asset = digitalAssetRepository.findById(assetId)
@@ -126,6 +137,10 @@ public class DigitalAssetService {
         digitalAssetRepository.delete(asset);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true)
+    })
     @Transactional
     public int deleteAllAvailableAssets(Long sellerId, Long variantId) {
         ProductVariant variant = getOwnedInstantVariant(sellerId, variantId);

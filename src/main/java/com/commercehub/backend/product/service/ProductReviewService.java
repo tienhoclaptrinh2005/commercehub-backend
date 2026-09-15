@@ -2,6 +2,7 @@ package com.commercehub.backend.product.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.cache.CacheNames;
 import com.commercehub.backend.order.repository.OrderItemRepository;
 import com.commercehub.backend.product.dto.request.CreateProductReviewRequest;
 import com.commercehub.backend.product.dto.response.ProductReviewResponse;
@@ -22,6 +23,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -44,6 +47,11 @@ public class ProductReviewService {
     private final ShopRepository shopRepository;
     private final MediaUrlService mediaUrlService;
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_SHOPS, allEntries = true)
+    })
     @Transactional
     public ProductReviewResponse createReview(Long userId, CreateProductReviewRequest request) {
         User user = userRepository.findById(userId)
@@ -88,6 +96,11 @@ public class ProductReviewService {
         return resolveReviewerAvatar(productMapper.toReviewResponse(savedReview));
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_SHOPS, allEntries = true)
+    })
     @Transactional
     public ProductReviewResponse setReviewVisibility(Long reviewId, boolean visible) {
         ProductReview review = reviewRepository.findByIdForVisibilityUpdate(reviewId)

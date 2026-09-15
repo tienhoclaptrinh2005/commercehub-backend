@@ -2,6 +2,7 @@ package com.commercehub.backend.product.service;
 
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
+import com.commercehub.backend.common.cache.CacheNames;
 import com.commercehub.backend.product.dto.request.CreateVariantRequest;
 import com.commercehub.backend.product.dto.request.UpdateVariantRequest;
 import com.commercehub.backend.product.entity.Product;
@@ -12,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 
 import java.util.List;
 import java.util.Locale;
@@ -25,6 +28,10 @@ public class ProductVariantService {
     private final ProductVariantRepository variantRepository;
     private final ProductRepository productRepository;
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true)
+    })
     @Transactional
     public ProductVariant createVariant(Long sellerId, CreateVariantRequest request) {
         if (request.getProductId() == null) {
@@ -58,6 +65,10 @@ public class ProductVariantService {
         return saveVariant(variant);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.BEST_SELLING_PRODUCTS, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PUBLIC_PRODUCT_PAGES, allEntries = true)
+    })
     @Transactional
     public ProductVariant updateVariant(Long sellerId, Long variantId, UpdateVariantRequest request) {
         ProductVariant variant = variantRepository.findById(variantId)

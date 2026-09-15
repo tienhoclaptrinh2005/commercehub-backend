@@ -33,6 +33,10 @@ spring:
       repositories:
         # Redis is only used as a shared counter store, not as a Spring Data repository.
         enabled: false
+  cache:
+    # Keep tests and developers without Redis independent by default.
+    # Local/staging/production explicitly opt in with CACHE_TYPE=redis.
+    type: ${CACHE_TYPE:none}
 
 google:
   client-id: ${GOOGLE_CLIENT_ID:}
@@ -77,6 +81,13 @@ sepay:
   max-creates-per-day: ${SEPAY_MAX_CREATES_PER_DAY:20}
 
 commercehub:
+  cache:
+    key-prefix: ${CACHE_KEY_PREFIX:commercehub:local:cache}
+    default-ttl: ${CACHE_DEFAULT_TTL:60s}
+    active-categories-ttl: ${CACHE_ACTIVE_CATEGORIES_TTL:15m}
+    best-selling-products-ttl: ${CACHE_BEST_SELLING_PRODUCTS_TTL:60s}
+    public-product-pages-ttl: ${CACHE_PUBLIC_PRODUCT_PAGES_TTL:60s}
+    public-shops-ttl: ${CACHE_PUBLIC_SHOPS_TTL:2m}
   cors:
     # Comma-separated so a domain migration only changes deployment secrets/config.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
