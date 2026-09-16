@@ -26,7 +26,7 @@ spring:
         default-page-size: 20
         max-page-size: 100
     redis:
-      # Only contacted when R2_RATE_LIMIT_STORE=redis.
+      # Shared by cache, rate limits and chat Pub/Sub when each feature is enabled.
       url: ${REDIS_URL:redis://localhost:6379}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_COMMAND_TIMEOUT:2s}
@@ -100,6 +100,13 @@ commercehub:
     warranty-processing-hours: ${DISPUTE_WARRANTY_PROCESSING_HOURS:24}
     buyer-confirmation-hours: ${DISPUTE_BUYER_CONFIRMATION_HOURS:24}
     admin-review-hours: ${DISPUTE_ADMIN_REVIEW_HOURS:72}
+  chat:
+    redis-pubsub-enabled: ${CHAT_REDIS_PUBSUB_ENABLED:false}
+    redis-channel: ${CHAT_REDIS_CHANNEL:commercehub:local:chat:events}
+    rate-limit-key-prefix: ${CHAT_RATE_LIMIT_KEY_PREFIX:commercehub:local:chat:rate-limit}
+    max-message-length: ${CHAT_MAX_MESSAGE_LENGTH:2000}
+    max-messages-per-window: ${CHAT_MAX_MESSAGES_PER_WINDOW:20}
+    rate-limit-window: ${CHAT_RATE_LIMIT_WINDOW:10s}
 
 storage:
   r2:

@@ -165,6 +165,15 @@ public enum ErrorCode {
     DISPUTE_BUYER_CONFIRMATION_DEADLINE_EXPIRED(409, "Buyer đã hết thời hạn xác nhận. Hệ thống sẽ tự động đóng khiếu nại!", HttpStatus.CONFLICT),
     DISPUTE_ESCALATION_REASON_REQUIRED(400, "Phải nhập lý do chuyển Admin và không được vượt quá 200 ký tự!", HttpStatus.BAD_REQUEST),
 
+    // Chat realtime
+    CHAT_CONVERSATION_NOT_FOUND(404, "Không tìm thấy cuộc trò chuyện!", HttpStatus.NOT_FOUND),
+    CHAT_ACCESS_DENIED(403, "Bạn không thuộc cuộc trò chuyện này!", HttpStatus.FORBIDDEN),
+    CHAT_CANNOT_MESSAGE_SELF(400, "Bạn không thể tạo cuộc trò chuyện với chính gian hàng của mình!", HttpStatus.BAD_REQUEST),
+    CHAT_SHOP_INACTIVE(400, "Chỉ có thể nhắn tin với gian hàng đang hoạt động!", HttpStatus.BAD_REQUEST),
+    CHAT_INVALID_MESSAGE(400, "Tin nhắn phải có nội dung từ 1 đến 2.000 ký tự!", HttpStatus.BAD_REQUEST),
+    CHAT_UNSUPPORTED_MESSAGE_TYPE(400, "Hiện tại hệ thống chỉ hỗ trợ tin nhắn văn bản!", HttpStatus.BAD_REQUEST),
+    CHAT_RATE_LIMITED(429, "Bạn gửi tin nhắn quá nhanh. Vui lòng chờ một chút!", HttpStatus.TOO_MANY_REQUESTS),
+
 
 
     ;
