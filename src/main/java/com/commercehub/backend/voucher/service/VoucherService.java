@@ -72,7 +72,7 @@ public class VoucherService {
                 .discountType(request.getDiscountType())
                 .discountValue(money(request.getDiscountValue()))
                 .maxDiscountAmount(nullableMoney(request.getMaxDiscountAmount()))
-                .minOrderAmount(money(request.getMinOrderAmount()))
+                .minOrderAmount(minimumOrderAmount(request.getMinOrderAmount()))
                 .applyAllProducts(request.isApplyAllProducts())
                 .products(loadOwnedProducts(shop.getId(), request.isApplyAllProducts(), request.getProductIds()))
                 .startsAt(request.getStartsAt())
@@ -106,7 +106,7 @@ public class VoucherService {
         voucher.setDiscountType(request.getDiscountType());
         voucher.setDiscountValue(money(request.getDiscountValue()));
         voucher.setMaxDiscountAmount(nullableMoney(request.getMaxDiscountAmount()));
-        voucher.setMinOrderAmount(money(request.getMinOrderAmount()));
+        voucher.setMinOrderAmount(minimumOrderAmount(request.getMinOrderAmount()));
         voucher.setApplyAllProducts(request.isApplyAllProducts());
         voucher.setProducts(loadOwnedProducts(shop.getId(), request.isApplyAllProducts(), request.getProductIds()));
         voucher.setStartsAt(request.getStartsAt());
@@ -285,6 +285,10 @@ public class VoucherService {
         if (!request.getStartsAt().isBefore(request.getExpiresAt())) {
             throw new AppException(ErrorCode.VOUCHER_INVALID_VALUE);
         }
+        if (request.getMinOrderAmount() != null
+                && request.getMinOrderAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new AppException(ErrorCode.VOUCHER_INVALID_VALUE);
+        }
         if (request.getDiscountType() == VoucherDiscountType.PERCENT
                 && request.getDiscountValue().compareTo(new BigDecimal("100")) >= 0) {
             throw new AppException(ErrorCode.VOUCHER_INVALID_VALUE);
@@ -301,7 +305,7 @@ public class VoucherService {
                 || voucher.getDiscountType() != request.getDiscountType()
                 || voucher.getDiscountValue().compareTo(money(request.getDiscountValue())) != 0
                 || !Objects.equals(voucher.getMaxDiscountAmount(), nullableMoney(request.getMaxDiscountAmount()))
-                || voucher.getMinOrderAmount().compareTo(money(request.getMinOrderAmount())) != 0
+                || voucher.getMinOrderAmount().compareTo(minimumOrderAmount(request.getMinOrderAmount())) != 0
                 || voucher.isApplyAllProducts() != request.isApplyAllProducts()
                 || (!request.isApplyAllProducts() && !existingProductIds.equals(requestedProductIds));
     }
@@ -336,6 +340,9 @@ public class VoucherService {
     private String normalizeDescription(String value) { return value == null || value.isBlank() ? null : value.trim(); }
     private BigDecimal money(BigDecimal value) { return value.setScale(MONEY_SCALE, RoundingMode.HALF_UP); }
     private BigDecimal nullableMoney(BigDecimal value) { return value == null ? null : money(value); }
+    private BigDecimal minimumOrderAmount(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO.setScale(MONEY_SCALE) : money(value);
+    }
 
     public record VoucherLine(Long productId, BigDecimal subtotal) { }
 

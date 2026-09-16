@@ -27,7 +27,6 @@ public class VoucherRequest {
     @DecimalMin(value = "1", message = "Mức giảm tối đa phải lớn hơn 0")
     private BigDecimal maxDiscountAmount;
 
-    @NotNull(message = "Giá trị đơn tối thiểu không được để trống")
     @DecimalMin(value = "0", message = "Giá trị đơn tối thiểu không hợp lệ")
     private BigDecimal minOrderAmount;
 

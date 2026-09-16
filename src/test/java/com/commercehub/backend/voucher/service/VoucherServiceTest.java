@@ -3,6 +3,10 @@ package com.commercehub.backend.voucher.service;
 import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.shop.entity.Shop;
+import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.user.entity.Role;
+import com.commercehub.backend.user.entity.User;
+import com.commercehub.backend.voucher.dto.request.VoucherRequest;
 import com.commercehub.backend.voucher.entity.*;
 import com.commercehub.backend.voucher.repository.VoucherRepository;
 import com.commercehub.backend.voucher.repository.VoucherUsageRepository;
@@ -22,6 +26,7 @@ import static org.mockito.Mockito.*;
 class VoucherServiceTest {
     private VoucherRepository voucherRepository;
     private VoucherUsageRepository usageRepository;
+    private ShopRepository shopRepository;
     private VoucherService service;
     private Shop shop;
 
@@ -29,15 +34,41 @@ class VoucherServiceTest {
     void setUp() {
         voucherRepository = mock(VoucherRepository.class);
         usageRepository = mock(VoucherUsageRepository.class);
+        shopRepository = mock(ShopRepository.class);
         service = new VoucherService(
                 voucherRepository,
                 usageRepository,
-                mock(com.commercehub.backend.shop.repository.ShopRepository.class),
+                shopRepository,
                 mock(com.commercehub.backend.product.repository.ProductRepository.class),
                 mock(com.commercehub.backend.product.repository.ProductVariantRepository.class),
                 mock(com.commercehub.backend.user.repository.UserRepository.class)
         );
-        shop = Shop.builder().id(10L).build();
+        Role sellerRole = new Role();
+        sellerRole.setName("SELLER");
+        User seller = User.builder().id(3L).status("ACTIVE")
+                .roles(new java.util.HashSet<>(java.util.Set.of(sellerRole))).build();
+        shop = Shop.builder().id(10L).owner(seller).status("ACTIVE").build();
+    }
+
+    @Test
+    void createDefaultsMissingMinimumOrderAmountToZero() {
+        VoucherRequest request = new VoucherRequest();
+        request.setCode("NO_MINIMUM");
+        request.setDiscountType(VoucherDiscountType.PERCENT);
+        request.setDiscountValue(new BigDecimal("10.00"));
+        request.setApplyAllProducts(true);
+        request.setStartsAt(OffsetDateTime.now().minusMinutes(1));
+        request.setExpiresAt(OffsetDateTime.now().plusDays(1));
+        request.setUsageLimit(100);
+
+        when(shopRepository.findByOwnerId(3L)).thenReturn(Optional.of(shop));
+        when(voucherRepository.save(any(Voucher.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.create(3L, request);
+
+        assertThat(response.minOrderAmount()).isEqualByComparingTo("0.00");
+        verify(voucherRepository).save(argThat(voucher ->
+                voucher.getMinOrderAmount().compareTo(BigDecimal.ZERO) == 0));
     }
 
     @Test
