@@ -29,6 +29,12 @@ public class ChatController {
         return ApiResponse.success(chatService.listConversations(SecurityUtils.getCurrentUserId(), pageable));
     }
 
+    @GetMapping("/conversations/{conversationId}")
+    public ApiResponse<ConversationResponse> get(@PathVariable Long conversationId) {
+        return ApiResponse.success(chatService.getConversation(
+                SecurityUtils.getCurrentUserId(), conversationId));
+    }
+
     @GetMapping("/conversations/{conversationId}/messages")
     public ApiResponse<ChatMessagePageResponse> messages(
             @PathVariable Long conversationId,

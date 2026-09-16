@@ -69,6 +69,16 @@ class ChatServiceTest {
     }
 
     @Test
+    void outsiderCannotOpenConversationByDeepLink() {
+        when(participants.findByConversationIdAndUserId(20L, 99L)).thenReturn(Optional.empty());
+        when(conversations.existsById(20L)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.getConversation(99L, 20L))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CHAT_ACCESS_DENIED));
+    }
+
+    @Test
     void messageIsPersistedBeforeRealtimeEventIsPublished() {
         User buyer = user(1L, "buyer@test", "buyer");
         User seller = user(2L, "seller@test", "seller");

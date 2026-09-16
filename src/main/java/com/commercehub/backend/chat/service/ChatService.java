@@ -92,6 +92,11 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
+    public ConversationResponse getConversation(Long userId, Long conversationId) {
+        return mapConversation(requireConversation(conversationId, userId), userId);
+    }
+
+    @Transactional(readOnly = true)
     public ChatMessagePageResponse getMessages(Long userId, Long conversationId, Long beforeId, Long afterId, int size) {
         requireConversation(conversationId, userId);
         int safeSize = Math.max(1, Math.min(size, 100));
