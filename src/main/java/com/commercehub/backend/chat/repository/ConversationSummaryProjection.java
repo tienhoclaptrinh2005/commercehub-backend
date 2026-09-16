@@ -8,10 +8,12 @@ public interface ConversationSummaryProjection {
     String getShopName();
     String getShopAvatarUrl();
     String getStatus();
+    String getViewerRole();
     Long getCounterpartId();
     String getCounterpartUsername();
     String getCounterpartFullName();
     String getCounterpartAvatarUrl();
+    String getCounterpartRole();
     String getLastMessagePreview();
     Instant getLastMessageAt();
     Long getUnreadCount();

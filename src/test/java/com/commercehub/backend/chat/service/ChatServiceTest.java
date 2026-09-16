@@ -9,6 +9,7 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,7 @@ class ChatServiceTest {
     private ChatMessageRepository messages;
     private UserRepository users;
     private ChatMessageRateLimiter rateLimiter;
+    private MediaUrlService mediaUrlService;
     private ApplicationEventPublisher events;
     private ChatService service;
 
@@ -46,10 +48,12 @@ class ChatServiceTest {
         messages = mock(ChatMessageRepository.class);
         users = mock(UserRepository.class);
         rateLimiter = mock(ChatMessageRateLimiter.class);
+        mediaUrlService = mock(MediaUrlService.class);
         events = mock(ApplicationEventPublisher.class);
         ChatProperties properties = new ChatProperties();
         service = new ChatService(conversations, participants, messages, mock(MessageReadRepository.class),
-                mock(ShopRepository.class), users, rateLimiter, properties, events);
+                mock(ShopRepository.class), users, rateLimiter, properties, mediaUrlService, events);
+        when(mediaUrlService.toPublicUrl(nullable(String.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -122,11 +126,19 @@ class ChatServiceTest {
         when(summary.getId()).thenReturn(20L);
         when(summary.getShopId()).thenReturn(5L);
         when(summary.getShopName()).thenReturn("CommerceHub Store");
+        when(summary.getShopAvatarUrl()).thenReturn("users/2/avatars/shop.webp");
         when(summary.getStatus()).thenReturn("OPEN");
+        when(summary.getViewerRole()).thenReturn("SELLER");
         when(summary.getCounterpartId()).thenReturn(2L);
         when(summary.getCounterpartUsername()).thenReturn("seller");
+        when(summary.getCounterpartAvatarUrl()).thenReturn("users/1/avatars/buyer.webp");
+        when(summary.getCounterpartRole()).thenReturn("BUYER");
         when(summary.getCreatedAt()).thenReturn(createdAt);
         when(summary.getUnreadCount()).thenReturn(0L);
+        when(mediaUrlService.toPublicUrl("users/2/avatars/shop.webp"))
+                .thenReturn("https://images.example/users/2/avatars/shop.webp");
+        when(mediaUrlService.toPublicUrl("users/1/avatars/buyer.webp"))
+                .thenReturn("https://images.example/users/1/avatars/buyer.webp");
         when(conversations.findSummariesForUser(eq(1L), any()))
                 .thenReturn(new PageImpl<>(List.of(summary), PageRequest.of(0, 20), 1));
 
@@ -136,6 +148,12 @@ class ChatServiceTest {
         assertThat(response.getData().get(0).createdAt())
                 .isEqualTo(createdAt.atOffset(ZoneOffset.UTC));
         assertThat(response.getData().get(0).lastMessageAt()).isNull();
+        assertThat(response.getData().get(0).viewerRole()).isEqualTo(ParticipantRole.SELLER);
+        assertThat(response.getData().get(0).shopAvatarUrl())
+                .isEqualTo("https://images.example/users/2/avatars/shop.webp");
+        assertThat(response.getData().get(0).counterpart().avatarUrl())
+                .isEqualTo("https://images.example/users/1/avatars/buyer.webp");
+        assertThat(response.getData().get(0).counterpart().roles()).containsExactly("BUYER");
     }
 
     private User user(Long id, String email, String username) {

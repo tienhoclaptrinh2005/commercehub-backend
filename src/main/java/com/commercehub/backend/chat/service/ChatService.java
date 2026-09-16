@@ -11,6 +11,7 @@ import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.common.response.PageResponse;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.shop.repository.ShopRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,8 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +42,7 @@ public class ChatService {
     private final UserRepository userRepository;
     private final ChatMessageRateLimiter rateLimiter;
     private final ChatProperties properties;
+    private final MediaUrlService mediaUrlService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -74,9 +78,13 @@ public class ChatService {
         Pageable safePage = PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 50));
         Page<ConversationResponse> page = conversationRepository.findSummariesForUser(userId, safePage)
                 .map(summary -> new ConversationResponse(summary.getId(), summary.getShopId(), summary.getShopName(),
-                        summary.getShopAvatarUrl(), ConversationStatus.valueOf(summary.getStatus()),
+                        mediaUrlService.toPublicUrl(summary.getShopAvatarUrl()),
+                        ConversationStatus.valueOf(summary.getStatus()),
+                        ParticipantRole.valueOf(summary.getViewerRole()),
                         new ChatUserResponse(summary.getCounterpartId(), summary.getCounterpartUsername(),
-                                summary.getCounterpartFullName(), summary.getCounterpartAvatarUrl()),
+                                summary.getCounterpartFullName(),
+                                mediaUrlService.toPublicUrl(summary.getCounterpartAvatarUrl()),
+                                roleSet(summary.getCounterpartRole())),
                         summary.getLastMessagePreview(), toOffsetDateTime(summary.getLastMessageAt()),
                         summary.getUnreadCount(), summary.getLastReadMessageId(),
                         toOffsetDateTime(summary.getCreatedAt())));
@@ -166,10 +174,13 @@ public class ChatService {
         ChatMessage latest = messageRepository.findFirstByConversationIdOrderByIdDesc(conversation.getId()).orElse(null);
         String preview = latest == null ? null : latest.getContent();
         if (preview != null && preview.length() > 80) preview = preview.substring(0, 80) + "…";
+        ParticipantRole viewerRole = conversation.getBuyer().getId().equals(viewerId)
+                ? ParticipantRole.BUYER : ParticipantRole.SELLER;
         return new ConversationResponse(conversation.getId(), conversation.getShop().getId(), conversation.getShop().getName(),
-                conversation.getShop().getShopAvatarUrl(), conversation.getStatus(), mapUser(counterpart), preview,
-                conversation.getLastMessageAt(), messageRepository.countUnreadInConversation(conversation.getId(), viewerId),
-                participant.getLastReadMessageId(), conversation.getCreatedAt());
+                mediaUrlService.toPublicUrl(conversation.getSeller().getAvatarUrl()), conversation.getStatus(),
+                viewerRole, mapUser(counterpart), preview, conversation.getLastMessageAt(),
+                messageRepository.countUnreadInConversation(conversation.getId(), viewerId), participant.getLastReadMessageId(),
+                conversation.getCreatedAt());
     }
 
     private ChatMessageResponse mapMessage(ChatMessage message, Long viewerId) {
@@ -179,7 +190,14 @@ public class ChatService {
     }
 
     private ChatUserResponse mapUser(User user) {
-        return new ChatUserResponse(user.getId(), user.getUsername(), user.getFullName(), user.getAvatarUrl());
+        return new ChatUserResponse(user.getId(), user.getUsername(), user.getFullName(),
+                mediaUrlService.toPublicUrl(user.getAvatarUrl()), user.getRoles().stream()
+                        .map(role -> role.getName())
+                        .collect(Collectors.toUnmodifiableSet()));
+    }
+
+    private Set<String> roleSet(String role) {
+        return role == null || role.isBlank() ? Collections.emptySet() : Set.of(role);
     }
 
     private OffsetDateTime toOffsetDateTime(Instant value) {

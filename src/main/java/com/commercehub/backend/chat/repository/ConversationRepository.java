@@ -27,12 +27,18 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             SELECT c.id AS id,
                    c.shop_id AS shopId,
                    s.name AS shopName,
-                   s.shop_avatar_url AS shopAvatarUrl,
+                   seller.avatar_url AS shopAvatarUrl,
                    c.status AS status,
+                   CASE WHEN c.buyer_id = :userId THEN 'BUYER' ELSE 'SELLER' END AS viewerRole,
                    CASE WHEN c.buyer_id = :userId THEN seller.id ELSE buyer.id END AS counterpartId,
                    CASE WHEN c.buyer_id = :userId THEN seller.username ELSE buyer.username END AS counterpartUsername,
                    CASE WHEN c.buyer_id = :userId THEN seller.full_name ELSE buyer.full_name END AS counterpartFullName,
                    CASE WHEN c.buyer_id = :userId THEN seller.avatar_url ELSE buyer.avatar_url END AS counterpartAvatarUrl,
+                   (SELECT role.name
+                    FROM user_roles user_role
+                    JOIN roles role ON role.id = user_role.role_id
+                    WHERE user_role.user_id = CASE WHEN c.buyer_id = :userId THEN seller.id ELSE buyer.id END
+                    LIMIT 1) AS counterpartRole,
                    CASE WHEN char_length(latest.content) > 80
                         THEN substring(latest.content FROM 1 FOR 80) || '…'
                         ELSE latest.content END AS lastMessagePreview,

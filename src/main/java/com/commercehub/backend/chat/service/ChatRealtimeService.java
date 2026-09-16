@@ -7,6 +7,7 @@ import com.commercehub.backend.chat.entity.Conversation;
 import com.commercehub.backend.chat.realtime.*;
 import com.commercehub.backend.chat.repository.ChatMessageRepository;
 import com.commercehub.backend.chat.repository.ConversationRepository;
+import com.commercehub.backend.storage.service.MediaUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -14,12 +15,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class ChatRealtimeService {
     private final ChatMessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
     private final ChatDeliveryPublisher deliveryPublisher;
+    private final MediaUrlService mediaUrlService;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
@@ -57,7 +61,10 @@ public class ChatRealtimeService {
         var sender = message.getSender();
         return new ChatMessageResponse(message.getId(), message.getConversation().getId(),
                 message.getClientMessageId(), message.getMessageType(), message.getContent(),
-                new ChatUserResponse(sender.getId(), sender.getUsername(), sender.getFullName(), sender.getAvatarUrl()),
+                new ChatUserResponse(sender.getId(), sender.getUsername(), sender.getFullName(),
+                        mediaUrlService.toPublicUrl(sender.getAvatarUrl()), sender.getRoles().stream()
+                                .map(role -> role.getName())
+                                .collect(Collectors.toUnmodifiableSet())),
                 sender.getId().equals(viewerId), message.getCreatedAt());
     }
 }
