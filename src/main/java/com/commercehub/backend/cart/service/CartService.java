@@ -223,6 +223,7 @@ public class CartService {
         checkoutRequest.setItems(checkoutItems);
         checkoutRequest.setPaymentMethod("WALLET");
         checkoutRequest.setIdempotencyKey(request != null ? request.getIdempotencyKey() : null);
+        checkoutRequest.setVouchers(request != null ? request.getVouchers() : null);
 
         List<Long> orderIds = checkoutService.processCheckout(userId, checkoutRequest);
 

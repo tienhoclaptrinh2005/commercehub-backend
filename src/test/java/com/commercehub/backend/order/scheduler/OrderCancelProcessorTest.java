@@ -10,6 +10,7 @@ import com.commercehub.backend.order.service.OrderStatusService;
 import com.commercehub.backend.shop.entity.Shop;
 import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.wallet.service.WalletService;
+import com.commercehub.backend.voucher.service.VoucherService;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -29,7 +30,8 @@ class OrderCancelProcessorTest {
         OrderCancelProcessor processor = new OrderCancelProcessor(
                 orderRepository,
                 walletService,
-                orderStatusService
+                orderStatusService,
+                mock(VoucherService.class)
         );
 
         User buyer = User.builder().id(1L).build();

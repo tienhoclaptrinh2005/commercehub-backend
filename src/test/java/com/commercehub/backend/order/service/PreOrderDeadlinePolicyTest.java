@@ -22,6 +22,8 @@ import com.commercehub.backend.user.repository.UserRepository;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
 import com.commercehub.backend.wallet.repository.WalletRepository;
 import com.commercehub.backend.wallet.service.WalletService;
+import com.commercehub.backend.voucher.service.VoucherService;
+import com.commercehub.backend.voucher.service.VoucherService.VoucherApplication;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -50,6 +52,7 @@ class PreOrderDeadlinePolicyTest {
         OrderStatusService orderStatusService = mock(OrderStatusService.class);
         WalletService walletService = mock(WalletService.class);
         FeeCalculationService feeCalculationService = mock(FeeCalculationService.class);
+        VoucherService voucherService = mock(VoucherService.class);
         PreOrderService service = new PreOrderService(
                 variantRepository,
                 orderRepository,
@@ -58,7 +61,8 @@ class PreOrderDeadlinePolicyTest {
                 userRepository,
                 orderStatusService,
                 walletService,
-                feeCalculationService
+                feeCalculationService,
+                voucherService
         );
 
         User buyer = User.builder().id(1L).build();
@@ -93,6 +97,8 @@ class PreOrderDeadlinePolicyTest {
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(buyer));
         when(variantRepository.findCheckoutVariants(Set.of(5L))).thenReturn(List.of(variant));
+        when(voucherService.reserve(any(), any(), any(), any()))
+                .thenReturn(VoucherApplication.none(new BigDecimal("100000.00"), 1));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order saved = invocation.getArgument(0);
             saved.setId(40L);
@@ -137,7 +143,8 @@ class PreOrderDeadlinePolicyTest {
                 mock(FeeCalculationService.class),
                 mock(PlatformFeeLedgerRepository.class),
                 mock(HoldReleaseRepository.class),
-                mock(WalletRepository.class)
+                mock(WalletRepository.class),
+                mock(VoucherService.class)
         );
 
         User seller = User.builder().id(2L).build();

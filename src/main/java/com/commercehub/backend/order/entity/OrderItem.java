@@ -52,6 +52,15 @@ public class OrderItem {
     @Column(name = "line_total", nullable = false, precision = 18, scale = 2)
     private BigDecimal lineTotal;
 
+    /** Giá gốc của dòng trước voucher. */
+    @Column(name = "line_subtotal", nullable = false, precision = 18, scale = 2)
+    private BigDecimal lineSubtotal;
+
+    /** Phần voucher được phân bổ chính xác cho dòng này. */
+    @Column(name = "voucher_discount", nullable = false, precision = 18, scale = 2)
+    @Builder.Default
+    private BigDecimal voucherDiscount = BigDecimal.ZERO;
+
     // =========================================================
     // SNAPSHOT PHÍ SÀN — chốt tại thời điểm buyer thanh toán.
     // Khi shop complete đơn PRE_ORDER, hệ thống dùng lại snapshot này

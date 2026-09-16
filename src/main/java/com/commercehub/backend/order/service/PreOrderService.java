@@ -22,6 +22,9 @@ import com.commercehub.backend.user.entity.User;
 import com.commercehub.backend.user.repository.UserRepository;
 import com.commercehub.backend.wallet.service.WalletService;
 import com.commercehub.backend.common.util.OrderCodeGenerator;
+import com.commercehub.backend.voucher.service.VoucherService;
+import com.commercehub.backend.voucher.service.VoucherService.VoucherApplication;
+import com.commercehub.backend.voucher.service.VoucherService.VoucherLine;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +54,7 @@ public class PreOrderService {
     private final OrderStatusService orderStatusService;
     private final WalletService walletService;
     private final FeeCalculationService feeCalculationService;
+    private final VoucherService voucherService;
 
     @Transactional
     public Long checkoutPreOrder(Long buyerId, CheckoutRequest request) {
@@ -112,6 +116,15 @@ public class PreOrderService {
 
         Long sellerId = targetShop.getOwner().getId();
 
+        VoucherApplication voucher = voucherService.reserve(
+                buyerId,
+                targetShop.getId(),
+                request.getVoucherCode(),
+                processedItems.stream()
+                        .map(context -> new VoucherLine(context.getVariant().getProduct().getId(), context.getItemSubtotal()))
+                        .toList()
+        );
+
         // 2. Tạo Order đã thanh toán và chờ Shop tiếp nhận.
         Order order = Order.builder()
                 .orderCode(OrderCodeGenerator.generate(targetShop.getId()))
@@ -119,7 +132,9 @@ public class PreOrderService {
                 .shop(targetShop)
                 .deliveryType("PRE_ORDER")
                 .subtotalAmount(totalOrderAmount)
-                .totalAmount(totalOrderAmount)
+                .voucherId(voucher.voucher() != null ? voucher.voucher().getId() : null)
+                .voucherDiscount(voucher.discountAmount())
+                .totalAmount(voucher.totalAmount())
                 .paymentMethod("WALLET") // Hệ thống hiện tại: nạp ví trước - mua hàng trừ ví
                 .paymentStatus(OrderPaymentStatus.PAID)
                 .status(OrderStatus.WAITING_SELLER_ACCEPTANCE)
@@ -132,8 +147,9 @@ public class PreOrderService {
         order = orderRepository.save(order);
 
 
-        walletService.deductBalance(buyerId, totalOrderAmount, "ORDER_PAYMENT", order.getId(), "ORDER_PRE");
-        walletService.systemHoldForSeller(sellerId, totalOrderAmount, order.getId());
+        walletService.deductBalance(buyerId, voucher.totalAmount(), "ORDER_PAYMENT", order.getId(), "ORDER_PRE");
+        walletService.systemHoldForSeller(sellerId, voucher.totalAmount(), order.getId());
+        voucherService.confirmUsage(voucher, buyerId, order);
 
         orderStatusService.logStatusChange(
                 order, null, OrderStatus.WAITING_SELLER_ACCEPTANCE, buyerId,
@@ -141,11 +157,14 @@ public class PreOrderService {
         );
 
         // 3. Tạo OrderItem và PreOrderItem
-        for (ItemProcessContext ctx : processedItems) {
+        for (int itemIndex = 0; itemIndex < processedItems.size(); itemIndex++) {
+            ItemProcessContext ctx = processedItems.get(itemIndex);
+            BigDecimal lineDiscount = voucher.lineDiscounts().get(itemIndex);
+            BigDecimal lineTotal = ctx.getItemSubtotal().subtract(lineDiscount);
             // SNAPSHOT phí sàn tại thời điểm buyer thanh toán — khi shop complete
             // đơn, hệ thống dùng lại snapshot này (admin đổi rate sau đó không
             // ảnh hưởng các đơn đã trả tiền).
-            FeeResult feeResult = feeCalculationService.calculateFee(ctx.getItemSubtotal());
+            FeeResult feeResult = feeCalculationService.calculateFee(lineTotal);
 
             OrderItem orderItem = OrderItem.builder()
                     .order(order)
@@ -156,7 +175,9 @@ public class PreOrderService {
                     .deliveryType("PRE_ORDER")
                     .unitPrice(ctx.getVariant().getPrice())
                     .quantity(ctx.getQuantity())
-                    .lineTotal(ctx.getItemSubtotal())
+                    .lineSubtotal(ctx.getItemSubtotal())
+                    .voucherDiscount(lineDiscount)
+                    .lineTotal(lineTotal)
                     .feeConfigId(feeResult.getFeeConfigId())
                     .feeRateSnapshot(feeResult.getFeeRateSnapshot())
                     .feeAmount(feeResult.getFeeAmount())

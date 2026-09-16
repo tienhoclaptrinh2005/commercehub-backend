@@ -10,6 +10,7 @@ import com.commercehub.backend.order.entity.OrderStatus;
 import com.commercehub.backend.order.repository.OrderRepository;
 import com.commercehub.backend.order.service.OrderStatusService;
 import com.commercehub.backend.wallet.service.WalletService;
+import com.commercehub.backend.voucher.service.VoucherService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ public class OrderCancelProcessor {
     private final OrderRepository orderRepository;
     private final WalletService walletService;
     private final OrderStatusService orderStatusService;
+    private final VoucherService voucherService;
 
     // BẮT BUỘC DÙNG REQUIRES_NEW ĐỂ TÁCH BIỆT GIAO DỊCH, TRÁNH CHẾT CHÙM
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -75,6 +77,7 @@ public class OrderCancelProcessor {
         // referenceType là loại bản ghi được referenceId trỏ tới, không phải nội dung mô tả.
         // Truyền `reason` vào đây làm PostgreSQL từ chối vì cột VARCHAR(30).
         walletService.systemCreditBalance(order.getUser().getId(), order.getTotalAmount(), "ORDER_REFUND", order.getId(), "ORDER");
+        voucherService.releaseUsageForCancelledOrder(order.getId());
 
         // 6. Ghi log trạng thái
         orderStatusService.logStatusChange(order, oldStatus, OrderStatus.CANCELLED, null, reason);

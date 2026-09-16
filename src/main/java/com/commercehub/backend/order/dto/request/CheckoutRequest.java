@@ -3,6 +3,7 @@ package com.commercehub.backend.order.dto.request;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -31,6 +32,15 @@ public class CheckoutRequest {
     @Size(min = 16, max = 100, message = "Idempotency key phải từ 16 đến 100 ký tự")
     String idempotencyKey;
 
+    /** Tối đa một voucher cho mỗi nhóm shop + loại giao hàng. */
+    @Valid
+    @Size(max = 50, message = "Mỗi lần checkout tối đa 50 mã giảm giá")
+    List<@NotNull @Valid CheckoutVoucherRequest> vouchers;
+
     @JsonIgnore
     Long checkoutRequestId;
+
+    /** Voucher đã chọn cho sub-order nội bộ sau khi CheckoutService tách nhóm. */
+    @JsonIgnore
+    String voucherCode;
 }

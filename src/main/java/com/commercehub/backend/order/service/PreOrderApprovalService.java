@@ -27,6 +27,7 @@ import com.commercehub.backend.wallet.entity.HoldRelease;
 import com.commercehub.backend.wallet.entity.HoldReleaseStatus;
 import com.commercehub.backend.fee.entity.PlatformFeeLedger;
 import com.commercehub.backend.fee.dto.FeeResult;
+import com.commercehub.backend.voucher.service.VoucherService;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -48,6 +49,7 @@ public class PreOrderApprovalService {
     private final PlatformFeeLedgerRepository feeLedgerRepository;
     private final HoldReleaseRepository holdReleaseRepository;
     private final WalletRepository walletRepository;
+    private final VoucherService voucherService;
 
     @Transactional
     public void acceptOrder(Long sellerId, Long orderId) {
@@ -128,6 +130,7 @@ public class PreOrderApprovalService {
                 order.getId(),
                 "ORDER"
         );
+        voucherService.releaseUsageForCancelledOrder(order.getId());
 
         List<OrderItem> items = orderItemRepository.findByOrder(order);
         List<com.commercehub.backend.order.entity.PreOrderItem> preItems =
@@ -282,6 +285,7 @@ public class PreOrderApprovalService {
         walletService.systemCancelSellerHold(order.getShop().getOwner().getId(), order.getTotalAmount(), order.getId());
 
         walletService.systemCreditBalance(buyerId, order.getTotalAmount(), "ORDER_REFUND", order.getId(), "ORDER");
+        voucherService.releaseUsageForCancelledOrder(order.getId());
 
         orderStatusService.logStatusChange(order, oldStatus, OrderStatus.CANCELLED, buyerId, "Người mua đã chủ động hủy đơn hàng trước khi Shop tiếp nhận.");
     }
@@ -311,6 +315,7 @@ public class PreOrderApprovalService {
         walletService.systemCancelSellerHold(sellerId, order.getTotalAmount(), order.getId());
 
         walletService.systemCreditBalance(order.getUser().getId(), order.getTotalAmount(), "ORDER_REFUND", order.getId(), "ORDER");
+        voucherService.releaseUsageForCancelledOrder(order.getId());
 
         List<OrderItem> items = orderItemRepository.findByOrder(order);
         List<com.commercehub.backend.order.entity.PreOrderItem> preItems =

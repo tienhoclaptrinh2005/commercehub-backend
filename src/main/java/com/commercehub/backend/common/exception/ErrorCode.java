@@ -119,6 +119,20 @@ public enum ErrorCode {
     CART_ITEM_NOT_FOUND(404, "Không tìm thấy sản phẩm này trong giỏ hàng của bạn!", HttpStatus.NOT_FOUND),
     CART_EMPTY(400, "Giỏ hàng của bạn đang trống!", HttpStatus.BAD_REQUEST),
 
+    // Voucher
+    VOUCHER_NOT_FOUND(404, "Không tìm thấy mã giảm giá!", HttpStatus.NOT_FOUND),
+    VOUCHER_CODE_ALREADY_EXISTS(409, "Mã giảm giá này đã tồn tại trong gian hàng!", HttpStatus.CONFLICT),
+    VOUCHER_NOT_ACTIVE(400, "Mã giảm giá hiện không hoạt động!", HttpStatus.BAD_REQUEST),
+    VOUCHER_NOT_STARTED(400, "Mã giảm giá chưa đến thời gian áp dụng!", HttpStatus.BAD_REQUEST),
+    VOUCHER_EXPIRED(400, "Mã giảm giá đã hết hạn!", HttpStatus.BAD_REQUEST),
+    VOUCHER_USAGE_LIMIT_REACHED(409, "Mã giảm giá đã hết lượt sử dụng!", HttpStatus.CONFLICT),
+    VOUCHER_ALREADY_USED(409, "Bạn đã sử dụng mã giảm giá này!", HttpStatus.CONFLICT),
+    VOUCHER_MIN_ORDER_NOT_MET(400, "Đơn hàng chưa đạt giá trị tối thiểu của mã giảm giá!", HttpStatus.BAD_REQUEST),
+    VOUCHER_PRODUCT_NOT_APPLICABLE(400, "Mã giảm giá không áp dụng cho các sản phẩm đã chọn!", HttpStatus.BAD_REQUEST),
+    VOUCHER_SHOP_MISMATCH(400, "Mã giảm giá không thuộc gian hàng của đơn hàng!", HttpStatus.BAD_REQUEST),
+    VOUCHER_INVALID_VALUE(400, "Giá trị mã giảm giá không hợp lệ!", HttpStatus.BAD_REQUEST),
+    VOUCHER_ALREADY_USED_CANNOT_EDIT(409, "Không thể sửa giá trị hoặc phạm vi của mã đã phát sinh lượt sử dụng!", HttpStatus.CONFLICT),
+
     ORDER_NOT_WAITING_SELLER_ACCEPTANCE(400, "Đơn hàng không ở trạng thái chờ Shop tiếp nhận!", HttpStatus.BAD_REQUEST),
     ORDER_DEADLINE_EXPIRED(400, "Đơn hàng đã quá thời hạn xử lý!", HttpStatus.BAD_REQUEST),
 

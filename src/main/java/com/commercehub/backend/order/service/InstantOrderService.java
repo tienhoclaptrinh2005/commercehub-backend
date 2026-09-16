@@ -28,6 +28,9 @@ import com.commercehub.backend.wallet.entity.Wallet;
 import com.commercehub.backend.wallet.repository.HoldReleaseRepository;
 import com.commercehub.backend.wallet.service.WalletService;
 import com.commercehub.backend.common.util.OrderCodeGenerator;
+import com.commercehub.backend.voucher.service.VoucherService;
+import com.commercehub.backend.voucher.service.VoucherService.VoucherApplication;
+import com.commercehub.backend.voucher.service.VoucherService.VoucherLine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,6 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Checkout INSTANT: giao hàng ngay, tiền buyer bị trừ và hold vào ví seller.
@@ -68,6 +72,7 @@ public class InstantOrderService {
     private final FeeCalculationService feeCalculationService;
     private final PlatformFeeLedgerRepository feeLedgerRepository;
     private final AssetDeliveryService assetDeliveryService;
+    private final VoucherService voucherService;
 
     @Transactional
     public Long checkoutInstant(Long buyerId, CheckoutRequest request) {
@@ -162,6 +167,15 @@ public class InstantOrderService {
             allocatedAssetsList.add(assetsToSell);
         }
 
+        List<VoucherLine> voucherLines = IntStream.range(0, processedVariants.size())
+                .mapToObj(index -> new VoucherLine(
+                        processedVariants.get(index).getProduct().getId(),
+                        processedVariants.get(index).getPrice().multiply(BigDecimal.valueOf(
+                                consolidatedItems.get(index).getQuantity()))))
+                .toList();
+        VoucherApplication voucher = voucherService.reserve(
+                buyerId, targetShop.getId(), request.getVoucherCode(), voucherLines);
+
         // ================= 2. TẠO ORDER =================
         // Thanh toán hiện tại luôn qua VÍ (nạp trước - mua sau).
         Order order = Order.builder()
@@ -170,7 +184,9 @@ public class InstantOrderService {
                 .shop(targetShop)
                 .deliveryType("INSTANT")
                 .subtotalAmount(orderTotalAmount)
-                .totalAmount(orderTotalAmount)
+                .voucherId(voucher.voucher() != null ? voucher.voucher().getId() : null)
+                .voucherDiscount(voucher.discountAmount())
+                .totalAmount(voucher.totalAmount())
                 .paymentMethod("WALLET")
                 .paymentStatus(OrderPaymentStatus.PAID)
                 .status(OrderStatus.DELIVERED)
@@ -182,8 +198,9 @@ public class InstantOrderService {
         order = orderRepository.save(order);
 
         // ================= 3. LUÂN CHUYỂN TIỀN =================
-        walletService.deductBalance(buyerId, orderTotalAmount, "ORDER_PAYMENT", order.getId(), "ORDER");
-        Wallet sellerWallet = walletService.systemHoldForSeller(sellerId, orderTotalAmount, order.getId());
+        walletService.deductBalance(buyerId, voucher.totalAmount(), "ORDER_PAYMENT", order.getId(), "ORDER");
+        Wallet sellerWallet = walletService.systemHoldForSeller(sellerId, voucher.totalAmount(), order.getId());
+        voucherService.confirmUsage(voucher, buyerId, order);
 
         orderStatusService.logStatusChange(order, null, OrderStatus.DELIVERED, buyerId, "Checkout tức thì - giao hàng ngay");
 
@@ -195,7 +212,9 @@ public class InstantOrderService {
             ProductVariant variant = processedVariants.get(i);
             List<DigitalAsset> assetsToSell = allocatedAssetsList.get(i);
 
-            BigDecimal lineTotal = variant.getPrice().multiply(new BigDecimal(itemReq.getQuantity()));
+            BigDecimal lineSubtotal = variant.getPrice().multiply(new BigDecimal(itemReq.getQuantity()));
+            BigDecimal lineDiscount = voucher.lineDiscounts().get(i);
+            BigDecimal lineTotal = lineSubtotal.subtract(lineDiscount);
 
             // Tính phí sàn cho dòng này (snapshot tại thời điểm thanh toán)
             FeeResult feeResult = feeCalculationService.calculateFee(lineTotal);
@@ -209,6 +228,8 @@ public class InstantOrderService {
                     .deliveryType("INSTANT")
                     .unitPrice(variant.getPrice())
                     .quantity(itemReq.getQuantity())
+                    .lineSubtotal(lineSubtotal)
+                    .voucherDiscount(lineDiscount)
                     .lineTotal(lineTotal)
                     .feeConfigId(feeResult.getFeeConfigId())
                     .feeRateSnapshot(feeResult.getFeeRateSnapshot())

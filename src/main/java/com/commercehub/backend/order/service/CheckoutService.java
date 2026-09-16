@@ -4,6 +4,7 @@ import com.commercehub.backend.common.exception.AppException;
 import com.commercehub.backend.common.exception.ErrorCode;
 import com.commercehub.backend.order.dto.request.CheckoutItemRequest;
 import com.commercehub.backend.order.dto.request.CheckoutRequest;
+import com.commercehub.backend.order.dto.request.CheckoutVoucherRequest;
 import com.commercehub.backend.order.entity.CheckoutAttempt;
 import com.commercehub.backend.order.repository.CheckoutAttemptRepository;
 import com.commercehub.backend.product.entity.ProductVariant;
@@ -90,12 +91,18 @@ public class CheckoutService {
             groupedItems.computeIfAbsent(groupKey, ignored -> new ArrayList<>()).add(item);
         }
 
+        Map<String, String> vouchersByGroup = normalizeVouchers(request.getVouchers());
+        if (!groupedItems.keySet().containsAll(vouchersByGroup.keySet())) {
+            throw new AppException(ErrorCode.VOUCHER_SHOP_MISMATCH);
+        }
+
         List<Long> createdOrderIds = new ArrayList<>();
         for (Map.Entry<String, List<CheckoutItemRequest>> entry : groupedItems.entrySet()) {
             CheckoutRequest subRequest = new CheckoutRequest();
             subRequest.setItems(entry.getValue());
             subRequest.setPaymentMethod(request.getPaymentMethod());
             subRequest.setCheckoutRequestId(attempt.getId());
+            subRequest.setVoucherCode(vouchersByGroup.get(entry.getKey()));
             // Không lưu key trực tiếp trên từng order: một checkout có thể tách
             // thành nhiều order. Liên kết chuẩn là orders.checkout_request_id.
             subRequest.setIdempotencyKey(null);
@@ -186,6 +193,12 @@ public class CheckoutService {
         Map<String, Object> canonical = new LinkedHashMap<>();
         canonical.put("paymentMethod", normalizePaymentMethod(request.getPaymentMethod()));
         canonical.put("items", canonicalItems);
+        List<String> canonicalVouchers = request.getVouchers() == null ? List.of() : request.getVouchers().stream()
+                .map(voucher -> voucher.getShopId() + "_" + voucher.getDeliveryType().trim().toUpperCase()
+                        + "_" + voucher.getCode().trim().toUpperCase())
+                .sorted()
+                .toList();
+        canonical.put("vouchers", canonicalVouchers);
 
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -199,6 +212,22 @@ public class CheckoutService {
 
     private String normalizePaymentMethod(String paymentMethod) {
         return paymentMethod == null ? "WALLET" : paymentMethod.trim().toUpperCase();
+    }
+
+    private Map<String, String> normalizeVouchers(List<CheckoutVoucherRequest> vouchers) {
+        if (vouchers == null || vouchers.isEmpty()) return Map.of();
+        Map<String, String> result = new TreeMap<>();
+        for (CheckoutVoucherRequest voucher : vouchers) {
+            String deliveryType = voucher.getDeliveryType().trim().toUpperCase();
+            if (!Set.of("INSTANT", "PRE_ORDER").contains(deliveryType)) {
+                throw new AppException(ErrorCode.INVALID_DELIVERY_TYPE);
+            }
+            String key = voucher.getShopId() + "_" + deliveryType;
+            if (result.putIfAbsent(key, voucher.getCode().trim().toUpperCase()) != null) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+        }
+        return result;
     }
 
     private List<Long> readOrderIds(String responseBody) {
