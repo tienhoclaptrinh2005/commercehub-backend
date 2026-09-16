@@ -49,21 +49,44 @@ public class ChatRedisSubscriptionWorker implements SmartLifecycle {
         while (running) {
             try (RedisConnection connection = connectionFactory.getConnection()) {
                 activeConnection = connection;
-                log.info("Chat Redis subscriber connected to channel {}", properties.getRedisChannel());
                 connection.subscribe(subscriber, channel);
+                if (!connection.isSubscribed()) {
+                    throw new IllegalStateException("Redis subscription was not registered");
+                }
+                log.info("Chat Redis subscriber connected to channel {}", properties.getRedisChannel());
+                keepSubscriptionAlive(connection);
             } catch (RuntimeException redisError) {
                 if (running) log.warn("Chat Redis subscriber unavailable; retrying in 5s: {}", redisError.getMessage());
             } finally {
                 activeConnection = null;
             }
-            if (running) {
-                try {
-                    Thread.sleep(5_000);
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+            if (running && !pauseBeforeReconnect()) return;
+        }
+    }
+
+    /**
+     * Lettuce registers SUBSCRIBE asynchronously and returns immediately. Keep
+     * the dedicated connection open until Redis reports that the subscription
+     * ended; otherwise try-with-resources would reconnect every five seconds.
+     */
+    private void keepSubscriptionAlive(RedisConnection connection) {
+        while (running && !connection.isClosed() && connection.isSubscribed()) {
+            try {
+                Thread.sleep(1_000);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
             }
+        }
+    }
+
+    private boolean pauseBeforeReconnect() {
+        try {
+            Thread.sleep(5_000);
+            return true;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
         }
     }
 
