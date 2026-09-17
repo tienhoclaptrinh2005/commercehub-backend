@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Service
@@ -353,6 +354,68 @@ public class DisputeService {
         dispute.setDeadlineAt(OffsetDateTime.now().plusHours(buyerConfirmationHours));
         dispute.setResolvedAt(null);
 
+        disputeRepository.save(dispute);
+
+        return disputeMapper.toResponse(dispute);
+    }
+
+    // =========================================================
+    // SELLER VOLUNTARY REFUND
+    // =========================================================
+
+    /**
+     * Seller chủ động hoàn 100% giá trị OrderItem đang khiếu nại.
+     *
+     * Luồng này đóng hồ sơ ngay, không cần Buyer xác nhận và không chuyển Admin.
+     * Khoản hoàn chỉ áp dụng cho OrderItem đang tranh chấp, không ảnh hưởng các
+     * mục hàng khác trong cùng đơn.
+     */
+    @Transactional
+    public DisputeResponse refundBySeller(
+            Long sellerId,
+            Long orderId,
+            Long orderItemId,
+            SellerRespondRequest request
+    ) {
+        validateSellerOwnership(sellerId, orderId, orderItemId);
+
+        OrderDispute dispute = getByOrderItemWithLock(orderItemId);
+
+        // Cho phép client retry an toàn nếu lần gọi trước đã commit nhưng mất response.
+        if (dispute.getStatus() == DisputeStatus.RESOLVED
+                && dispute.getResolution() == DisputeResolution.SELLER_REFUND
+                && sellerId.equals(dispute.getResolverId())) {
+            return disputeMapper.toResponse(dispute);
+        }
+
+        requireAnyStatus(
+                dispute,
+                DisputeStatus.OPEN,
+                DisputeStatus.WARRANTY_IN_PROGRESS
+        );
+
+        ErrorCode deadlineError = dispute.getStatus() == DisputeStatus.OPEN
+                ? ErrorCode.DISPUTE_SELLER_RESPONSE_DEADLINE_EXPIRED
+                : ErrorCode.DISPUTE_WARRANTY_DEADLINE_EXPIRED;
+        requireDeadlineActive(dispute, OffsetDateTime.now(), deadlineError);
+
+        BigDecimal refundAmount = holdReleaseService.refundDisputedItemBySeller(
+                orderItemId,
+                dispute.getUserId(),
+                sellerId,
+                orderId
+        );
+
+        applySellerResponse(dispute, request);
+        disputeRepository.linkFeeLedgerToDispute(orderItemId, dispute.getId());
+
+        dispute.setStatus(DisputeStatus.RESOLVED);
+        dispute.setResolution(DisputeResolution.SELLER_REFUND);
+        dispute.setResolvedBy(DisputeResolvedBy.SELLER);
+        dispute.setResolverId(sellerId);
+        dispute.setRefundAmount(refundAmount);
+        dispute.setResolutionNote("Seller chủ động hoàn 100% giá trị sản phẩm khiếu nại");
+        dispute.setResolvedAt(OffsetDateTime.now());
         disputeRepository.save(dispute);
 
         return disputeMapper.toResponse(dispute);

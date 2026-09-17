@@ -34,6 +34,8 @@ public class DisputeResponse {
 
     private String variantName;
 
+    private BigDecimal disputedAmount;
+
     private String buyerUsername;
 
     private String sellerUsername;

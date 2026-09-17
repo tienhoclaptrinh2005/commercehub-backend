@@ -20,6 +20,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.List;
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -146,6 +147,34 @@ class DisputeServiceTest {
         assertThat(dispute.getDeadlineAt()).isBetween(earliestDeadline, latestDeadline);
         verify(holdReleaseService).startWarranty(30L);
         verify(disputeRepository).save(dispute);
+    }
+
+    @Test
+    void sellerCanRefundOpenComplaint() {
+        assertSellerCanRefund(DisputeStatus.OPEN);
+    }
+
+    @Test
+    void sellerCanRefundComplaintDuringWarranty() {
+        assertSellerCanRefund(DisputeStatus.WARRANTY_IN_PROGRESS);
+    }
+
+    @Test
+    void sellerRefundRetryReturnsExistingResolutionWithoutDuplicatingMoneyMovement() {
+        OrderDispute dispute = dispute(DisputeStatus.RESOLVED);
+        dispute.setResolution(DisputeResolution.SELLER_REFUND);
+        dispute.setResolvedBy(DisputeResolvedBy.SELLER);
+        dispute.setResolverId(70L);
+        DisputeResponse response = mock(DisputeResponse.class);
+        when(disputeRepository.sellerOwnsOrderItem(70L, 20L, 30L)).thenReturn(true);
+        when(disputeRepository.findByOrderItemIdWithLock(30L)).thenReturn(Optional.of(dispute));
+        when(disputeMapper.toResponse(dispute)).thenReturn(response);
+
+        DisputeResponse result = service.refundBySeller(70L, 20L, 30L, null);
+
+        assertThat(result).isSameAs(response);
+        verifyNoInteractions(holdReleaseService);
+        verify(disputeRepository, never()).save(any());
     }
 
     @Test
@@ -335,6 +364,34 @@ class DisputeServiceTest {
                 .status(status)
                 .deadlineAt(OffsetDateTime.now().plusHours(1))
                 .build();
+    }
+
+    private void assertSellerCanRefund(DisputeStatus initialStatus) {
+        OrderDispute dispute = dispute(initialStatus);
+        DisputeResponse response = mock(DisputeResponse.class);
+        BigDecimal refundAmount = new BigDecimal("100.00");
+        when(disputeRepository.sellerOwnsOrderItem(70L, 20L, 30L)).thenReturn(true);
+        when(disputeRepository.findByOrderItemIdWithLock(30L)).thenReturn(Optional.of(dispute));
+        when(holdReleaseService.refundDisputedItemBySeller(30L, 40L, 70L, 20L))
+                .thenReturn(refundAmount);
+        when(disputeMapper.toResponse(dispute)).thenReturn(response);
+
+        DisputeResponse result = service.refundBySeller(
+                70L,
+                20L,
+                30L,
+                null
+        );
+
+        assertThat(result).isSameAs(response);
+        assertThat(dispute.getStatus()).isEqualTo(DisputeStatus.RESOLVED);
+        assertThat(dispute.getResolution()).isEqualTo(DisputeResolution.SELLER_REFUND);
+        assertThat(dispute.getResolvedBy()).isEqualTo(DisputeResolvedBy.SELLER);
+        assertThat(dispute.getResolverId()).isEqualTo(70L);
+        assertThat(dispute.getRefundAmount()).isEqualByComparingTo(refundAmount);
+        assertThat(dispute.getResolvedAt()).isNotNull();
+        verify(disputeRepository).linkFeeLedgerToDispute(30L, 10L);
+        verify(disputeRepository).save(dispute);
     }
 
     private void assertDeadlineError(

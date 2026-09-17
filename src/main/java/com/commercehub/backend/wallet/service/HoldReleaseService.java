@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -341,6 +342,37 @@ public class HoldReleaseService {
         );
     }
 
+    /**
+     * Seller chủ động hoàn tiền cho OrderItem đang khiếu nại.
+     * PostgreSQL vẫn là nguồn dữ liệu chính; toàn bộ cập nhật ví, hold, phí và
+     * trạng thái hoàn của item được thực hiện trong cùng transaction.
+     *
+     * @return số tiền thực tế đã hoàn cho Buyer
+     */
+    @Transactional
+    public BigDecimal refundDisputedItemBySeller(
+            Long orderItemId,
+            Long buyerId,
+            Long sellerId,
+            Long orderId
+    ) {
+        HoldRelease holdRelease = holdReleaseRepository
+                .findByOrderItemIdWithLock(orderItemId)
+                .orElseThrow(() -> new AppException(ErrorCode.HOLD_RELEASE_NOT_FOUND));
+
+        if (holdRelease.getStatus() != HoldReleaseStatus.FROZEN) {
+            throw new AppException(ErrorCode.HOLD_RELEASE_NOT_FROZEN);
+        }
+
+        refundBuyer(
+                holdRelease,
+                buyerId,
+                sellerId,
+                "Seller chủ động hoàn tiền dispute - Order ID " + orderId
+        );
+        return holdRelease.getHoldAmount();
+    }
+
     // =========================================================
     // 5. ADMIN RESOLVE DISPUTE
     //
@@ -397,61 +429,12 @@ public class HoldReleaseService {
         // =====================================================
 
         if (isBuyerWin) {
-
-            /*
-             * Gỡ tiền đang hold trong ví seller.
-             *
-             * refId = HoldRelease ID
-             * để đảm bảo mỗi HoldRelease được xử lý riêng.
-             */
-            walletService.systemCancelSellerHold(
-                    sellerId,
-                    hr.getHoldAmount(),
-                    hr.getId()
-            );
-
-            /*
-             * Hoàn tiền lại ví khả dụng của buyer.
-             */
-            walletService.systemCreditBalance(
+            refundBuyer(
+                    hr,
                     buyerId,
-                    hr.getHoldAmount(),
-                    "DISPUTE_REFUND",
-                    hr.getId(),
-                    "HOLD_RELEASE"
+                    sellerId,
+                    "Buyer thắng dispute - Order ID " + orderId
             );
-
-            /*
-             * Buyer thắng:
-             * giao dịch không hoàn tất thành công,
-             * platform không thu phí.
-             *
-             * Không sử dụng WAIVED.
-             */
-            if (hr.getFeeLedgerId() != null) {
-
-                platformFeeLedgerService.markAsCancelled(
-                        hr.getFeeLedgerId(),
-                        "Buyer thắng dispute - Order ID " + orderId,
-                        null
-                );
-            }
-
-            hr.setStatus(HoldReleaseStatus.REFUNDED);
-
-            holdReleaseRepository.save(hr);
-            markOrderItemRefunded(hr.getOrderItemId());
-            if (productRepository.incrementFailedDisputeCountByOrderItemId(hr.getOrderItemId()) != 1) {
-                log.warn("Không cập nhật được failed_dispute_count cho orderItem {}", hr.getOrderItemId());
-            }
-
-            log.info(
-                    "HoldRelease {}: BUYER thắng dispute, hoàn {} cho Buyer ID {}",
-                    holdReleaseId,
-                    hr.getHoldAmount(),
-                    buyerId
-            );
-
             return;
         }
 
@@ -486,6 +469,54 @@ public class HoldReleaseService {
     // =========================================================
     // PRIVATE HELPERS
     // =========================================================
+
+    private void refundBuyer(
+            HoldRelease holdRelease,
+            Long buyerId,
+            Long sellerId,
+            String feeCancellationReason
+    ) {
+        /*
+         * refId = HoldRelease ID giúp các bút toán ví giữ tính idempotent cho
+         * từng OrderItem, kể cả khi request bị retry.
+         */
+        walletService.systemCancelSellerHold(
+                sellerId,
+                holdRelease.getHoldAmount(),
+                holdRelease.getId()
+        );
+
+        walletService.systemCreditBalance(
+                buyerId,
+                holdRelease.getHoldAmount(),
+                "DISPUTE_REFUND",
+                holdRelease.getId(),
+                "HOLD_RELEASE"
+        );
+
+        if (holdRelease.getFeeLedgerId() != null) {
+            platformFeeLedgerService.markAsCancelled(
+                    holdRelease.getFeeLedgerId(),
+                    feeCancellationReason,
+                    null
+            );
+        }
+
+        holdRelease.setStatus(HoldReleaseStatus.REFUNDED);
+        holdReleaseRepository.save(holdRelease);
+        markOrderItemRefunded(holdRelease.getOrderItemId());
+
+        if (productRepository.incrementFailedDisputeCountByOrderItemId(holdRelease.getOrderItemId()) != 1) {
+            log.warn("Không cập nhật được failed_dispute_count cho orderItem {}", holdRelease.getOrderItemId());
+        }
+
+        log.info(
+                "HoldRelease {}: hoàn {} cho Buyer ID {} từ dispute",
+                holdRelease.getId(),
+                holdRelease.getHoldAmount(),
+                buyerId
+        );
+    }
 
     /**
      * remainingHoldSeconds phải tồn tại và > 0

@@ -76,6 +76,31 @@ public class SellerDisputeController {
     }
 
     /**
+     * Seller chủ động hoàn 100% giá trị mục hàng đang khiếu nại.
+     * Có thể thực hiện khi đang chờ phản hồi hoặc đang bảo hành.
+     */
+    @PostMapping("/orders/{orderId}/items/{itemId}/dispute-refund")
+    public ResponseEntity<ApiResponse<DisputeResponse>> refundDisputedItem(
+            @PathVariable Long orderId,
+            @PathVariable Long itemId,
+            @Valid
+            @RequestBody(required = false)
+            SellerRespondRequest request
+    ) {
+        Long sellerId = SecurityUtils.getCurrentUserId();
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã hoàn tiền sản phẩm khiếu nại cho buyer!",
+                disputeService.refundBySeller(
+                        sellerId,
+                        orderId,
+                        itemId,
+                        request
+                )
+        ));
+    }
+
+    /**
      * Seller từ chối/không xử lý được
      * và đưa lên Admin.
      */

@@ -110,4 +110,56 @@ class HoldReleaseServiceWithdrawalTest {
         assertThat(order.getPaymentStatus()).isEqualTo(OrderPaymentStatus.PARTIALLY_REFUNDED);
         verify(walletService).systemCreditBalance(40L, new BigDecimal("100.00"), "DISPUTE_REFUND", 10L, "HOLD_RELEASE");
     }
+
+    @Test
+    void sellerVoluntaryRefundUsesTheDisputedItemHoldAndRefundsBuyer() {
+        HoldReleaseRepository holdRepository = mock(HoldReleaseRepository.class);
+        OrderItemRepository itemRepository = mock(OrderItemRepository.class);
+        OrderRepository orderRepository = mock(OrderRepository.class);
+        WalletService walletService = mock(WalletService.class);
+        ProductRepository productRepository = mock(ProductRepository.class);
+        HoldReleaseService service = new HoldReleaseService(
+                holdRepository,
+                mock(HoldReleaseProcessor.class),
+                mock(PlatformFeeLedgerService.class),
+                walletService,
+                itemRepository,
+                orderRepository,
+                productRepository
+        );
+
+        Order order = Order.builder()
+                .id(20L)
+                .status(OrderStatus.DELIVERED)
+                .paymentStatus(OrderPaymentStatus.PAID)
+                .build();
+        OrderItem item = OrderItem.builder()
+                .id(30L)
+                .order(order)
+                .refundStatus("NONE")
+                .build();
+        HoldRelease holdRelease = HoldRelease.builder()
+                .id(10L)
+                .orderId(20L)
+                .orderItemId(30L)
+                .holdAmount(new BigDecimal("100.00"))
+                .status(HoldReleaseStatus.FROZEN)
+                .remainingHoldSeconds(120L)
+                .build();
+
+        when(holdRepository.findByOrderItemIdWithLock(30L)).thenReturn(Optional.of(holdRelease));
+        when(itemRepository.findByIdWithLock(30L)).thenReturn(Optional.of(item));
+        when(orderRepository.findByIdWithLock(20L)).thenReturn(Optional.of(order));
+        when(itemRepository.countByOrderId(20L)).thenReturn(1L);
+        when(itemRepository.countByOrderIdAndRefundStatus(20L, "REFUNDED")).thenReturn(1L);
+
+        BigDecimal refunded = service.refundDisputedItemBySeller(30L, 40L, 50L, 20L);
+
+        assertThat(refunded).isEqualByComparingTo("100.00");
+        assertThat(holdRelease.getStatus()).isEqualTo(HoldReleaseStatus.REFUNDED);
+        assertThat(item.getRefundStatus()).isEqualTo("REFUNDED");
+        assertThat(order.getPaymentStatus()).isEqualTo(OrderPaymentStatus.REFUNDED);
+        verify(walletService).systemCancelSellerHold(50L, new BigDecimal("100.00"), 10L);
+        verify(walletService).systemCreditBalance(40L, new BigDecimal("100.00"), "DISPUTE_REFUND", 10L, "HOLD_RELEASE");
+    }
 }

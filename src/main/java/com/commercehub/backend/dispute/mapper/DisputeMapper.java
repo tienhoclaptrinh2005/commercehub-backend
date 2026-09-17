@@ -28,6 +28,7 @@ public class DisputeMapper {
                 .shopName(dispute.getShop() == null ? null : dispute.getShop().getName())
                 .productName(dispute.getOrderItem() == null ? null : dispute.getOrderItem().getProductName())
                 .variantName(dispute.getOrderItem() == null ? null : dispute.getOrderItem().getVariantName())
+                .disputedAmount(dispute.getOrderItem() == null ? null : dispute.getOrderItem().getLineTotal())
                 .buyerUsername(dispute.getOrder() == null || dispute.getOrder().getUser() == null
                         ? null : dispute.getOrder().getUser().getUsername())
                 .sellerUsername(dispute.getShop() == null || dispute.getShop().getOwner() == null
