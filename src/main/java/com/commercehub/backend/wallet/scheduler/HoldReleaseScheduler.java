@@ -27,10 +27,10 @@ public class HoldReleaseScheduler {
     private final HoldReleaseService holdReleaseService;
 
     /**
-     * Chạy mỗi 5 phút để tìm và xử lý các khoản Hold đã đến hạn giải phóng.
-     * Cron: giây 0, mỗi 5 phút, mọi giờ, mọi ngày.
+     * Chạy mỗi 10 phút để tìm và xử lý các khoản Hold đã đến hạn giải phóng.
+     * Cron: giây 0, mỗi 10 phút, mọi giờ, mọi ngày.
      */
-    @Scheduled(cron = "0 */5 * * * *")
+    @Scheduled(cron = "0 */10 * * * *")
     @SchedulerLock(name = "holdRelease_releaseHeldFunds", lockAtMostFor = "10m", lockAtLeastFor = "30s")
     public void releaseHeldFunds() {
         log.info("⏰ [HoldReleaseScheduler] Bắt đầu quét các khoản hold đến hạn...");
