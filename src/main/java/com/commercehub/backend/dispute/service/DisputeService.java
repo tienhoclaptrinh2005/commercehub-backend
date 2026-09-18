@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
+import jakarta.persistence.EntityManager;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -33,6 +34,7 @@ public class DisputeService {
     private final OrderDisputeRepository disputeRepository;
     private final DisputeMapper disputeMapper;
     private final HoldReleaseService holdReleaseService;
+    private final EntityManager entityManager;
 
     /*
      * schema bắt buộc deadline_at NOT NULL.
@@ -135,9 +137,19 @@ public class DisputeService {
                         .build();
 
         dispute =
-                disputeRepository.save(dispute);
+                disputeRepository.saveAndFlush(dispute);
 
-        OrderDispute detailedDispute = disputeRepository.findById(dispute.getId()).orElse(dispute);
+        /*
+         * findById có thể trả lại ngay entity vừa persist từ persistence context.
+         * Khi đó các association insertable=false (order/orderItem/shop) vẫn chưa
+         * được hydrate và response tạo khiếu nại bị thiếu orderCode/disputedAmount.
+         * Truy vấn có EntityGraph + lock buộc Hibernate nạp đầy đủ ngữ cảnh tiền
+         * trước khi dựng response công khai.
+         */
+        Long disputeId = dispute.getId();
+        entityManager.clear();
+        OrderDispute detailedDispute = disputeRepository.findByIdWithLock(disputeId)
+                .orElseThrow(() -> new AppException(ErrorCode.RECORD_NOT_FOUND));
         return disputeMapper.toResponse(detailedDispute);
     }
 

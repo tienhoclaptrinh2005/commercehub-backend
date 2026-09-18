@@ -16,6 +16,7 @@ import com.commercehub.backend.wallet.service.HoldReleaseService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import jakarta.persistence.EntityManager;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -31,6 +32,7 @@ class DisputeServiceTest {
     private OrderDisputeRepository disputeRepository;
     private DisputeMapper disputeMapper;
     private HoldReleaseService holdReleaseService;
+    private EntityManager entityManager;
     private DisputeService service;
 
     @BeforeEach
@@ -38,7 +40,8 @@ class DisputeServiceTest {
         disputeRepository = mock(OrderDisputeRepository.class);
         disputeMapper = mock(DisputeMapper.class);
         holdReleaseService = mock(HoldReleaseService.class);
-        service = new DisputeService(disputeRepository, disputeMapper, holdReleaseService);
+        entityManager = mock(EntityManager.class);
+        service = new DisputeService(disputeRepository, disputeMapper, holdReleaseService, entityManager);
         ReflectionTestUtils.setField(service, "warrantyProcessingHours", 24L);
         ReflectionTestUtils.setField(service, "adminReviewHours", 72L);
     }
@@ -118,6 +121,53 @@ class DisputeServiceTest {
 
         verify(disputeRepository, never()).save(any());
         verifyNoInteractions(holdReleaseService);
+    }
+
+    @Test
+    void createComplaintMapsReloadedDetailsSoDisputedAmountIsNotLost() {
+        OrderDispute persisted = OrderDispute.builder()
+                .id(10L)
+                .orderId(20L)
+                .orderItemId(30L)
+                .userId(40L)
+                .shopId(50L)
+                .reason("Tài khoản không sử dụng được")
+                .status(DisputeStatus.OPEN)
+                .deadlineAt(OffsetDateTime.now().plusHours(24))
+                .build();
+        OrderDispute detailed = OrderDispute.builder()
+                .id(10L)
+                .orderId(20L)
+                .orderItemId(30L)
+                .userId(40L)
+                .shopId(50L)
+                .reason("Tài khoản không sử dụng được")
+                .status(DisputeStatus.OPEN)
+                .deadlineAt(OffsetDateTime.now().plusHours(24))
+                .build();
+        DisputeResponse response = DisputeResponse.builder()
+                .id(10L)
+                .disputedAmount(new BigDecimal("79000.00"))
+                .build();
+
+        when(disputeRepository.buyerOwnsOrderItem(40L, 20L, 30L)).thenReturn(true);
+        when(disputeRepository.existsByOrderItemId(30L)).thenReturn(false);
+        when(disputeRepository.findShopId(20L, 30L)).thenReturn(Optional.of(50L));
+        when(disputeRepository.saveAndFlush(any(OrderDispute.class))).thenReturn(persisted);
+        when(disputeRepository.findByIdWithLock(10L)).thenReturn(Optional.of(detailed));
+        when(disputeMapper.toResponse(detailed)).thenReturn(response);
+
+        DisputeResponse result = service.createComplaint(
+                40L,
+                20L,
+                30L,
+                new CreateDisputeRequest("Tài khoản không sử dụng được", List.of())
+        );
+
+        assertThat(result.getDisputedAmount()).isEqualByComparingTo("79000.00");
+        verify(entityManager).clear();
+        verify(disputeRepository).findByIdWithLock(10L);
+        verify(disputeMapper).toResponse(detailed);
     }
 
     @Test
