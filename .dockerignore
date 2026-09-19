@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.vscode
+target
+*.log
+.env
+.env.*
+!.env.example
+!.env.*.example
+secrets
+credentials
+diff.patch

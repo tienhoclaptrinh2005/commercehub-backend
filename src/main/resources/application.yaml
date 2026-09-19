@@ -145,6 +145,23 @@ storage:
     rate-limit-store: ${R2_RATE_LIMIT_STORE:memory}
     rate-limit-key-prefix: ${R2_RATE_LIMIT_KEY_PREFIX:commercehub:r2:presign}
 
+# Expose only non-sensitive health probes. PostgreSQL is required for readiness;
+# Redis is intentionally excluded because cache and chat can degrade gracefully.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+        add-additional-paths: true
+      group:
+        readiness:
+          include: readinessState,db
+
 #  server:
 #    port: ${SERVER_PORT:8080}
 #

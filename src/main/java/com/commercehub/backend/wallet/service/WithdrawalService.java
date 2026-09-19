@@ -62,8 +62,9 @@ public class WithdrawalService {
                         || !saved.getAccountName().equalsIgnoreCase(request.getAccountName().trim())) {
                     throw new AppException(ErrorCode.WITHDRAWAL_IDEMPOTENCY_CONFLICT);
                 }
-                log.info("Withdrawal idempotency hit — user {} key {} → đơn rút ID {}",
-                        userId, idempotencyKey, saved.getId());
+                // Idempotency keys are request credentials and must not appear in deployment logs.
+                log.info("Withdrawal idempotency hit — user {} → đơn rút ID {}",
+                        userId, saved.getId());
                 return walletMapper.toWithdrawalResponse(saved);
             }
         }

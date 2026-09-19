@@ -1,0 +1,79 @@
+name: commercehub-staging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ${POSTGRES_ENV_FILE:-/etc/commercehub/staging/postgres.env}
+    volumes:
+      - postgres-staging-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - commercehub-internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redis-staging-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - commercehub-internal
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: commercehub-backend:staging
+    restart: unless-stopped
+    env_file:
+      - ${BACKEND_ENV_FILE:-/etc/commercehub/staging/backend.env}
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - http://localhost:8080/readyz
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    networks:
+      - commercehub-internal
+
+volumes:
+  postgres-staging-data:
+  redis-staging-data:
+
+networks:
+  commercehub-internal:
+    driver: bridge

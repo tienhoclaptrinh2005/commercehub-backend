@@ -116,6 +116,10 @@ public class SecurityConfig {
                                 "/api/v1/auth/verify-email",
                                 "/ws/chat/**",
                                 "/api/v1/users/levels",
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/livez",
+                                "/readyz",
                                 "/error",
                                 "/api/v1/payments/sepay/webhook"
                         ).permitAll()
